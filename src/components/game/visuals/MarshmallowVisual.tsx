@@ -11,33 +11,68 @@ export function MarshmallowVisual() {
         <ellipse cx="55" cy="135" rx="32" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         <ellipse cx="55" cy="132" rx="25" ry="5" fill="hsl(var(--muted))" opacity="0.2" />
         
-        {/* Improved Marshmallow - soft, fluffy, organic shape */}
+        {/* Kawaii Marshmallow - cute pillowy shape with face */}
         <motion.g
           animate={{ y: [0, -3, 0] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
         >
-          {/* Main marshmallow body - soft cylinder with organic curves */}
+          {/* Soft pillowy marshmallow body */}
           <path 
-            d="M40 125 
-               Q37 120 39 110 
-               Q38 100 43 95 
-               Q45 88 55 85 
-               Q65 88 67 95 
-               Q72 100 71 110 
-               Q73 120 70 125 
-               Q65 130 55 132 
-               Q45 130 40 125Z" 
-            className="stick-line" 
-            fill="hsl(var(--background))" 
-            strokeWidth="2"
+            d="M38 125 
+               Q34 115 36 105 
+               Q35 95 41 88 
+               Q48 80 55 78 
+               Q62 80 69 88 
+               Q75 95 74 105 
+               Q76 115 72 125 
+               Q65 132 55 133 
+               Q45 132 38 125Z" 
+            stroke="hsl(30 20% 60%)" 
+            fill="hsl(40 30% 96%)" 
+            strokeWidth="1.5"
           />
-          {/* Top rounded cap */}
-          <ellipse cx="55" cy="88" rx="12" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          {/* Bottom squish (sitting on plate) */}
-          <ellipse cx="55" cy="128" rx="14" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          {/* Soft highlights */}
-          <path d="M45 100 Q43 108 45 115" stroke="hsl(var(--muted))" strokeWidth="2" fill="none" opacity="0.4" strokeLinecap="round" />
-          <ellipse cx="47" cy="95" rx="2" ry="3" fill="hsl(var(--muted))" opacity="0.3" />
+          {/* Top rounded dome */}
+          <ellipse cx="55" cy="80" rx="13" ry="6" stroke="hsl(30 20% 60%)" fill="hsl(40 30% 96%)" strokeWidth="1.5" />
+          {/* Bottom squish on plate */}
+          <ellipse cx="55" cy="130" rx="16" ry="5" stroke="hsl(30 20% 60%)" fill="hsl(40 30% 96%)" strokeWidth="1.5" />
+          {/* Soft highlight */}
+          <path d="M43 98 Q41 107 43 116" stroke="hsl(0 0% 100%)" strokeWidth="2.5" fill="none" opacity="0.6" strokeLinecap="round" />
+          
+          {/* Kawaii Face - nervous/excited expression */}
+          {/* Eyes - wide and looking at child */}
+          <circle cx="48" cy="105" r="3" fill="hsl(30 25% 25%)" />
+          <circle cx="62" cy="105" r="3" fill="hsl(30 25% 25%)" />
+          {/* Eye shines */}
+          <circle cx="47" cy="104" r="1.2" fill="hsl(0 0% 100%)" />
+          <circle cx="61" cy="104" r="1.2" fill="hsl(0 0% 100%)" />
+          
+          {/* Rosy cheeks */}
+          <motion.circle 
+            cx="42" cy="110" r="5" 
+            fill="hsl(350 70% 75%)" 
+            opacity="0.5"
+            animate={{ opacity: [0.4, 0.6, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          <motion.circle 
+            cx="68" cy="110" r="5" 
+            fill="hsl(350 70% 75%)" 
+            opacity="0.5"
+            animate={{ opacity: [0.4, 0.6, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          
+          {/* Nervous wavy mouth */}
+          <path d="M50 116 Q52 118 55 116 Q58 114 60 116" stroke="hsl(30 25% 25%)" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          
+          {/* Nervous sweat drop */}
+          <motion.path
+            d="M70 92 Q72 96 70 100 Q68 96 70 92Z"
+            fill="hsl(200 80% 70%)"
+            opacity="0.7"
+            animate={{ y: [0, 2, 0], opacity: [0.5, 0.8, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          />
         </motion.g>
         
         {/* Chibi Child - chin resting on hands, staring at marshmallow */}
@@ -116,9 +151,17 @@ export function MarshmallowVisual() {
           <circle cx="178" cy="58" r="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           <circle cx="186" cy="45" r="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           <ellipse cx="195" cy="28" rx="14" ry="12" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          {/* Two tiny marshmallows in thought */}
-          <rect x="186" y="23" width="6" height="9" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          <rect x="194" y="23" width="6" height="9" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          {/* Two tiny kawaii marshmallows in thought */}
+          {/* First mini marshmallow */}
+          <rect x="185" y="22" width="7" height="10" rx="3" stroke="hsl(30 20% 60%)" fill="hsl(40 30% 96%)" strokeWidth="1" />
+          <circle cx="187" cy="26" r="1" fill="hsl(30 25% 25%)" />
+          <circle cx="190" cy="26" r="1" fill="hsl(30 25% 25%)" />
+          <path d="M187 28 Q188.5 29 190 28" stroke="hsl(30 25% 25%)" strokeWidth="0.8" fill="none" strokeLinecap="round" />
+          {/* Second mini marshmallow */}
+          <rect x="194" y="22" width="7" height="10" rx="3" stroke="hsl(30 20% 60%)" fill="hsl(40 30% 96%)" strokeWidth="1" />
+          <circle cx="196" cy="26" r="1" fill="hsl(30 25% 25%)" />
+          <circle cx="199" cy="26" r="1" fill="hsl(30 25% 25%)" />
+          <path d="M196 28 Q197.5 29 199 28" stroke="hsl(30 25% 25%)" strokeWidth="0.8" fill="none" strokeLinecap="round" />
         </motion.g>
       </svg>
     </div>
