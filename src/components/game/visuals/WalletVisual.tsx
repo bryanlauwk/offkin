@@ -7,118 +7,132 @@ export function WalletVisual() {
         {/* Ground */}
         <ellipse cx="100" cy="150" rx="90" ry="10" fill="hsl(var(--muted))" opacity="0.2" />
         
-        {/* Chibi person looking at wallet dreamily */}
+        {/* Chibi person looking at wallet sadly */}
         <g>
           {/* Body */}
-          <ellipse cx="60" cy="125" rx="20" ry="15" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <ellipse cx="55" cy="125" rx="20" ry="15" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
           {/* Legs */}
-          <path d="M48 135 Q42 148 45 155" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M72 135 Q78 148 75 155" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+          <path d="M43 135 Q37 148 40 155" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+          <path d="M67 135 Q73 148 70 155" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
           
           {/* Arm holding wallet out */}
-          <path d="M78 120 Q95 115 105 110" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-          {/* Other arm at side */}
-          <path d="M42 120 Q35 130 38 140" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+          <path d="M73 118 Q90 112 102 108" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+          {/* Other arm drooped at side */}
+          <path d="M37 120 Q28 132 32 142" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
           
           {/* Hand holding wallet */}
-          <ellipse cx="105" cy="108" rx="7" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <ellipse cx="102" cy="106" rx="7" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
-          {/* Head - sad/longing expression */}
-          <ellipse cx="60" cy="85" rx="25" ry="22" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          {/* Head - large, sad */}
+          <ellipse cx="55" cy="82" rx="28" ry="25" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
-          {/* Hair */}
-          <path d="M38 70 Q42 50 60 45 Q78 50 82 70" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M42 65 Q50 55 60 50" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-          <path d="M78 65 Q70 55 60 50" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-          {/* Hair tuft */}
-          <path d="M60 45 Q62 38 65 43" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Hair - FILLED with warm brown */}
+          <path 
+            d="M30 68 Q35 45 55 40 Q75 45 80 68 L77 65 Q72 52 55 48 Q38 52 33 65 Z" 
+            className="hair-fill"
+            strokeWidth="2"
+          />
+          {/* Hair highlights */}
+          <path d="M40 52 Q50 45 60 48" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
+          {/* Droopy hair strand - matching mood */}
+          <path d="M55 40 Q54 33 58 38" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
           {/* Sad face looking at wallet */}
           <motion.g
-            animate={{ x: [0, 0.5, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            animate={{ y: [0, 1, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
           >
-            {/* Droopy eyes */}
-            <ellipse cx="52" cy="83" rx="5" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-            <ellipse cx="68" cy="83" rx="5" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            {/* Droopy sad eyes - half closed */}
+            <ellipse cx="45" cy="80" rx="7" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            <ellipse cx="65" cy="80" rx="7" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
             {/* Pupils looking at wallet */}
-            <circle cx="54" cy="83" r="2" className="stick-fill" />
-            <circle cx="70" cy="83" r="2" className="stick-fill" />
-            {/* Eye shine */}
-            <circle cx="53" cy="82" r="0.8" fill="hsl(var(--background))" />
-            <circle cx="69" cy="82" r="0.8" fill="hsl(var(--background))" />
+            <circle cx="48" cy="81" r="2.5" className="stick-fill" />
+            <circle cx="68" cy="81" r="2.5" className="stick-fill" />
+            {/* Eye shines - dim */}
+            <circle cx="47" cy="79" r="1" fill="hsl(var(--background))" />
+            <circle cx="67" cy="79" r="1" fill="hsl(var(--background))" />
+            {/* Droopy eyelids */}
+            <path d="M38 77 Q45 75 52 77" className="stick-line" fill="none" strokeWidth="1.5" />
+            <path d="M58 77 Q65 75 72 77" className="stick-line" fill="none" strokeWidth="1.5" />
           </motion.g>
           
-          {/* Sad eyebrows */}
-          <path d="M47 77 Q52 75 57 78" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M63 78 Q68 75 73 77" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+          {/* Very sad eyebrows - tilted up in middle */}
+          <path d="M38 72 Q45 68 52 74" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          <path d="M58 74 Q65 68 72 72" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
           {/* Small nose */}
-          <path d="M60 87 Q61 90 60 92" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M55 86 Q56 90 55 92" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
           
-          {/* Sad mouth */}
-          <path d="M54 98 Q60 95 66 98" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Sad wavering mouth */}
+          <path d="M48 100 Q55 95 62 100" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
-          {/* Tear */}
+          {/* Tear dropping */}
           <motion.path
-            d="M48 88 Q46 93 48 96 Q50 93 48 88Z"
+            d="M38 85 Q35 92 38 96 Q41 92 38 85Z"
             className="stick-line"
             fill="hsl(var(--background))"
-            strokeWidth="1"
-            animate={{ y: [0, 8], opacity: [1, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeIn" }}
+            strokeWidth="1.5"
+            animate={{ y: [0, 15], opacity: [1, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeIn" }}
           />
           
-          {/* Cheek blush */}
-          <ellipse cx="45" cy="90" rx="4" ry="2.5" fill="hsl(var(--muted))" opacity="0.35" />
-          <ellipse cx="75" cy="90" rx="4" ry="2.5" fill="hsl(var(--muted))" opacity="0.35" />
+          {/* Cheek blush - sad pink */}
+          <ellipse cx="35" cy="88" rx="5" ry="3" fill="hsl(0 60% 75%)" opacity="0.4" />
+          <ellipse cx="75" cy="88" rx="5" ry="3" fill="hsl(0 60% 75%)" opacity="0.4" />
         </g>
         
-        {/* Empty wallet */}
+        {/* Empty wallet - open and sad */}
         <g>
           {/* Wallet body - open */}
-          <rect x="105" y="95" width="40" height="30" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <rect x="105" y="92" width="42" height="32" rx="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
           {/* Wallet flap open */}
-          <path d="M105 95 L100 75 L140 75 L145 95" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <path d="M105 92 L100 70 L147 70 L152 92" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
-          {/* Empty card slots */}
-          <rect x="110" y="100" width="30" height="5" rx="1" stroke="hsl(var(--muted-foreground))" strokeDasharray="2" fill="none" strokeWidth="1" />
-          <rect x="110" y="108" width="30" height="5" rx="1" stroke="hsl(var(--muted-foreground))" strokeDasharray="2" fill="none" strokeWidth="1" />
-          <rect x="110" y="116" width="30" height="5" rx="1" stroke="hsl(var(--muted-foreground))" strokeDasharray="2" fill="none" strokeWidth="1" />
+          {/* Empty card slots - dashed to show emptiness */}
+          <rect x="110" y="98" width="32" height="6" rx="1" stroke="hsl(var(--muted-foreground))" strokeDasharray="3" fill="none" strokeWidth="1.5" />
+          <rect x="110" y="107" width="32" height="6" rx="1" stroke="hsl(var(--muted-foreground))" strokeDasharray="3" fill="none" strokeWidth="1.5" />
+          <rect x="110" y="116" width="32" height="5" rx="1" stroke="hsl(var(--muted-foreground))" strokeDasharray="3" fill="none" strokeWidth="1.5" />
           
-          {/* Fly buzzing around */}
+          {/* Cobweb in wallet */}
+          <path d="M142 95 Q150 102 146 112" stroke="hsl(var(--muted-foreground))" strokeWidth="0.8" fill="none" opacity="0.6" />
+          <path d="M146 95 Q152 105 142 112" stroke="hsl(var(--muted-foreground))" strokeWidth="0.8" fill="none" opacity="0.6" />
+          <path d="M144 95 L145 110" stroke="hsl(var(--muted-foreground))" strokeWidth="0.5" fill="none" opacity="0.4" />
+          
+          {/* Fly buzzing around empty wallet */}
           <motion.g
             animate={{
-              x: [0, 5, -3, 4, 0],
-              y: [0, -3, 3, -4, 0],
-              rotate: [0, 10, -8, 12, 0],
+              x: [0, 8, -5, 6, 0],
+              y: [0, -5, 4, -6, 0],
+              rotate: [0, 15, -10, 18, 0],
             }}
-            transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
           >
-            <ellipse cx="155" cy="85" rx="4" ry="3" className="stick-fill" />
-            <circle cx="155" cy="82" r="2" className="stick-fill" />
-            <ellipse cx="151" cy="84" rx="3" ry="1.5" className="stick-line" fill="none" strokeWidth="1" />
-            <ellipse cx="159" cy="84" rx="3" ry="1.5" className="stick-line" fill="none" strokeWidth="1" />
+            <ellipse cx="160" cy="82" rx="5" ry="4" className="stick-fill" />
+            <circle cx="160" cy="78" r="3" className="stick-fill" />
+            {/* Wings */}
+            <ellipse cx="155" cy="80" rx="4" ry="2" className="stick-line" fill="none" strokeWidth="1" />
+            <ellipse cx="165" cy="80" rx="4" ry="2" className="stick-line" fill="none" strokeWidth="1" />
+            {/* Tiny eyes */}
+            <circle cx="159" cy="77" r="0.8" fill="hsl(var(--background))" />
+            <circle cx="161" cy="77" r="0.8" fill="hsl(var(--background))" />
           </motion.g>
-          
-          {/* Cobweb in wallet corner */}
-          <path d="M142 100 Q148 105 145 112" stroke="hsl(var(--muted-foreground))" strokeWidth="0.5" fill="none" opacity="0.5" />
-          <path d="M145 100 Q148 108 142 112" stroke="hsl(var(--muted-foreground))" strokeWidth="0.5" fill="none" opacity="0.5" />
         </g>
         
-        {/* Dream bubble with money */}
+        {/* Dream bubble with money - what they wish they had */}
         <motion.g
-          animate={{ opacity: [0.5, 1, 0.5], y: [0, -2, 0] }}
+          animate={{ opacity: [0.5, 1, 0.5], y: [0, -3, 0] }}
           transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         >
-          <circle cx="35" cy="45" r="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
-          <circle cx="28" cy="35" r="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
-          <ellipse cx="18" cy="22" rx="14" ry="12" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          {/* Dollar signs */}
-          <text x="12" y="26" className="stick-fill" fontSize="8" fontWeight="bold">$</text>
-          <text x="20" y="24" className="stick-fill" fontSize="6" fontWeight="bold">$</text>
+          <circle cx="30" cy="50" r="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <circle cx="22" cy="38" r="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <ellipse cx="15" cy="22" rx="16" ry="14" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          {/* Dollar signs - dreamy */}
+          <text x="8" y="28" className="stick-fill" fontSize="10" fontWeight="bold">$</text>
+          <text x="18" y="24" className="stick-fill" fontSize="8" fontWeight="bold">$</text>
+          {/* Sparkles */}
+          <text x="24" y="18" className="stick-fill" fontSize="6">✦</text>
         </motion.g>
       </svg>
     </div>

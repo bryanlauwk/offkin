@@ -15,30 +15,30 @@ export function TimerVisual({ seconds, maxSeconds = 60 }: TimerVisualProps) {
         {/* Ground */}
         <ellipse cx="100" cy="155" rx="80" ry="8" fill="hsl(var(--muted))" opacity="0.2" />
         
-        {/* Large clock overhead */}
+        {/* Large clock overhead - looming */}
         <motion.g
-          animate={isNearEnd ? { scale: [1, 1.02, 1] } : {}}
-          transition={{ duration: 0.5, repeat: Infinity }}
+          animate={isNearEnd ? { scale: [1, 1.03, 1] } : {}}
+          transition={{ duration: 0.4, repeat: Infinity }}
         >
           {/* Clock face */}
-          <circle cx="100" cy="45" r="35" className="stick-line" fill="hsl(var(--background))" strokeWidth="2.5" />
+          <circle cx="100" cy="42" r="38" className="stick-line" fill="hsl(var(--background))" strokeWidth="2.5" />
           
           {/* Clock inner ring */}
-          <circle cx="100" cy="45" r="30" className="stick-line" fill="none" strokeWidth="1" opacity="0.3" />
+          <circle cx="100" cy="42" r="32" className="stick-line" fill="none" strokeWidth="1" opacity="0.3" />
           
           {/* Hour markers */}
           {[...Array(12)].map((_, i) => {
             const angle = (i * 30 - 90) * (Math.PI / 180);
-            const x1 = 100 + Math.cos(angle) * 26;
-            const y1 = 45 + Math.sin(angle) * 26;
-            const x2 = 100 + Math.cos(angle) * 30;
-            const y2 = 45 + Math.sin(angle) * 30;
+            const x1 = 100 + Math.cos(angle) * 28;
+            const y1 = 42 + Math.sin(angle) * 28;
+            const x2 = 100 + Math.cos(angle) * 32;
+            const y2 = 42 + Math.sin(angle) * 32;
             return (
               <line 
                 key={i}
                 x1={x1} y1={y1} x2={x2} y2={y2}
                 className="stick-line"
-                strokeWidth={i % 3 === 0 ? "2" : "1"}
+                strokeWidth={i % 3 === 0 ? "2.5" : "1.5"}
               />
             );
           })}
@@ -46,150 +46,170 @@ export function TimerVisual({ seconds, maxSeconds = 60 }: TimerVisualProps) {
           {/* Clock hands */}
           {/* Hour hand (slow) */}
           <line 
-            x1="100" y1="45" 
-            x2="100" y2="30" 
+            x1="100" y1="42" 
+            x2="100" y2="28" 
             className="stick-line" 
-            strokeWidth="2.5"
+            strokeWidth="3"
             strokeLinecap="round"
-            transform={`rotate(${(seconds / 3600) * 360} 100 45)`}
+            transform={`rotate(${(seconds / 3600) * 360} 100 42)`}
           />
           
           {/* Minute hand (progress based) */}
           <motion.line 
-            x1="100" y1="45" 
-            x2="100" y2="22" 
+            x1="100" y1="42" 
+            x2="100" y2="18" 
             className="stick-line" 
-            strokeWidth="2"
+            strokeWidth="2.5"
             strokeLinecap="round"
             animate={{ rotate: progress * 360 }}
-            style={{ transformOrigin: '100px 45px' }}
+            style={{ transformOrigin: '100px 42px' }}
           />
           
-          {/* Second hand */}
+          {/* Second hand - red, ticking */}
           <motion.line 
-            x1="100" y1="45" 
-            x2="100" y2="18" 
+            x1="100" y1="42" 
+            x2="100" y2="14" 
             stroke="hsl(var(--destructive))"
-            strokeWidth="1"
+            strokeWidth="1.5"
             strokeLinecap="round"
             animate={{ rotate: (seconds % 60) * 6 }}
-            style={{ transformOrigin: '100px 45px' }}
+            style={{ transformOrigin: '100px 42px' }}
           />
           
           {/* Center dot */}
-          <circle cx="100" cy="45" r="3" className="stick-fill" />
+          <circle cx="100" cy="42" r="4" className="stick-fill" />
         </motion.g>
         
         {/* Chibi person sitting and waiting */}
         <g>
           {/* Chair */}
-          <rect x="75" y="130" width="50" height="5" rx="1" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
-          <rect x="78" y="135" width="4" height="20" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          <rect x="118" y="135" width="4" height="20" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <rect x="72" y="130" width="56" height="6" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <rect x="76" y="136" width="5" height="20" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <rect x="119" y="136" width="5" height="20" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           
           {/* Body sitting */}
-          <ellipse cx="100" cy="122" rx="18" ry="12" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <ellipse cx="100" cy="120" rx="20" ry="14" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
           {/* Legs dangling */}
-          <path d="M88 130 Q82 140 85 150" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M112 130 Q118 140 115 150" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+          <path d="M86 130 Q80 142 84 152" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+          <path d="M114 130 Q120 142 116 152" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
           
-          {/* Arms - hands clasped in lap */}
-          <path d="M85 120 Q75 125 80 130" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-          <path d="M115 120 Q125 125 120 130" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Arms - hands clasped together nervously */}
+          <path d="M82 118 Q72 124 78 132" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          <path d="M118 118 Q128 124 122 132" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           {/* Clasped hands */}
-          <ellipse cx="100" cy="130" rx="8" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <ellipse cx="100" cy="132" rx="10" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
           {/* Head */}
-          <ellipse cx="100" cy="100" rx="22" ry="20" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <ellipse cx="100" cy="96" rx="24" ry="22" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
-          {/* Hair */}
-          <path d="M80 88 Q82 72 100 68 Q118 72 120 88" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-          <path d="M84 84 Q92 75 100 72" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M116 84 Q108 75 100 72" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+          {/* Hair - FILLED */}
+          <path 
+            d="M78 84 Q82 65 100 60 Q118 65 122 84 L118 82 Q112 70 100 68 Q88 70 82 82 Z" 
+            className="hair-fill"
+            strokeWidth="2"
+          />
+          {/* Hair highlights */}
+          <path d="M88 70 Q96 64 105 68" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
+          {/* Hair tuft */}
+          <path d="M100 60 Q102 54 106 58" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
           {/* Face expression changes based on progress */}
           {progress < 0.5 ? (
             // Calm waiting face
             <>
-              {/* Normal eyes */}
-              <ellipse cx="92" cy="98" rx="4" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-              <ellipse cx="108" cy="98" rx="4" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-              <circle cx="92" cy="99" r="2" className="stick-fill" />
-              <circle cx="108" cy="99" r="2" className="stick-fill" />
+              {/* Normal relaxed eyes */}
+              <ellipse cx="90" cy="94" rx="6" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+              <ellipse cx="110" cy="94" rx="6" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+              <circle cx="90" cy="95" r="3" className="stick-fill" />
+              <circle cx="110" cy="95" r="3" className="stick-fill" />
+              <circle cx="89" cy="93" r="1.2" fill="hsl(var(--background))" />
+              <circle cx="109" cy="93" r="1.2" fill="hsl(var(--background))" />
               {/* Neutral eyebrows */}
-              <path d="M87 92 Q92 90 97 92" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M103 92 Q108 90 113 92" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-              {/* Calm mouth */}
-              <path d="M95 108 Q100 110 105 108" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M84 86 Q90 84 96 86" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M104 86 Q110 84 116 86" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+              {/* Calm small smile */}
+              <path d="M94 106 Q100 109 106 106" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
             </>
           ) : progress < 0.83 ? (
-            // Getting antsy
+            // Getting antsy - fidgeting
             <>
-              {/* Slightly strained eyes */}
-              <motion.g animate={{ y: [0, -0.5, 0] }} transition={{ duration: 0.5, repeat: Infinity }}>
-                <ellipse cx="92" cy="98" rx="5" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-                <ellipse cx="108" cy="98" rx="5" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-                <circle cx="92" cy="98" r="2.5" className="stick-fill" />
-                <circle cx="108" cy="98" r="2.5" className="stick-fill" />
+              {/* Slightly strained wider eyes */}
+              <motion.g animate={{ y: [0, -0.5, 0] }} transition={{ duration: 0.4, repeat: Infinity }}>
+                <ellipse cx="90" cy="94" rx="7" ry="8" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+                <ellipse cx="110" cy="94" rx="7" ry="8" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+                <circle cx="90" cy="94" r="3.5" className="stick-fill" />
+                <circle cx="110" cy="94" r="3.5" className="stick-fill" />
+                <circle cx="89" cy="92" r="1.2" fill="hsl(var(--background))" />
+                <circle cx="109" cy="92" r="1.2" fill="hsl(var(--background))" />
               </motion.g>
               {/* Tense eyebrows */}
-              <path d="M86 91 Q92 88 98 92" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M102 92 Q108 88 114 91" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-              {/* Tense mouth */}
-              <path d="M94 108 Q100 106 106 108" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+              <path d="M82 85 Q90 81 98 87" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+              <path d="M102 87 Q110 81 118 85" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+              {/* Tense mouth - straight line */}
+              <path d="M92 106 Q100 104 108 106" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
             </>
           ) : (
-            // Almost there - excited/strained
+            // Almost there - very strained, determined
             <>
-              {/* Wide determined eyes */}
-              <motion.g animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 0.3, repeat: Infinity }}>
-                <ellipse cx="92" cy="98" rx="5" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-                <ellipse cx="108" cy="98" rx="5" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-                <circle cx="92" cy="98" r="3" className="stick-fill" />
-                <circle cx="108" cy="98" r="3" className="stick-fill" />
-                <circle cx="91" cy="96" r="1" fill="hsl(var(--background))" />
-                <circle cx="107" cy="96" r="1" fill="hsl(var(--background))" />
+              {/* Wide intense eyes */}
+              <motion.g animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 0.25, repeat: Infinity }}>
+                <ellipse cx="90" cy="94" rx="8" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+                <ellipse cx="110" cy="94" rx="8" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+                <circle cx="90" cy="94" r="4" className="stick-fill" />
+                <circle cx="110" cy="94" r="4" className="stick-fill" />
+                <circle cx="88" cy="91" r="1.5" fill="hsl(var(--background))" />
+                <circle cx="108" cy="91" r="1.5" fill="hsl(var(--background))" />
               </motion.g>
-              {/* Determined eyebrows */}
-              <path d="M85 90 Q92 86 99 91" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-              <path d="M101 91 Q108 86 115 90" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-              {/* Gritted teeth smile */}
-              <path d="M93 108 Q100 112 107 108" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+              {/* Very determined eyebrows - angled intensely */}
+              <path d="M80 84 Q90 78 100 86" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+              <path d="M100 86 Q110 78 120 84" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+              {/* Gritted teeth smile - almost there! */}
+              <path d="M92 106 Q100 111 108 106" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
             </>
           )}
           
           {/* Nose */}
-          <path d="M100 102 Q101 105 100 107" className="stick-line" fill="none" strokeWidth="1" strokeLinecap="round" />
+          <path d="M100 100 Q101 103 100 105" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
           
           {/* Cheek blush */}
-          <ellipse cx="84" cy="104" rx="4" ry="2.5" fill="hsl(var(--muted))" opacity="0.35" />
-          <ellipse cx="116" cy="104" rx="4" ry="2.5" fill="hsl(var(--muted))" opacity="0.35" />
+          <ellipse cx="80" cy="100" rx="5" ry="3" fill="hsl(0 60% 75%)" opacity="0.4" />
+          <ellipse cx="120" cy="100" rx="5" ry="3" fill="hsl(0 60% 75%)" opacity="0.4" />
           
-          {/* Sweat drop if past halfway */}
+          {/* Sweat drops if past halfway - increasing with progress */}
           {progress > 0.5 && (
             <motion.path
-              d="M78 95 Q76 100 78 103 Q80 100 78 95Z"
+              d="M74 90 Q72 96 74 100 Q76 96 74 90Z"
+              className="stick-line"
+              fill="hsl(var(--background))"
+              strokeWidth="1.5"
+              animate={{ y: [0, 8], opacity: [1, 0] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "easeIn" }}
+            />
+          )}
+          {progress > 0.7 && (
+            <motion.path
+              d="M126 88 Q124 94 126 98 Q128 94 126 88Z"
               className="stick-line"
               fill="hsl(var(--background))"
               strokeWidth="1"
-              animate={{ y: [0, 5], opacity: [1, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "easeIn" }}
+              animate={{ y: [0, 6], opacity: [1, 0] }}
+              transition={{ duration: 1, repeat: Infinity, ease: "easeIn", delay: 0.3 }}
             />
           )}
         </g>
         
-        {/* Tick marks / time passing indicators */}
+        {/* Tick tock text indicators */}
         {progress > 0.3 && (
           <motion.text
-            x="155"
-            y="100"
+            x="158"
+            y="98"
             className="stick-fill"
-            fontSize="10"
+            fontSize="11"
             fontStyle="italic"
             opacity="0.5"
-            animate={{ opacity: [0.3, 0.6, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity }}
+            animate={{ opacity: [0.3, 0.7, 0.3] }}
+            transition={{ duration: 1.8, repeat: Infinity }}
           >
             tick...
           </motion.text>
@@ -197,14 +217,14 @@ export function TimerVisual({ seconds, maxSeconds = 60 }: TimerVisualProps) {
         
         {progress > 0.6 && (
           <motion.text
-            x="40"
-            y="95"
+            x="35"
+            y="92"
             className="stick-fill"
-            fontSize="10"
+            fontSize="11"
             fontStyle="italic"
             opacity="0.5"
-            animate={{ opacity: [0.3, 0.6, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+            animate={{ opacity: [0.3, 0.7, 0.3] }}
+            transition={{ duration: 1.8, repeat: Infinity, delay: 0.6 }}
           >
             tock...
           </motion.text>

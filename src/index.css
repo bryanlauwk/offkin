@@ -147,6 +147,17 @@
     stroke: none;
   }
 
+  /* Hair fill style - warm brown for chibi characters */
+  .hair-fill {
+    fill: hsl(30 25% 35%);
+    stroke: hsl(var(--foreground));
+  }
+
+  .dark .hair-fill {
+    fill: hsl(30 20% 25%);
+    stroke: hsl(var(--foreground));
+  }
+
   /* Wobbly hand-drawn effect */
   .wobbly {
     filter: url(#wobbly);

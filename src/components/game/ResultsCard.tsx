@@ -12,97 +12,189 @@ interface ResultsCardProps {
   onRestart: () => void;
 }
 
-// Chibi avatar based on archetype
+// Improved chibi avatar based on archetype with filled hair
 function ChibiAvatar({ archetypeId }: { archetypeId: string }) {
   if (archetypeId === 'toddler') {
     // Impulsive - fallen/chaotic chibi
     return (
-      <svg viewBox="0 0 80 80" className="w-20 h-20">
-        {/* Fallen body */}
-        <ellipse cx="45" cy="55" rx="15" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" transform="rotate(-20 45 55)" />
+      <svg viewBox="0 0 80 80" className="w-24 h-24">
+        {/* Fallen body - twisted */}
+        <ellipse cx="48" cy="55" rx="16" ry="11" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" transform="rotate(-25 48 55)" />
         {/* Legs splayed */}
-        <path d="M55 60 Q65 55 70 62" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        <path d="M58 65 Q65 70 68 75" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        {/* Arms */}
-        <path d="M35 50 Q25 45 20 50" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        <path d="M38 58 Q30 62 25 60" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        <path d="M58 62 Q70 56 75 65" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M62 68 Q70 75 72 80" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+        {/* Arms flailing */}
+        <path d="M38 50 Q25 42 18 48" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M40 60 Q28 65 22 62" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
         {/* Head */}
-        <ellipse cx="32" cy="38" rx="16" ry="14" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
-        {/* Hair */}
-        <path d="M18 30 Q22 18 32 15 Q42 18 46 30" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        {/* Dizzy eyes */}
-        <circle cx="26" cy="36" r="3" className="stick-line" fill="none" strokeWidth="1.5" />
-        <circle cx="38" cy="36" r="3" className="stick-line" fill="none" strokeWidth="1.5" />
-        {/* Swirl in eyes */}
-        <path d="M25 35 Q27 37 25 37" className="stick-line" fill="none" strokeWidth="1" />
-        <path d="M37 35 Q39 37 37 37" className="stick-line" fill="none" strokeWidth="1" />
-        {/* Dazed mouth */}
-        <path d="M28 46 Q32 44 36 46" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-        {/* Stars */}
-        <text x="48" y="25" className="stick-fill" fontSize="8">✱</text>
-        <text x="12" y="50" className="stick-fill" fontSize="6">✱</text>
+        <ellipse cx="32" cy="36" rx="18" ry="16" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        {/* Hair - FILLED */}
+        <path 
+          d="M16 28 Q20 14 32 10 Q44 14 48 28 L45 26 Q40 18 32 16 Q24 18 19 26 Z" 
+          className="hair-fill"
+          strokeWidth="2"
+        />
+        {/* Messy strands from fall */}
+        <path d="M18 24 Q14 18 20 14" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        <path d="M46 22 Q52 16 48 12" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        {/* Dizzy spiral eyes */}
+        <motion.g
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          style={{ transformOrigin: '26px 34px' }}
+        >
+          <path d="M24 34 Q26 32 28 34 Q26 36 24 34" className="stick-line" fill="none" strokeWidth="1.5" />
+        </motion.g>
+        <motion.g
+          animate={{ rotate: [0, -360] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          style={{ transformOrigin: '38px 34px' }}
+        >
+          <path d="M36 34 Q38 32 40 34 Q38 36 36 34" className="stick-line" fill="none" strokeWidth="1.5" />
+        </motion.g>
+        {/* Dazed wavy mouth */}
+        <path d="M26 46 Q29 44 32 46 Q35 44 38 46" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+        {/* Stars spinning */}
+        <motion.text 
+          x="50" y="22" 
+          className="stick-fill" 
+          fontSize="10"
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+          style={{ transformOrigin: '50px 22px' }}
+        >✱</motion.text>
+        <motion.text 
+          x="10" y="50" 
+          className="stick-fill" 
+          fontSize="8"
+          animate={{ rotate: [0, -360] }}
+          transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+          style={{ transformOrigin: '10px 50px' }}
+        >✱</motion.text>
+        {/* Cheek blush */}
+        <ellipse cx="22" cy="40" rx="4" ry="2.5" fill="hsl(0 60% 75%)" opacity="0.5" />
+        <ellipse cx="42" cy="40" rx="4" ry="2.5" fill="hsl(0 60% 75%)" opacity="0.5" />
       </svg>
     );
   }
 
   if (archetypeId === 'monk') {
-    // Zen master - peaceful meditation pose
+    // Zen master - peaceful meditation pose with glow
     return (
-      <svg viewBox="0 0 80 80" className="w-20 h-20">
+      <svg viewBox="0 0 80 80" className="w-24 h-24">
+        {/* Peaceful glow behind */}
+        <motion.circle 
+          cx="40" cy="40" r="35" 
+          fill="hsl(var(--muted))" 
+          opacity="0.15"
+          animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.2, 0.1] }}
+          transition={{ duration: 3, repeat: Infinity }}
+        />
         {/* Sitting body */}
-        <ellipse cx="40" cy="58" rx="18" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        <ellipse cx="40" cy="58" rx="20" ry="12" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         {/* Crossed legs */}
-        <path d="M28 62 Q25 68 30 72" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        <path d="M52 62 Q55 68 50 72" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        {/* Arms in meditation pose */}
-        <path d="M26 55 Q20 60 25 65" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        <path d="M54 55 Q60 60 55 65" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        {/* Hands together */}
-        <ellipse cx="40" cy="62" rx="6" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+        <path d="M26 64 Q22 72 28 76" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M54 64 Q58 72 52 76" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+        {/* Arms in meditation mudra pose */}
+        <path d="M24 55 Q16 62 22 70" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        <path d="M56 55 Q64 62 58 70" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        {/* Hands together in lap */}
+        <ellipse cx="40" cy="66" rx="8" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
         {/* Head */}
-        <ellipse cx="40" cy="38" rx="16" ry="14" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
-        {/* Peaceful closed eyes */}
-        <path d="M32 36 Q36 33 40 36" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M40 36 Q44 33 48 36" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-        {/* Serene smile */}
-        <path d="M35 44 Q40 47 45 44" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-        {/* Halo/glow */}
-        <circle cx="40" cy="20" r="8" className="stick-line" fill="none" strokeWidth="1" strokeDasharray="2" opacity="0.5" />
-        {/* Cheek blush */}
-        <ellipse cx="30" cy="40" rx="3" ry="2" fill="hsl(var(--muted))" opacity="0.35" />
-        <ellipse cx="50" cy="40" rx="3" ry="2" fill="hsl(var(--muted))" opacity="0.35" />
+        <ellipse cx="40" cy="35" rx="18" ry="16" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        {/* Hair - FILLED, neat and calm */}
+        <path 
+          d="M24 28 Q28 14 40 10 Q52 14 56 28 L53 26 Q48 18 40 16 Q32 18 27 26 Z" 
+          className="hair-fill"
+          strokeWidth="2"
+        />
+        {/* Serene closed eyes - upward curves showing contentment */}
+        <path d="M32 33 Q36 29 40 33" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        <path d="M40 33 Q44 29 48 33" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        {/* Peaceful serene smile */}
+        <path d="M34 43 Q40 48 46 43" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        {/* Halo/enlightenment circle */}
+        <motion.circle 
+          cx="40" cy="5" r="8" 
+          className="stick-line" 
+          fill="none" 
+          strokeWidth="1.5" 
+          strokeDasharray="3"
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+          style={{ transformOrigin: '40px 5px' }}
+        />
+        {/* Cheek blush - subtle peace */}
+        <ellipse cx="28" cy="38" rx="4" ry="2.5" fill="hsl(0 60% 75%)" opacity="0.35" />
+        <ellipse cx="52" cy="38" rx="4" ry="2.5" fill="hsl(0 60% 75%)" opacity="0.35" />
+        {/* Small sparkles of zen */}
+        <motion.text 
+          x="12" y="25" 
+          className="stick-fill" 
+          fontSize="6"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >✦</motion.text>
+        <motion.text 
+          x="62" y="22" 
+          className="stick-fill" 
+          fontSize="5"
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 2.5, repeat: Infinity, delay: 0.5 }}
+        >✦</motion.text>
       </svg>
     );
   }
 
-  // Default - balanced/normal chibi
+  // Default - balanced/normal happy chibi
   return (
-    <svg viewBox="0 0 80 80" className="w-20 h-20">
-      {/* Body */}
-      <ellipse cx="40" cy="58" rx="15" ry="12" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+    <svg viewBox="0 0 80 80" className="w-24 h-24">
+      {/* Body standing confidently */}
+      <ellipse cx="40" cy="56" rx="16" ry="12" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
       {/* Legs */}
-      <path d="M32 66 Q28 74 32 78" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-      <path d="M48 66 Q52 74 48 78" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-      {/* Arms at sides */}
-      <path d="M28 55 Q20 60 22 68" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-      <path d="M52 55 Q60 60 58 68" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+      <path d="M32 65 Q28 74 32 80" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M48 65 Q52 74 48 80" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+      {/* Arms - one up in friendly wave, one at side */}
+      <path d="M26 52 Q18 48 14 38" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M54 52 Q62 58 60 68" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
+      {/* Waving hand */}
+      <motion.ellipse 
+        cx="12" cy="36" rx="5" ry="4" 
+        className="stick-line" 
+        fill="hsl(var(--background))" 
+        strokeWidth="2"
+        animate={{ rotate: [-10, 10, -10] }}
+        transition={{ duration: 0.5, repeat: Infinity }}
+        style={{ transformOrigin: '12px 36px' }}
+      />
       {/* Head */}
-      <ellipse cx="40" cy="35" rx="18" ry="16" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
-      {/* Hair */}
-      <path d="M24 28 Q28 15 40 12 Q52 15 56 28" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-      <path d="M28 24 Q35 18 42 16" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-      {/* Happy eyes */}
-      <ellipse cx="33" cy="33" rx="4" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-      <ellipse cx="47" cy="33" rx="4" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-      <circle cx="33" cy="34" r="2" className="stick-fill" />
-      <circle cx="47" cy="34" r="2" className="stick-fill" />
-      <circle cx="32" cy="32" r="0.8" fill="hsl(var(--background))" />
-      <circle cx="46" cy="32" r="0.8" fill="hsl(var(--background))" />
-      {/* Smile */}
-      <path d="M35 43 Q40 47 45 43" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+      <ellipse cx="40" cy="32" rx="20" ry="18" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+      {/* Hair - FILLED */}
+      <path 
+        d="M22 24 Q26 8 40 5 Q54 8 58 24 L55 22 Q50 14 40 12 Q30 14 25 22 Z" 
+        className="hair-fill"
+        strokeWidth="2"
+      />
+      {/* Hair highlights */}
+      <path d="M30 14 Q38 8 46 12" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
+      {/* Hair tuft */}
+      <path d="M40 5 Q42 0 46 4" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+      {/* Happy bright eyes */}
+      <ellipse cx="32" cy="30" rx="6" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+      <ellipse cx="48" cy="30" rx="6" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+      <circle cx="32" cy="31" r="3" className="stick-fill" />
+      <circle cx="48" cy="31" r="3" className="stick-fill" />
+      {/* Eye shines */}
+      <circle cx="30" cy="29" r="1.5" fill="hsl(var(--background))" />
+      <circle cx="46" cy="29" r="1.5" fill="hsl(var(--background))" />
+      {/* Happy eyebrows */}
+      <path d="M26 22 Q32 20 38 23" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M42 23 Q48 20 54 22" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+      {/* Big happy smile */}
+      <path d="M32 42 Q40 50 48 42" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
       {/* Cheek blush */}
-      <ellipse cx="27" cy="38" rx="3" ry="2" fill="hsl(var(--muted))" opacity="0.35" />
-      <ellipse cx="53" cy="38" rx="3" ry="2" fill="hsl(var(--muted))" opacity="0.35" />
+      <ellipse cx="24" cy="36" rx="4" ry="2.5" fill="hsl(0 60% 75%)" opacity="0.4" />
+      <ellipse cx="56" cy="36" rx="4" ry="2.5" fill="hsl(0 60% 75%)" opacity="0.4" />
     </svg>
   );
 }

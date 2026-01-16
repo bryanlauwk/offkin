@@ -25,69 +25,93 @@ export function BatteryVisual() {
           <ellipse cx="85" cy="92" rx="6" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
           {/* Head */}
-          <ellipse cx="70" cy="75" rx="28" ry="25" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <ellipse cx="70" cy="72" rx="30" ry="26" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
-          {/* Hair */}
-          <path d="M45 60 Q50 40 70 35 Q90 40 95 60" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M50 55 Q55 48 65 45" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-          <path d="M90 55 Q85 48 75 45" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-          {/* Hair tuft */}
-          <path d="M70 35 Q72 28 75 33" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Hair - FILLED with warm brown and messy stressed strands */}
+          <path 
+            d="M42 58 Q45 35 70 30 Q95 35 98 58 L95 55 Q90 42 70 38 Q50 42 47 55 Z" 
+            className="hair-fill"
+            strokeWidth="2"
+          />
+          {/* Messy stress strands */}
+          <path d="M48 50 Q45 42 50 38" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          <path d="M92 50 Q95 42 90 38" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Hair highlights */}
+          <path d="M55 42 Q65 35 75 38" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
+          {/* Hair tuft - panicked */}
+          <motion.path 
+            d="M70 30 Q72 22 76 28"
+            className="stick-line" 
+            fill="none" 
+            strokeWidth="2.5" 
+            strokeLinecap="round"
+            animate={{ rotate: [-5, 5, -5] }}
+            style={{ transformOrigin: '70px 30px' }}
+            transition={{ duration: 0.3, repeat: Infinity }}
+          />
           
           {/* Worried face looking at phone */}
           <motion.g
             animate={{ y: [0, 1, 0] }}
             transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut" }}
           >
-            {/* Eyes - wide with worry */}
-            <ellipse cx="60" cy="72" rx="6" ry="8" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-            <ellipse cx="80" cy="72" rx="6" ry="8" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-            {/* Pupils - looking up at phone */}
-            <circle cx="60" cy="70" r="3" className="stick-fill" />
-            <circle cx="80" cy="70" r="3" className="stick-fill" />
-            {/* Eye shine */}
-            <circle cx="59" cy="68" r="1" fill="hsl(var(--background))" />
-            <circle cx="79" cy="68" r="1" fill="hsl(var(--background))" />
+            {/* Eyes - WIDE with worry, larger */}
+            <ellipse cx="58" cy="70" rx="8" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            <ellipse cx="82" cy="70" rx="8" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            {/* Tiny pupils - looking up at phone in panic */}
+            <circle cx="58" cy="68" r="3" className="stick-fill" />
+            <circle cx="82" cy="68" r="3" className="stick-fill" />
+            {/* Eye shines */}
+            <circle cx="56" cy="66" r="1.5" fill="hsl(var(--background))" />
+            <circle cx="80" cy="66" r="1.5" fill="hsl(var(--background))" />
           </motion.g>
           
-          {/* Worried eyebrows */}
-          <path d="M54 62 Q60 58 66 64" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M74 64 Q80 58 86 62" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+          {/* Worried eyebrows - very angled */}
+          <path d="M50 58 Q58 52 66 60" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          <path d="M74 60 Q82 52 90 58" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
           {/* Nose */}
           <path d="M70 76 Q72 80 70 82" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
           
-          {/* Worried mouth - open */}
-          <ellipse cx="70" cy="90" rx="5" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          {/* Worried mouth - open grimace */}
+          <ellipse cx="70" cy="90" rx="7" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          {/* Teeth showing in grimace */}
+          <line x1="65" y1="90" x2="75" y2="90" className="stick-line" strokeWidth="1" />
           
-          {/* Sweat drops */}
+          {/* Multiple sweat drops */}
           <motion.g
-            animate={{ y: [0, 5, 0], opacity: [1, 0.5, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            animate={{ y: [0, 8, 0], opacity: [1, 0, 1] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeIn" }}
           >
-            <path d="M42 65 Q40 70 42 72 Q44 70 42 65Z" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
+            <path d="M40 62 Q38 70 40 74 Q42 70 40 62Z" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           </motion.g>
           <motion.g
-            animate={{ y: [0, 5, 0], opacity: [1, 0.5, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+            animate={{ y: [0, 8, 0], opacity: [1, 0, 1] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeIn", delay: 0.4 }}
           >
-            <path d="M98 70 Q96 75 98 77 Q100 75 98 70Z" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
+            <path d="M100 68 Q98 76 100 80 Q102 76 100 68Z" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          </motion.g>
+          <motion.g
+            animate={{ y: [0, 6, 0], opacity: [1, 0, 1] }}
+            transition={{ duration: 1, repeat: Infinity, ease: "easeIn", delay: 0.2 }}
+          >
+            <path d="M44 75 Q42 80 44 83 Q46 80 44 75Z" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
           </motion.g>
           
-          {/* Cheek blush */}
-          <ellipse cx="52" cy="80" rx="4" ry="2.5" fill="hsl(var(--muted))" opacity="0.35" />
-          <ellipse cx="88" cy="80" rx="4" ry="2.5" fill="hsl(var(--muted))" opacity="0.35" />
+          {/* Cheek blush - stressed */}
+          <ellipse cx="48" cy="80" rx="5" ry="3" fill="hsl(0 60% 75%)" opacity="0.4" />
+          <ellipse cx="92" cy="80" rx="5" ry="3" fill="hsl(0 60% 75%)" opacity="0.4" />
         </g>
         
         {/* Phone being held - larger and more detailed */}
         <g>
-          <rect x="55" y="45" width="30" height="50" rx="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <rect x="55" y="42" width="30" height="52" rx="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="2.5" />
           {/* Screen */}
-          <rect x="58" y="50" width="24" height="38" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
+          <rect x="58" y="48" width="24" height="40" fill="hsl(var(--muted))" opacity="0.3" />
           
           {/* Battery icon on screen */}
-          <rect x="63" y="55" width="14" height="24" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          <rect x="67" y="52" width="6" height="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
+          <rect x="62" y="54" width="16" height="26" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          <rect x="67" y="50" width="6" height="4" rx="1" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           
           {/* Battery level - 1% red sliver with pulse */}
           <motion.rect
@@ -97,7 +121,7 @@ export function BatteryVisual() {
             height="2"
             fill="hsl(var(--destructive))"
             animate={{ opacity: [1, 0.3, 1] }}
-            transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }}
           />
           
           {/* 1% text */}
@@ -105,10 +129,11 @@ export function BatteryVisual() {
             x="70" 
             y="70" 
             className="stick-fill" 
-            fontSize="6" 
+            fontSize="8" 
+            fontWeight="bold"
             textAnchor="middle"
             animate={{ opacity: [1, 0.3, 1] }}
-            transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }}
           >
             1%
           </motion.text>
@@ -116,17 +141,28 @@ export function BatteryVisual() {
         
         {/* Lightning bolt / charging desire */}
         <motion.g
-          animate={{ opacity: [0, 1, 0], scale: [0.8, 1.1, 0.8] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          animate={{ opacity: [0, 1, 0], scale: [0.8, 1.2, 0.8] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
         >
-          <path d="M145 50 L140 65 L148 63 L142 80 L155 58 L147 60 L155 50Z" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <path d="M145 48 L138 68 L148 64 L140 88 L158 58 L148 62 L158 48Z" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         </motion.g>
         
         {/* Outlet on wall - what they want */}
         <g>
-          <rect x="160" y="100" width="25" height="35" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
-          <rect x="165" y="110" width="5" height="8" rx="1" className="stick-fill" />
-          <rect x="175" y="110" width="5" height="8" rx="1" className="stick-fill" />
+          <rect x="158" y="100" width="28" height="40" rx="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="2.5" />
+          <rect x="164" y="112" width="6" height="10" rx="1" className="stick-fill" />
+          <rect x="176" y="112" width="6" height="10" rx="1" className="stick-fill" />
+          {/* Outlet glow */}
+          <motion.ellipse
+            cx="172"
+            cy="120"
+            rx="20"
+            ry="15"
+            fill="hsl(var(--muted))"
+            opacity="0.2"
+            animate={{ opacity: [0.1, 0.3, 0.1], scale: [0.9, 1.1, 0.9] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
         </g>
       </svg>
     </div>
