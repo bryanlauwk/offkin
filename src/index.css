@@ -110,6 +110,12 @@
     @apply bg-background paper-border p-6 md:p-8;
   }
 
+  /* Minimal button style - neal.fun inspired */
+  .btn-minimal {
+    @apply bg-background border border-foreground px-6 py-3 font-sans font-medium
+           transition-all hover:bg-secondary active:scale-[0.98] rounded-md;
+  }
+
   /* Button styles matching the design doc */
   .btn-now {
     @apply bg-action-now text-action-now-foreground paper-border font-semibold 
@@ -119,6 +125,12 @@
   .btn-later {
     @apply bg-action-later text-action-later-foreground paper-border font-semibold 
            transition-colors hover:brightness-110 active:brightness-90;
+  }
+
+  /* Choice button - minimal style */
+  .btn-choice {
+    @apply bg-background border border-foreground px-8 py-4 font-sans font-medium text-base
+           transition-all hover:bg-secondary active:scale-[0.98] rounded-lg;
   }
 
   /* Stick figure line style */

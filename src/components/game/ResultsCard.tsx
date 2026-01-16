@@ -68,99 +68,92 @@ export function ResultsCard({ archetype, choices, level7WaitTime, onRestart }: R
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex flex-col items-center justify-center px-4 pt-24 pb-12"
     >
-      <div className="max-w-lg w-full">
-        {/* The shareable card */}
-        <div 
-          ref={cardRef}
-          className="paper-container bg-background mb-6"
-        >
-          {/* Header */}
-          <div className="text-center mb-6">
-            <p className="font-mono text-xs text-muted-foreground mb-1">
-              THE ABSURD MARSHMALLOW TEST
-            </p>
-            <p className="font-mono text-xs text-muted-foreground">
-              OFFICIAL RESULTS
-            </p>
-          </div>
-
-          {/* Archetype */}
-          <div className="text-center mb-6">
-            <h2 className="font-serif text-3xl md:text-4xl font-black mb-1">
-              {archetype.name}
-            </h2>
-            <p className="font-mono text-sm text-muted-foreground">
-              {archetype.title}
-            </p>
-          </div>
-
-          {/* Stick figure avatar */}
-          <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 border-2 border-foreground flex items-center justify-center">
-              <StickFigure 
-                pose={archetype.id === 'toddler' ? 'tripped' : 'standing'} 
-                className={archetype.id === 'toddler' ? 'w-16 h-12' : 'w-12 h-16'}
-              />
-            </div>
-          </div>
-
-          {/* Description */}
-          <p className="font-sans text-center text-sm mb-6 leading-relaxed">
-            {archetype.description}
+      {/* The shareable card */}
+      <div 
+        ref={cardRef}
+        className="bg-background p-8 md:p-12 max-w-md w-full mb-8"
+      >
+        {/* Header */}
+        <div className="text-center mb-8">
+          <p className="font-mono text-xs text-muted-foreground tracking-widest">
+            THE ABSURD MARSHMALLOW TEST
           </p>
+        </div>
 
-          {/* Stats */}
-          <div className="border-t border-foreground pt-4">
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div>
-                <p className="font-mono text-2xl font-bold">{laterCount}/6</p>
-                <p className="font-sans text-xs text-muted-foreground">Delayed Choices</p>
-              </div>
-              <div>
-                <p className="font-mono text-2xl font-bold">
-                  {level7WaitTime !== null ? `${level7WaitTime}s` : '-'}
-                </p>
-                <p className="font-sans text-xs text-muted-foreground">Timer Endurance</p>
-              </div>
-            </div>
+        {/* Stick figure avatar */}
+        <div className="flex justify-center mb-8">
+          <div className="w-24 h-24 flex items-center justify-center">
+            <StickFigure 
+              pose={archetype.id === 'toddler' ? 'tripped' : 'standing'} 
+              className={archetype.id === 'toddler' ? 'w-20 h-16' : 'w-16 h-20'}
+            />
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <button
-            onClick={handleDownload}
-            className="btn-later p-3 text-sm font-semibold"
-          >
-            Download
-          </button>
-          <button
-            onClick={handleShare}
-            className="btn-later p-3 text-sm font-semibold"
-          >
-            Share
-          </button>
-          <button
-            onClick={handleCopyLink}
-            className="btn-later p-3 text-sm font-semibold"
-          >
-            Copy Link
-          </button>
+        {/* Archetype */}
+        <div className="text-center mb-6">
+          <h2 className="font-serif text-3xl md:text-4xl font-bold italic mb-2">
+            {archetype.name}
+          </h2>
+          <p className="font-mono text-sm text-muted-foreground">
+            {archetype.title}
+          </p>
         </div>
 
-        {/* Restart */}
+        {/* Description */}
+        <p className="font-serif text-center text-base md:text-lg italic text-muted-foreground mb-8 leading-relaxed">
+          {archetype.description}
+        </p>
+
+        {/* Stats */}
+        <div className="flex justify-center gap-8 text-center">
+          <div>
+            <p className="font-mono text-3xl font-bold">{laterCount}/6</p>
+            <p className="font-mono text-xs text-muted-foreground mt-1">Delayed</p>
+          </div>
+          <div>
+            <p className="font-mono text-3xl font-bold">
+              {level7WaitTime !== null ? `${level7WaitTime}s` : '-'}
+            </p>
+            <p className="font-mono text-xs text-muted-foreground mt-1">Timer</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Action buttons - minimal */}
+      <div className="flex gap-4 mb-6">
         <button
-          onClick={() => {
-            playClick();
-            onRestart();
-          }}
-          className="w-full paper-border bg-background p-3 text-sm font-semibold hover:bg-secondary transition-colors"
+          onClick={handleDownload}
+          className="btn-choice px-6 py-3 text-sm"
         >
-          Take Test Again
+          Download
+        </button>
+        <button
+          onClick={handleShare}
+          className="btn-choice px-6 py-3 text-sm"
+        >
+          Share
+        </button>
+        <button
+          onClick={handleCopyLink}
+          className="btn-choice px-6 py-3 text-sm"
+        >
+          Copy Link
         </button>
       </div>
+
+      {/* Restart */}
+      <button
+        onClick={() => {
+          playClick();
+          onRestart();
+        }}
+        className="font-mono text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-4"
+      >
+        Take Test Again
+      </button>
     </motion.div>
   );
 }

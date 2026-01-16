@@ -22,10 +22,10 @@ export function ChoiceButtons({
   const [hoveringNow, setHoveringNow] = useState(false);
 
   return (
-    <div className="grid grid-cols-2 gap-4">
+    <div className="flex flex-col sm:flex-row gap-4 w-full max-w-xl">
       {/* NOW Button */}
       <motion.button
-        className={`relative btn-now p-4 min-h-[100px] flex flex-col items-center justify-center text-center ${
+        className={`relative btn-choice flex-1 min-h-[80px] flex items-center justify-center text-center ${
           disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
         }`}
         onClick={() => !disabled && onChoice('now')}
@@ -36,8 +36,9 @@ export function ChoiceButtons({
           x: [0, -2, 2, -2, 2, 0],
         } : {}}
         transition={{ duration: 0.4, repeat: hoveringNow ? Infinity : 0 }}
+        whileHover={!disabled ? { scale: 1.01 } : {}}
       >
-        <span className="font-sans text-sm md:text-base font-semibold leading-tight">
+        <span className="font-sans text-sm md:text-base font-medium leading-tight px-2">
           {choiceNow}
         </span>
         
@@ -45,7 +46,7 @@ export function ChoiceButtons({
         <AnimatePresence>
           {showStats && stats && (
             <motion.div
-              className="absolute inset-0 bg-foreground/90 flex items-center justify-center"
+              className="absolute inset-0 bg-foreground/90 flex items-center justify-center rounded-lg"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -60,14 +61,14 @@ export function ChoiceButtons({
 
       {/* LATER Button */}
       <motion.button
-        className={`relative btn-later p-4 min-h-[100px] flex flex-col items-center justify-center text-center ${
+        className={`relative btn-choice flex-1 min-h-[80px] flex items-center justify-center text-center ${
           disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
         }`}
         onClick={() => !disabled && onChoice('later')}
         disabled={disabled}
         whileHover={!disabled ? { scale: 1.01 } : {}}
       >
-        <span className="font-sans text-sm md:text-base font-semibold leading-tight">
+        <span className="font-sans text-sm md:text-base font-medium leading-tight px-2">
           {choiceLater}
         </span>
         
@@ -75,7 +76,7 @@ export function ChoiceButtons({
         <AnimatePresence>
           {showStats && stats && (
             <motion.div
-              className="absolute inset-0 bg-foreground/90 flex items-center justify-center"
+              className="absolute inset-0 bg-foreground/90 flex items-center justify-center rounded-lg"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
