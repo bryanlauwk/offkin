@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useSound } from '@/hooks/useSound';
 import { useQuizStats } from '@/hooks/useQuizStats';
+import { TimerVisual } from './visuals/TimerVisual';
 
 interface TimerChallengeProps {
   sessionId: string;
@@ -94,19 +95,22 @@ export function TimerChallenge({ sessionId, onComplete }: TimerChallengeProps) {
       exit={{ opacity: 0 }}
       className="min-h-screen flex flex-col items-center justify-center px-4 pt-24 pb-12"
     >
+      {/* Chibi character visual */}
+      <TimerVisual seconds={seconds} maxSeconds={REQUIRED_TIME} />
+
       {/* Timer - Large and centered */}
       <motion.div 
-        className="mb-8"
+        className="mb-4"
         animate={seconds >= 50 && seconds < REQUIRED_TIME ? { scale: [1, 1.05, 1] } : {}}
         transition={{ duration: 1, repeat: Infinity }}
       >
-        <span className="font-mono text-7xl md:text-8xl lg:text-9xl font-bold">
+        <span className="font-mono text-5xl md:text-6xl lg:text-7xl font-bold">
           {formatTime(seconds)}
         </span>
       </motion.div>
 
       {/* Instructions - Italic serif */}
-      <p className="font-serif text-xl md:text-2xl text-center italic text-muted-foreground mb-12">
+      <p className="font-serif text-lg md:text-xl text-center italic text-muted-foreground mb-8">
         Do not press the button for 60 seconds.
       </p>
 

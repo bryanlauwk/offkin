@@ -4,3 +4,4 @@ export { TVVisual } from './TVVisual';
 export { WalletVisual } from './WalletVisual';
 export { EmbarrassmentVisual } from './EmbarrassmentVisual';
 export { TeethVisual } from './TeethVisual';
+export { TimerVisual } from './TimerVisual';
