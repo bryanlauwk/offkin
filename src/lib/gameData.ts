@@ -11,7 +11,7 @@ export interface Level {
   choiceNow: string;
   choiceLater: string;
   lesson?: string;
-  visualType: 'marshmallow' | 'fatigue' | 'unreliable' | 'broken' | 'starvation' | 'inflation' | 'lootbox' | 'treadmill' | 'mirror' | 'void';
+  visualType: 'marshmallow' | 'fatigue' | 'unreliable' | 'broken' | 'starvation' | 'inflation' | 'lootbox' | 'treadmill' | 'mirror' | 'void' | 'battery' | 'tv' | 'wallet' | 'embarrassment' | 'teeth';
 }
 
 export const levels: Level[] = [
