@@ -9,6 +9,8 @@ interface ResultsCardProps {
   laterCount: number;
   nowCount: number;
   level10IdleTime: number;
+  toastWaitTime?: number;
+  toastPassed?: boolean;
   onRestart: () => void;
 }
 
@@ -247,7 +249,7 @@ function ArchetypeAvatar({ archetypeId }: { archetypeId: string }) {
   );
 }
 
-export function ResultsCard({ archetype, laterCount, nowCount, level10IdleTime, onRestart }: ResultsCardProps) {
+export function ResultsCard({ archetype, laterCount, nowCount, level10IdleTime, toastWaitTime = 0, toastPassed = false, onRestart }: ResultsCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const { playClick } = useSound();
 
@@ -306,7 +308,7 @@ export function ResultsCard({ archetype, laterCount, nowCount, level10IdleTime, 
           "{archetype.description}"
         </p>
 
-        <div className="flex justify-center gap-8 text-center font-mono">
+        <div className="flex justify-center gap-6 text-center font-mono">
           <div>
             <p className="text-2xl font-bold">{laterCount}/9</p>
             <p className="text-xs text-muted-foreground">Waited</p>
@@ -318,6 +320,10 @@ export function ResultsCard({ archetype, laterCount, nowCount, level10IdleTime, 
           <div>
             <p className="text-2xl font-bold">{level10IdleTime}s</p>
             <p className="text-xs text-muted-foreground">Void</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{toastPassed ? '✓' : `${toastWaitTime}s`}</p>
+            <p className="text-xs text-muted-foreground">Toast</p>
           </div>
         </div>
       </div>

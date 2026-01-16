@@ -4,6 +4,7 @@ import { GameHeader } from './GameHeader';
 import { StartScreen } from './StartScreen';
 import { ScenarioCard } from './ScenarioCard';
 import { Level10Void } from './Level10Void';
+import { ToastChallenge } from './ToastChallenge';
 import { ResultsCard } from './ResultsCard';
 
 export function GameContainer() {
@@ -12,10 +13,13 @@ export function GameContainer() {
     sessionId,
     choices,
     level10IdleTime,
+    toastWaitTime,
+    toastPassed,
     startGame,
     makeChoice,
     advanceToNextLevel,
     completeLevel10,
+    completeToastChallenge,
     restartGame,
     getResult,
     getCurrentLevel,
@@ -31,15 +35,22 @@ export function GameContainer() {
     if (phase === 'playing' && currentLevel) {
       return {
         current: currentLevel.id,
-        total: 10,
+        total: 11,
         title: currentLevel.title,
       };
     }
     if (phase === 'void') {
       return {
         current: 10,
-        total: 10,
+        total: 11,
         title: 'The Pause',
+      };
+    }
+    if (phase === 'toast') {
+      return {
+        current: 11,
+        total: 11,
+        title: 'The Final Test',
       };
     }
     return null;
@@ -76,6 +87,14 @@ export function GameContainer() {
           />
         )}
 
+        {phase === 'toast' && (
+          <ToastChallenge
+            key="toast"
+            sessionId={sessionId}
+            onComplete={completeToastChallenge}
+          />
+        )}
+
         {phase === 'results' && (
           <ResultsCard
             key="results"
@@ -83,6 +102,8 @@ export function GameContainer() {
             laterCount={getLaterCount()}
             nowCount={getNowCount()}
             level10IdleTime={level10IdleTime}
+            toastWaitTime={toastWaitTime}
+            toastPassed={toastPassed}
             onRestart={restartGame}
           />
         )}

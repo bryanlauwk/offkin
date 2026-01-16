@@ -16,3 +16,4 @@ export { EmbarrassmentVisual } from './EmbarrassmentVisual';
 export { TeethVisual } from './TeethVisual';
 
 export { TimerVisual } from './TimerVisual';
+export { ToastingMarshmallowVisual } from './ToastingMarshmallowVisual';

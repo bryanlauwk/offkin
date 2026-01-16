@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { levels, level10, getArchetype, Archetype, ChoiceRecord, Phase } from '@/lib/gameData';
 
-export type GamePhase = 'start' | 'playing' | 'void' | 'results';
+export type GamePhase = 'start' | 'playing' | 'void' | 'toast' | 'results';
 export type Choice = 'now' | 'later';
 
 interface GameState {
@@ -11,6 +11,8 @@ interface GameState {
   sessionId: string;
   level10IdleTime: number;
   level10Clicked: boolean;
+  toastWaitTime: number;
+  toastPassed: boolean;
 }
 
 export function useGameState() {
@@ -21,6 +23,8 @@ export function useGameState() {
     sessionId: crypto.randomUUID(),
     level10IdleTime: 0,
     level10Clicked: false,
+    toastWaitTime: 0,
+    toastPassed: false,
   }));
 
   const startGame = useCallback(() => {
@@ -32,6 +36,8 @@ export function useGameState() {
       sessionId: crypto.randomUUID(),
       level10IdleTime: 0,
       level10Clicked: false,
+      toastWaitTime: 0,
+      toastPassed: false,
     }));
   }, []);
 
@@ -70,6 +76,15 @@ export function useGameState() {
       ...prev,
       level10IdleTime: idleTime,
       level10Clicked: true,
+      phase: 'toast',
+    }));
+  }, []);
+
+  const completeToastChallenge = useCallback((waitTime: number, passed: boolean) => {
+    setState(prev => ({
+      ...prev,
+      toastWaitTime: waitTime,
+      toastPassed: passed,
       phase: 'results',
     }));
   }, []);
@@ -82,6 +97,8 @@ export function useGameState() {
       sessionId: crypto.randomUUID(),
       level10IdleTime: 0,
       level10Clicked: false,
+      toastWaitTime: 0,
+      toastPassed: false,
     });
   }, []);
 
@@ -115,6 +132,7 @@ export function useGameState() {
     makeChoice,
     advanceToNextLevel,
     completeLevel10,
+    completeToastChallenge,
     restartGame,
     getLaterCount,
     getNowCount,
