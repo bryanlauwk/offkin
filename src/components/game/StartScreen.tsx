@@ -37,33 +37,63 @@ export function StartScreen({ onStart }: StartScreenProps) {
         <ellipse cx="65" cy="115" rx="28" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         <ellipse cx="65" cy="113" rx="22" ry="4" fill="hsl(var(--muted))" opacity="0.2" />
         
-        {/* Marshmallow on plate - with subtle bounce */}
+        {/* Kawaii Marshmallow on plate */}
         <motion.g
           animate={{ y: [0, -2, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         >
-          {/* Fluffy marshmallow body */}
+          {/* Soft pillowy marshmallow body */}
           <path 
-            d="M52 108 
-               Q49 103 51 95 
-               Q50 88 54 83 
-               Q58 78 65 76 
-               Q72 78 76 83 
-               Q80 88 79 95 
-               Q81 103 78 108 
-               Q73 112 65 113 
-               Q57 112 52 108Z" 
-            className="stick-line" 
-            fill="hsl(var(--background))" 
+            d="M50 108 
+               Q46 100 48 92 
+               Q47 84 52 78 
+               Q58 72 65 70 
+               Q72 72 78 78 
+               Q83 84 82 92 
+               Q84 100 80 108 
+               Q74 114 65 115 
+               Q56 114 50 108Z" 
+            stroke="hsl(30 20% 60%)" 
+            fill="hsl(40 30% 96%)" 
             strokeWidth="1.5"
           />
-          {/* Top cap */}
-          <ellipse cx="65" cy="78" rx="10" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          {/* Top rounded dome */}
+          <ellipse cx="65" cy="72" rx="12" ry="6" stroke="hsl(30 20% 60%)" fill="hsl(40 30% 96%)" strokeWidth="1.5" />
           {/* Bottom squish */}
-          <ellipse cx="65" cy="110" rx="12" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          {/* Marshmallow shine */}
-          <path d="M56 90 Q54 96 56 102" stroke="hsl(var(--muted))" strokeWidth="2" fill="none" opacity="0.4" strokeLinecap="round" />
-          <ellipse cx="58" cy="86" rx="2" ry="3" fill="hsl(var(--muted))" opacity="0.3" />
+          <ellipse cx="65" cy="112" rx="14" ry="5" stroke="hsl(30 20% 60%)" fill="hsl(40 30% 96%)" strokeWidth="1.5" />
+          {/* Soft highlight */}
+          <path d="M54 88 Q52 95 54 102" stroke="hsl(0 0% 100%)" strokeWidth="2.5" fill="none" opacity="0.6" strokeLinecap="round" />
+          
+          {/* Kawaii Face */}
+          {/* Eyes - cute dots looking up at child */}
+          <circle cx="59" cy="92" r="2.5" fill="hsl(30 25% 25%)" />
+          <circle cx="71" cy="92" r="2.5" fill="hsl(30 25% 25%)" />
+          {/* Eye shines */}
+          <circle cx="58" cy="91" r="1" fill="hsl(0 0% 100%)" />
+          <circle cx="70" cy="91" r="1" fill="hsl(0 0% 100%)" />
+          
+          {/* Rosy cheeks */}
+          <motion.circle 
+            cx="53" cy="96" r="4" 
+            fill="hsl(350 70% 75%)" 
+            opacity="0.5"
+            animate={{ opacity: [0.4, 0.6, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          <motion.circle 
+            cx="77" cy="96" r="4" 
+            fill="hsl(350 70% 75%)" 
+            opacity="0.5"
+            animate={{ opacity: [0.4, 0.6, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          
+          {/* Cute smile */}
+          <path d="M62 98 Q65 101 68 98" stroke="hsl(30 25% 25%)" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          
+          {/* Tiny arms reaching toward child */}
+          <path d="M80 88 Q86 85 90 88" stroke="hsl(30 20% 60%)" strokeWidth="2" fill="none" strokeLinecap="round" />
+          <circle cx="90" cy="88" r="2" stroke="hsl(30 20% 60%)" fill="hsl(40 30% 96%)" strokeWidth="1" />
         </motion.g>
         
         {/* Child's arms resting on table */}
