@@ -60,41 +60,19 @@ export function ScenarioCard({ level, sessionId, onChoice, onAdvance }: Scenario
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="paper-container max-w-2xl mx-auto"
+      className="min-h-screen flex flex-col items-center justify-center px-4 pt-24 pb-12"
     >
-      {/* Level indicator */}
-      <div className="flex items-center justify-between mb-4">
-        <span className="font-mono text-sm text-muted-foreground">
-          Level {level.id} of 6
-        </span>
-        <div className="flex gap-1">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className={`w-3 h-3 border border-foreground ${
-                i <= level.id ? 'bg-foreground' : 'bg-background'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Title */}
-      <h2 className="font-serif text-2xl md:text-3xl font-bold mb-2 text-center">
-        {level.title}
-      </h2>
-
-      {/* Description */}
-      <p className="font-sans text-center text-muted-foreground mb-6">
-        {level.description}
-      </p>
-
-      {/* Visual */}
-      <div className="mb-8 border-2 border-foreground bg-secondary/30">
+      {/* Visual - Large and prominent */}
+      <div className="w-full max-w-md md:max-w-lg mb-8">
         <ScenarioVisual level={level} />
       </div>
 
-      {/* Choice buttons */}
+      {/* Description - Italic serif style */}
+      <p className="font-serif text-xl md:text-2xl text-center italic text-muted-foreground mb-10 max-w-lg leading-relaxed">
+        {level.description}
+      </p>
+
+      {/* Choice buttons - minimal style, side by side */}
       <ChoiceButtons
         choiceNow={level.choiceNow}
         choiceLater={level.choiceLater}

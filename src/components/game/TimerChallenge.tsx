@@ -92,80 +92,63 @@ export function TimerChallenge({ sessionId, onComplete }: TimerChallengeProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex flex-col items-center justify-center px-4 pt-24 pb-12"
     >
-      <div className="paper-container max-w-lg text-center">
-        {/* Level indicator */}
-        <div className="flex items-center justify-center mb-4">
-          <span className="font-mono text-sm text-muted-foreground">
-            Level 7 of 7 - THE FINAL TEST
-          </span>
-        </div>
+      {/* Timer - Large and centered */}
+      <motion.div 
+        className="mb-8"
+        animate={seconds >= 50 && seconds < REQUIRED_TIME ? { scale: [1, 1.05, 1] } : {}}
+        transition={{ duration: 1, repeat: Infinity }}
+      >
+        <span className="font-mono text-7xl md:text-8xl lg:text-9xl font-bold">
+          {formatTime(seconds)}
+        </span>
+      </motion.div>
 
-        {/* Title */}
-        <h2 className="font-serif text-2xl md:text-3xl font-bold mb-2">
-          The Meta-Test
-        </h2>
+      {/* Instructions - Italic serif */}
+      <p className="font-serif text-xl md:text-2xl text-center italic text-muted-foreground mb-12">
+        Do not press the button for 60 seconds.
+      </p>
 
-        {/* Instructions */}
-        <p className="font-sans text-muted-foreground mb-8">
-          Do not press the button for 60 seconds.
-        </p>
-
-        {/* Timer */}
-        <motion.div 
-          className="mb-8"
-          animate={seconds >= 50 && seconds < REQUIRED_TIME ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ duration: 1, repeat: Infinity }}
+      {/* The Big Button */}
+      {!isComplete ? (
+        <motion.button
+          className="btn-choice text-lg md:text-xl px-12 py-6"
+          onClick={handleButtonClick}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          animate={seconds < 10 ? { 
+            x: [0, -2, 2, -2, 2, 0],
+          } : {}}
+          transition={{ duration: 0.5, repeat: seconds < 10 ? Infinity : 0 }}
         >
-          <span className="font-mono text-6xl md:text-7xl font-bold">
-            {formatTime(seconds)}
-          </span>
+          {getButtonLabel(seconds)}
+        </motion.button>
+      ) : (
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-center"
+        >
+          <p className="font-serif text-2xl md:text-3xl font-bold italic">
+            {seconds >= REQUIRED_TIME ? "Impressive." : "You pressed it."}
+          </p>
+          <p className="font-serif text-lg text-muted-foreground mt-2 italic">
+            {seconds >= REQUIRED_TIME 
+              ? "60 seconds of pure restraint." 
+              : `You lasted ${seconds} seconds.`}
+          </p>
         </motion.div>
+      )}
 
-        {/* The Big Red Button */}
-        {!isComplete ? (
-          <motion.button
-            className="btn-now px-12 py-6 text-xl font-bold"
-            onClick={handleButtonClick}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            animate={seconds < 10 ? { 
-              x: [0, -2, 2, -2, 2, 0],
-            } : {}}
-            transition={{ duration: 0.5, repeat: seconds < 10 ? Infinity : 0 }}
-          >
-            {getButtonLabel(seconds)}
-          </motion.button>
-        ) : (
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="py-6"
-          >
-            <p className="font-serif text-2xl font-bold">
-              {seconds >= REQUIRED_TIME ? "Impressive." : "You pressed it."}
-            </p>
-            <p className="font-sans text-muted-foreground mt-2">
-              {seconds >= REQUIRED_TIME 
-                ? "60 seconds of pure restraint." 
-                : `You lasted ${seconds} seconds.`}
-            </p>
-          </motion.div>
-        )}
-
-        {/* Progress bar */}
-        <div className="mt-8 h-2 border border-foreground bg-background">
-          <motion.div
-            className="h-full bg-foreground"
-            initial={{ width: 0 }}
-            animate={{ width: `${Math.min((seconds / REQUIRED_TIME) * 100, 100)}%` }}
-            transition={{ duration: 0.5 }}
-          />
-        </div>
-        <p className="font-mono text-xs mt-2 text-muted-foreground">
-          {Math.min(seconds, REQUIRED_TIME)} / {REQUIRED_TIME} seconds
-        </p>
+      {/* Progress bar - minimal */}
+      <div className="mt-12 w-full max-w-md h-1 bg-secondary rounded-full overflow-hidden">
+        <motion.div
+          className="h-full bg-foreground"
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min((seconds / REQUIRED_TIME) * 100, 100)}%` }}
+          transition={{ duration: 0.5 }}
+        />
       </div>
     </motion.div>
   );
