@@ -4,6 +4,7 @@ import { Level } from '@/lib/gameData';
 import { Choice } from '@/hooks/useGameState';
 import { ScenarioVisual } from './ScenarioVisual';
 import { ChoiceButtons } from './ChoiceButtons';
+import { ResearcherVisual } from './ResearcherVisual';
 import { useSound } from '@/hooks/useSound';
 import { useQuizStats } from '@/hooks/useQuizStats';
 
@@ -60,15 +61,24 @@ export function ScenarioCard({ level, sessionId, onChoice, onAdvance }: Scenario
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="min-h-screen flex flex-col items-center justify-center px-4 pt-24 pb-12"
+      className="min-h-screen flex flex-col items-center justify-center px-4 pt-20 pb-12"
     >
+      {/* Researcher with dialogue bubble - positioned above visual */}
+      <div className="w-full max-w-md md:max-w-lg mb-6">
+        <ResearcherVisual 
+          phase={level.phase} 
+          levelId={level.id} 
+          dialogue={level.researcherDialogue} 
+        />
+      </div>
+
       {/* Visual - Large and prominent */}
-      <div className="w-full max-w-md md:max-w-lg mb-8">
+      <div className="w-full max-w-md md:max-w-lg mb-6">
         <ScenarioVisual level={level} />
       </div>
 
       {/* Description - Italic serif style */}
-      <p className="font-serif text-xl md:text-2xl text-center italic text-muted-foreground mb-10 max-w-lg leading-relaxed">
+      <p className="font-serif text-lg md:text-xl text-center italic text-muted-foreground mb-8 max-w-lg leading-relaxed">
         {level.description}
       </p>
 
