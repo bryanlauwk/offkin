@@ -8,8 +8,8 @@ export function MarshmallowVisual() {
         <ellipse cx="100" cy="145" rx="90" ry="12" fill="hsl(var(--muted))" opacity="0.3" />
         
         {/* Plate */}
-        <ellipse cx="60" cy="135" rx="32" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
-        <ellipse cx="60" cy="132" rx="25" ry="5" fill="hsl(var(--muted))" opacity="0.2" />
+        <ellipse cx="55" cy="135" rx="32" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        <ellipse cx="55" cy="132" rx="25" ry="5" fill="hsl(var(--muted))" opacity="0.2" />
         
         {/* Improved Marshmallow - soft, fluffy, organic shape */}
         <motion.g
@@ -18,28 +18,26 @@ export function MarshmallowVisual() {
         >
           {/* Main marshmallow body - soft cylinder with organic curves */}
           <path 
-            d="M45 125 
-               Q42 120 44 110 
-               Q43 100 48 95 
-               Q50 88 60 85 
-               Q70 88 72 95 
-               Q77 100 76 110 
-               Q78 120 75 125 
-               Q70 130 60 132 
-               Q50 130 45 125Z" 
+            d="M40 125 
+               Q37 120 39 110 
+               Q38 100 43 95 
+               Q45 88 55 85 
+               Q65 88 67 95 
+               Q72 100 71 110 
+               Q73 120 70 125 
+               Q65 130 55 132 
+               Q45 130 40 125Z" 
             className="stick-line" 
             fill="hsl(var(--background))" 
             strokeWidth="2"
           />
           {/* Top rounded cap */}
-          <ellipse cx="60" cy="88" rx="12" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <ellipse cx="55" cy="88" rx="12" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           {/* Bottom squish (sitting on plate) */}
-          <ellipse cx="60" cy="128" rx="14" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <ellipse cx="55" cy="128" rx="14" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           {/* Soft highlights */}
-          <path d="M50 100 Q48 108 50 115" stroke="hsl(var(--muted))" strokeWidth="2" fill="none" opacity="0.4" strokeLinecap="round" />
-          <ellipse cx="52" cy="95" rx="2" ry="3" fill="hsl(var(--muted))" opacity="0.3" />
-          {/* Subtle texture lines */}
-          <path d="M54 92 Q55 95 54 98" stroke="hsl(var(--muted))" strokeWidth="0.5" fill="none" opacity="0.3" />
+          <path d="M45 100 Q43 108 45 115" stroke="hsl(var(--muted))" strokeWidth="2" fill="none" opacity="0.4" strokeLinecap="round" />
+          <ellipse cx="47" cy="95" rx="2" ry="3" fill="hsl(var(--muted))" opacity="0.3" />
         </motion.g>
         
         {/* Chibi Child - chin resting on hands, staring at marshmallow */}
@@ -55,42 +53,59 @@ export function MarshmallowVisual() {
           {/* Head resting on hands */}
           <ellipse cx="145" cy="95" rx="35" ry="30" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
-          {/* Hair - messy cute style */}
-          <path d="M115 75 Q118 50 140 45 Q165 42 180 60 Q186 72 183 90" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M118 68 Q125 58 135 52" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-          <path d="M170 62 Q174 55 178 65" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Hair - FILLED with warm brown */}
+          <path 
+            d="M112 80 Q115 55 140 48 Q168 52 180 72 Q185 85 182 100 L178 95 Q175 75 145 68 Q120 72 118 90 Z" 
+            className="hair-fill"
+            strokeWidth="2"
+          />
+          {/* Hair highlight strokes */}
+          <path d="M120 72 Q130 60 145 55" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
+          <path d="M165 60 Q172 65 175 75" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
           {/* Hair tuft */}
-          <path d="M145 45 Q148 35 152 42" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          <path d="M143 48 Q146 38 152 45" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
           
           {/* Face - eyes looking left at marshmallow */}
           <motion.g
             animate={{ x: [0, -1, 0] }}
             transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
           >
-            {/* Eyes */}
-            <ellipse cx="132" cy="92" rx="7" ry="8" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-            <ellipse cx="155" cy="92" rx="7" ry="8" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            {/* Eyes - larger, more expressive */}
+            <ellipse cx="130" cy="92" rx="9" ry="11" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            <ellipse cx="156" cy="92" rx="9" ry="11" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
             {/* Pupils looking at marshmallow */}
-            <circle cx="128" cy="93" r="3.5" className="stick-fill" />
-            <circle cx="151" cy="93" r="3.5" className="stick-fill" />
-            {/* Eye shine */}
-            <circle cx="127" cy="91" r="1.2" fill="hsl(var(--background))" />
-            <circle cx="150" cy="91" r="1.2" fill="hsl(var(--background))" />
+            <ellipse cx="126" cy="94" rx="4" ry="5" className="stick-fill" />
+            <ellipse cx="152" cy="94" rx="4" ry="5" className="stick-fill" />
+            {/* Eye shines - multiple for sparkle */}
+            <circle cx="124" cy="91" r="2" fill="hsl(var(--background))" />
+            <circle cx="127" cy="96" r="1" fill="hsl(var(--background))" />
+            <circle cx="150" cy="91" r="2" fill="hsl(var(--background))" />
+            <circle cx="153" cy="96" r="1" fill="hsl(var(--background))" />
           </motion.g>
           
           {/* Eyebrows - longing expression */}
-          <path d="M125 82 Q132 79 139 83" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M148 83 Q155 79 162 82" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M122 78 Q130 74 138 80" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          <path d="M148 80 Q156 74 164 78" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
           {/* Small nose */}
-          <path d="M143 98 Q145 102 143 105" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M143 100 Q145 105 143 108" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
           
-          {/* Mouth - slight pout/drool */}
-          <path d="M138 112 Q145 109 152 112" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Mouth - slight pout/longing */}
+          <path d="M136 116 Q143 112 150 116" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Drool hint */}
+          <motion.path 
+            d="M148 118 Q150 122 148 125"
+            className="stick-line"
+            fill="none"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            animate={{ opacity: [0.3, 0.7, 0.3] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
           
-          {/* Cheek blush */}
-          <ellipse cx="122" cy="102" rx="5" ry="3" fill="hsl(var(--muted))" opacity="0.35" />
-          <ellipse cx="165" cy="102" rx="5" ry="3" fill="hsl(var(--muted))" opacity="0.35" />
+          {/* Cheek blush - larger, more prominent */}
+          <ellipse cx="118" cy="102" rx="7" ry="4" fill="hsl(0 60% 75%)" opacity="0.4" />
+          <ellipse cx="168" cy="102" rx="7" ry="4" fill="hsl(0 60% 75%)" opacity="0.4" />
         </g>
         
         {/* Thought bubble showing two marshmallows */}
@@ -98,12 +113,12 @@ export function MarshmallowVisual() {
           animate={{ opacity: [0.6, 1, 0.6], y: [0, -2, 0] }}
           transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         >
-          <circle cx="175" cy="55" r="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
-          <circle cx="182" cy="45" r="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
-          <ellipse cx="190" cy="30" rx="12" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <circle cx="178" cy="58" r="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <circle cx="186" cy="45" r="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <ellipse cx="195" cy="28" rx="14" ry="12" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           {/* Two tiny marshmallows in thought */}
-          <rect x="183" y="26" width="5" height="7" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
-          <rect x="190" y="26" width="5" height="7" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
+          <rect x="186" y="23" width="6" height="9" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <rect x="194" y="23" width="6" height="9" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
         </motion.g>
       </svg>
     </div>

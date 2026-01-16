@@ -63,86 +63,104 @@ export function TVVisual() {
         <rect x="12" y="125" width="45" height="22" rx="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         <path d="M57 145 Q62 140 59 130 L55 130 L55 145 Z" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         
-        {/* Chibi person on couch watching */}
+        {/* Chibi person on couch watching - leaning forward eagerly */}
         <g>
-          {/* Body sitting */}
-          <ellipse cx="35" cy="118" rx="15" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          {/* Body sitting - leaning forward */}
+          <ellipse cx="35" cy="115" rx="16" ry="11" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" transform="rotate(-10 35 115)" />
           
           {/* Legs on couch */}
-          <path d="M25 125 Q20 130 22 135" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-          <path d="M45 125 Q50 130 48 135" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          <path d="M25 125 Q20 132 22 138" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          <path d="M45 125 Q50 132 48 138" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
-          {/* Arm holding remote */}
-          <path d="M48 115 Q55 105 58 110" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Arm holding remote up excitedly */}
+          <path d="M48 112 Q58 100 62 105" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
           {/* Remote */}
-          <rect x="55" y="106" width="8" height="12" rx="1" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          <circle cx="59" cy="110" r="1" className="stick-fill" />
+          <rect x="58" y="100" width="8" height="14" rx="2" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <circle cx="62" cy="105" r="1.5" className="stick-fill" />
           
-          {/* Other arm on lap */}
-          <path d="M22 115 Q15 120 18 125" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          {/* Other arm on knee */}
+          <path d="M22 112 Q15 118 18 125" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
-          {/* Head - eager expression */}
-          <ellipse cx="35" cy="95" rx="18" ry="16" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          {/* Head - eager expression, leaning toward TV */}
+          <ellipse cx="35" cy="90" rx="20" ry="18" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
           
-          {/* Hair */}
-          <path d="M20 85 Q22 70 35 65 Q48 70 50 85" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-          <path d="M23 80 Q28 72 35 68" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+          {/* Hair - FILLED */}
+          <path 
+            d="M17 80 Q20 62 35 58 Q50 62 53 80 L50 78 Q48 68 35 65 Q22 68 20 78 Z" 
+            className="hair-fill"
+            strokeWidth="2"
+          />
+          {/* Hair highlights */}
+          <path d="M25 68 Q32 62 40 65" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
+          {/* Hair tuft */}
+          <path d="M35 58 Q37 52 40 56" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
-          {/* Face - excited/anticipating, looking at TV */}
+          {/* Face - VERY excited/anticipating, looking at TV */}
           <motion.g
             animate={{ x: [0, 1, 0] }}
             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
           >
-            {/* Wide eyes */}
-            <ellipse cx="29" cy="93" rx="5" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-            <ellipse cx="41" cy="93" rx="5" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            {/* WIDE sparkly eyes */}
+            <ellipse cx="28" cy="88" rx="7" ry="9" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            <ellipse cx="42" cy="88" rx="7" ry="9" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
             {/* Pupils looking at TV */}
-            <circle cx="31" cy="93" r="2.5" className="stick-fill" />
-            <circle cx="43" cy="93" r="2.5" className="stick-fill" />
-            {/* Eye shine */}
-            <circle cx="30" cy="91" r="0.8" fill="hsl(var(--background))" />
-            <circle cx="42" cy="91" r="0.8" fill="hsl(var(--background))" />
+            <ellipse cx="30" cy="89" rx="3" ry="4" className="stick-fill" />
+            <ellipse cx="44" cy="89" rx="3" ry="4" className="stick-fill" />
+            {/* Multiple eye shines - sparkly */}
+            <circle cx="28" cy="86" r="1.5" fill="hsl(var(--background))" />
+            <circle cx="31" cy="90" r="1" fill="hsl(var(--background))" />
+            <circle cx="42" cy="86" r="1.5" fill="hsl(var(--background))" />
+            <circle cx="45" cy="90" r="1" fill="hsl(var(--background))" />
           </motion.g>
           
-          {/* Raised eyebrows - anticipation */}
-          <path d="M24 85 Q29 82 34 85" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M36 85 Q41 82 46 85" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+          {/* Raised eyebrows - very high with anticipation */}
+          <path d="M21 77 Q28 72 35 78" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+          <path d="M35 78 Q42 72 49 77" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
           
           {/* Small nose */}
-          <path d="M35 96 Q36 99 35 100" className="stick-line" fill="none" strokeWidth="1" strokeLinecap="round" />
+          <path d="M35 93 Q36 96 35 98" className="stick-line" fill="none" strokeWidth="1" strokeLinecap="round" />
           
-          {/* Excited open mouth */}
-          <motion.ellipse 
-            cx="35" 
-            cy="105" 
-            rx="4" 
-            ry="3" 
+          {/* Excited open mouth - big smile */}
+          <motion.path 
+            d="M28 104 Q35 110 42 104" 
             className="stick-line" 
-            fill="hsl(var(--background))" 
-            strokeWidth="1.5"
-            animate={{ ry: [3, 2, 3] }}
-            transition={{ duration: 1, repeat: Infinity }}
+            fill="none" 
+            strokeWidth="2"
+            strokeLinecap="round"
+            animate={{ d: ["M28 104 Q35 110 42 104", "M28 104 Q35 108 42 104", "M28 104 Q35 110 42 104"] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
           />
           
           {/* Cheek blush */}
-          <ellipse cx="22" cy="98" rx="3" ry="2" fill="hsl(var(--muted))" opacity="0.35" />
-          <ellipse cx="48" cy="98" rx="3" ry="2" fill="hsl(var(--muted))" opacity="0.35" />
+          <ellipse cx="18" cy="94" rx="4" ry="2.5" fill="hsl(0 60% 75%)" opacity="0.4" />
+          <ellipse cx="52" cy="94" rx="4" ry="2.5" fill="hsl(0 60% 75%)" opacity="0.4" />
         </g>
         
-        {/* Popcorn bowl */}
+        {/* Popcorn bowl - with pieces spilling */}
         <g>
           <path d="M170 135 L175 150 L195 150 L200 135 Z" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+          {/* Red stripes on bowl */}
+          <line x1="178" y1="137" x2="180" y2="148" stroke="hsl(var(--destructive))" strokeWidth="2" opacity="0.4" />
+          <line x1="188" y1="136" x2="189" y2="149" stroke="hsl(var(--destructive))" strokeWidth="2" opacity="0.4" />
           {/* Popcorn pieces */}
           <motion.g
-            animate={{ y: [0, -1, 0] }}
+            animate={{ y: [0, -2, 0] }}
             transition={{ duration: 0.5, repeat: Infinity, staggerChildren: 0.1 }}
           >
-            <circle cx="180" cy="132" r="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
-            <circle cx="186" cy="130" r="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
-            <circle cx="192" cy="132" r="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
-            <circle cx="183" cy="128" r="2.5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
-            <circle cx="189" cy="127" r="2.5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
+            <circle cx="180" cy="132" r="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            <circle cx="187" cy="130" r="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            <circle cx="194" cy="132" r="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+            <circle cx="183" cy="127" r="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
+            <circle cx="190" cy="125" r="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
+          </motion.g>
+          {/* Spilled popcorn pieces */}
+          <motion.g
+            animate={{ rotate: [0, 5, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <circle cx="165" cy="148" r="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
+            <circle cx="205" cy="146" r="2.5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1" />
           </motion.g>
         </g>
       </svg>

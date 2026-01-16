@@ -22,7 +22,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
       exit={{ opacity: 0 }}
       className="min-h-screen flex flex-col items-center justify-center px-4 pt-20 pb-12"
     >
-      {/* Child staring at marshmallow illustration */}
+      {/* Child staring at marshmallow illustration - improved chibi style */}
       <motion.svg 
         viewBox="0 0 200 140" 
         className="w-64 h-44 md:w-80 md:h-56 lg:w-96 lg:h-64 mb-8"
@@ -34,19 +34,36 @@ export function StartScreen({ onStart }: StartScreenProps) {
         <ellipse cx="100" cy="125" rx="85" ry="12" fill="hsl(var(--muted))" opacity="0.3" />
         
         {/* Plate */}
-        <ellipse cx="70" cy="115" rx="28" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
-        <ellipse cx="70" cy="113" rx="22" ry="4" fill="hsl(var(--muted))" opacity="0.2" />
+        <ellipse cx="65" cy="115" rx="28" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        <ellipse cx="65" cy="113" rx="22" ry="4" fill="hsl(var(--muted))" opacity="0.2" />
         
         {/* Marshmallow on plate - with subtle bounce */}
         <motion.g
           animate={{ y: [0, -2, 0] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         >
-          <ellipse cx="70" cy="108" rx="10" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          <rect x="62" y="95" width="16" height="13" rx="3" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          <ellipse cx="70" cy="95" rx="10" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          {/* Fluffy marshmallow body */}
+          <path 
+            d="M52 108 
+               Q49 103 51 95 
+               Q50 88 54 83 
+               Q58 78 65 76 
+               Q72 78 76 83 
+               Q80 88 79 95 
+               Q81 103 78 108 
+               Q73 112 65 113 
+               Q57 112 52 108Z" 
+            className="stick-line" 
+            fill="hsl(var(--background))" 
+            strokeWidth="1.5"
+          />
+          {/* Top cap */}
+          <ellipse cx="65" cy="78" rx="10" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          {/* Bottom squish */}
+          <ellipse cx="65" cy="110" rx="12" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           {/* Marshmallow shine */}
-          <ellipse cx="66" cy="100" rx="2" ry="4" fill="hsl(var(--muted))" opacity="0.3" />
+          <path d="M56 90 Q54 96 56 102" stroke="hsl(var(--muted))" strokeWidth="2" fill="none" opacity="0.4" strokeLinecap="round" />
+          <ellipse cx="58" cy="86" rx="2" ry="3" fill="hsl(var(--muted))" opacity="0.3" />
         </motion.g>
         
         {/* Child's arms resting on table */}
@@ -58,47 +75,54 @@ export function StartScreen({ onStart }: StartScreenProps) {
         <ellipse cx="148" cy="110" rx="7" ry="5" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         
         {/* Child's head resting on hands */}
-        <ellipse cx="140" cy="75" rx="32" ry="28" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        <ellipse cx="140" cy="72" rx="34" ry="30" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         
-        {/* Hair - messy/cute style */}
-        <path d="M112 55 Q115 35 135 30 Q160 28 172 45 Q178 55 175 70" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
-        <path d="M115 50 Q120 42 130 38" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        <path d="M165 48 Q168 42 172 50" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        {/* Hair - FILLED with warm brown */}
+        <path 
+          d="M108 58 Q112 35 138 28 Q168 32 178 55 Q182 68 180 82 L175 78 Q172 60 142 52 Q118 56 115 75 Z" 
+          className="hair-fill"
+          strokeWidth="2"
+        />
+        {/* Hair highlights */}
+        <path d="M118 48 Q130 38 145 35" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
+        <path d="M162 42 Q170 50 174 62" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
         {/* Hair tuft */}
-        <path d="M140 30 Q142 22 145 28" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        <path d="M140 28 Q143 20 148 26" className="stick-line" fill="none" strokeWidth="2.5" strokeLinecap="round" />
         
         {/* Face - looking at marshmallow */}
         <motion.g
           animate={{ x: [0, -1, 0] }}
           transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
         >
-          {/* Eyes looking left at marshmallow */}
-          <ellipse cx="128" cy="72" rx="6" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          <ellipse cx="148" cy="72" rx="6" ry="7" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          {/* Eyes looking left at marshmallow - LARGE and expressive */}
+          <ellipse cx="126" cy="70" rx="8" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+          <ellipse cx="150" cy="70" rx="8" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
           {/* Pupils looking at marshmallow */}
-          <circle cx="125" cy="73" r="3" className="stick-fill" />
-          <circle cx="145" cy="73" r="3" className="stick-fill" />
-          {/* Eye shine */}
-          <circle cx="124" cy="71" r="1" fill="hsl(var(--background))" />
-          <circle cx="144" cy="71" r="1" fill="hsl(var(--background))" />
+          <ellipse cx="122" cy="72" rx="4" ry="5" className="stick-fill" />
+          <ellipse cx="146" cy="72" rx="4" ry="5" className="stick-fill" />
+          {/* Multiple eye shines */}
+          <circle cx="120" cy="69" r="2" fill="hsl(var(--background))" />
+          <circle cx="123" cy="74" r="1" fill="hsl(var(--background))" />
+          <circle cx="144" cy="69" r="2" fill="hsl(var(--background))" />
+          <circle cx="147" cy="74" r="1" fill="hsl(var(--background))" />
         </motion.g>
         
         {/* Eyebrows - slightly worried/longing */}
-        <path d="M122 63 Q128 61 134 64" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M142 64 Q148 61 154 63" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M118 58 Q126 54 134 60" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        <path d="M142 60 Q150 54 158 58" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
         
         {/* Small nose */}
-        <path d="M138 78 Q140 82 138 84" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M138 78 Q140 82 138 85" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" />
         
         {/* Mouth - slight pout */}
-        <path d="M133 92 Q140 90 147 92" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        <path d="M132 92 Q138 88 144 92" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
         
-        {/* Cheek blush */}
-        <ellipse cx="120" cy="82" rx="5" ry="3" fill="hsl(var(--muted))" opacity="0.3" />
-        <ellipse cx="158" cy="82" rx="5" ry="3" fill="hsl(var(--muted))" opacity="0.3" />
+        {/* Cheek blush - prominent */}
+        <ellipse cx="115" cy="80" rx="6" ry="3.5" fill="hsl(0 60% 75%)" opacity="0.4" />
+        <ellipse cx="162" cy="80" rx="6" ry="3.5" fill="hsl(0 60% 75%)" opacity="0.4" />
         
         {/* Chin resting indication */}
-        <path d="M125 100 Q140 105 155 100" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
+        <path d="M122 98 Q138 104 154 98" className="stick-line" fill="none" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
       </motion.svg>
 
       {/* Title - Italic serif like neal.fun */}
