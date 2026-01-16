@@ -43,47 +43,70 @@ export function MarshmallowPileVisual({ className = '' }: MarshmallowPileVisualP
           {/* Tiny eyes */}
           <circle cx="7" cy="10" r="1" fill="hsl(30 25% 25%)" />
           <circle cx="13" cy="10" r="1" fill="hsl(30 25% 25%)" />
+          {/* Tiny shine */}
+          <circle cx="6.5" cy="9.5" r="0.4" fill="hsl(0 0% 100%)" />
+          <circle cx="12.5" cy="9.5" r="0.4" fill="hsl(0 0% 100%)" />
           {/* Tiny smile */}
           <path d="M8 14 Q10 15 12 14" stroke="hsl(30 25% 25%)" strokeWidth="0.8" fill="none" strokeLinecap="round" />
+          {/* Tiny blush */}
+          <circle cx="5" cy="12" r="1.2" fill="hsl(350 70% 75%)" opacity="0.4" />
+          <circle cx="15" cy="12" r="1.2" fill="hsl(350 70% 75%)" opacity="0.4" />
         </g>
       ))}
 
-      {/* Bored chibi child sitting on pile */}
+      {/* Warm chibi child sitting on pile - bored expression */}
       <motion.g
         animate={{ y: [0, -2, 0] }}
         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
       >
-        {/* Head */}
-        <ellipse cx="100" cy="55" rx="24" ry="22" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        {/* Head - large chibi proportions */}
+        <ellipse cx="100" cy="52" rx="26" ry="24" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         
-        {/* Hair */}
+        {/* Hair - FILLED warm brown */}
         <path 
-          d="M78 48 Q82 30 100 26 Q118 30 122 48 Q118 38 100 34 Q84 38 80 48 Z" 
-          className="hair-fill"
-          strokeWidth="2"
+          d="M76 44 Q80 24 100 18 Q120 24 124 44 Q120 32 100 26 Q82 32 78 44 Z" 
+          fill="hsl(30 25% 35%)"
+          stroke="hsl(var(--foreground))"
+          strokeWidth="1.5"
         />
         {/* Hair highlights */}
-        <path d="M86 38 Q95 32 104 36" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.3" strokeLinecap="round" />
+        <path d="M84 32 Q96 24 108 30" stroke="hsl(var(--background))" strokeWidth="2" fill="none" opacity="0.4" strokeLinecap="round" />
+        {/* Hair tuft */}
+        <path d="M100 18 Q104 10 108 16" stroke="hsl(30 25% 35%)" fill="none" strokeWidth="2.5" strokeLinecap="round" />
         
         {/* Bored half-closed eyes */}
-        <path d="M90 52 Q94 50 98 52" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
-        <path d="M102 52 Q106 50 110 52" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        <g>
+          {/* Left eye - half closed */}
+          <ellipse cx="90" cy="50" rx="6" ry="4" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+          <ellipse cx="90" cy="51" rx="3" ry="2" fill="hsl(30 25% 25%)" />
+          <circle cx="89" cy="50" r="1" fill="hsl(var(--background))" />
+          {/* Droopy eyelid */}
+          <path d="M84 48 Q90 46 96 48" stroke="hsl(var(--foreground))" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          
+          {/* Right eye - half closed */}
+          <ellipse cx="110" cy="50" rx="6" ry="4" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+          <ellipse cx="110" cy="51" rx="3" ry="2" fill="hsl(30 25% 25%)" />
+          <circle cx="109" cy="50" r="1" fill="hsl(var(--background))" />
+          {/* Droopy eyelid */}
+          <path d="M104 48 Q110 46 116 48" stroke="hsl(var(--foreground))" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        </g>
         
         {/* Unimpressed flat mouth */}
         <line x1="94" y1="64" x2="106" y2="64" className="stick-line" strokeWidth="2" strokeLinecap="round" />
         
-        {/* Pale cheeks - not excited */}
-        <ellipse cx="82" cy="58" rx="4" ry="2.5" fill="hsl(0 40% 80%)" opacity="0.25" />
-        <ellipse cx="118" cy="58" rx="4" ry="2.5" fill="hsl(0 40% 80%)" opacity="0.25" />
+        {/* Pale rosy cheeks - less excited */}
+        <ellipse cx="80" cy="56" rx="5" ry="3" fill="hsl(350 60% 80%)" opacity="0.3" />
+        <ellipse cx="120" cy="56" rx="5" ry="3" fill="hsl(350 60% 80%)" opacity="0.3" />
         
         {/* Body sitting on pile */}
-        <ellipse cx="100" cy="82" rx="14" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        <ellipse cx="100" cy="85" rx="16" ry="12" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         
-        {/* Arms hanging limply */}
-        <path d="M88 78 Q78 85 76 95" className="stick-line" strokeWidth="2" strokeLinecap="round" />
-        <path d="M112 78 Q122 85 124 95" className="stick-line" strokeWidth="2" strokeLinecap="round" />
-        <ellipse cx="75" cy="97" rx="3" ry="2.5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-        <ellipse cx="125" cy="97" rx="3" ry="2.5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+        {/* Arms hanging limply - with proper hands */}
+        <path d="M86 80 Q74 88 72 98" className="stick-line" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+        <ellipse cx="70" cy="100" rx="4" ry="3" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+        
+        <path d="M114 80 Q126 88 128 98" className="stick-line" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+        <ellipse cx="130" cy="100" rx="4" ry="3" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
       </motion.g>
 
       {/* Counter */}

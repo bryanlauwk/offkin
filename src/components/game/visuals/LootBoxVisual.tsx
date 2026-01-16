@@ -115,71 +115,98 @@ export function LootBoxVisual({ className = '' }: LootBoxVisualProps) {
         </motion.text>
       </motion.g>
 
-      {/* Chibi child staring at box - excited/conflicted */}
+      {/* Warm chibi child - excited about box */}
       <motion.g
         animate={{ y: [0, -2, 0] }}
         transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
       >
-        {/* Head */}
-        <ellipse cx="40" cy="100" rx="22" ry="20" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        {/* Head - large chibi proportions */}
+        <ellipse cx="40" cy="100" rx="24" ry="22" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         
-        {/* Hair */}
+        {/* Hair - FILLED with warm brown, matching StartScreen */}
         <path 
-          d="M20 92 Q24 76 40 72 Q56 76 60 92 Q57 82 40 78 Q26 82 22 92 Z" 
-          className="hair-fill"
-          strokeWidth="2"
+          d="M18 92 Q22 74 40 68 Q58 74 62 92 Q58 80 40 74 Q25 80 20 92 Z" 
+          fill="hsl(30 25% 35%)"
+          stroke="hsl(var(--foreground))"
+          strokeWidth="1.5"
         />
+        {/* Hair highlight */}
+        <path d="M26 80 Q36 72 46 78" stroke="hsl(var(--background))" strokeWidth="2" fill="none" opacity="0.4" strokeLinecap="round" />
         {/* Hair tuft */}
-        <path d="M40 72 Q42 66 46 70" className="stick-line" fill="none" strokeWidth="2" strokeLinecap="round" />
+        <path d="M40 68 Q44 60 48 66" stroke="hsl(30 25% 35%)" fill="none" strokeWidth="2.5" strokeLinecap="round" />
         
         {/* Excited/wide eyes looking at box */}
         <motion.g
-          animate={{ scale: [1, 1.1, 1] }}
+          animate={{ scale: [1, 1.05, 1] }}
           transition={{ duration: 1, repeat: Infinity }}
         >
-          <ellipse cx="34" cy="98" rx="5" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          <ellipse cx="48" cy="98" rx="5" ry="6" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
-          <ellipse cx="35" cy="99" rx="3" ry="4" className="stick-fill" />
-          <ellipse cx="49" cy="99" rx="3" ry="4" className="stick-fill" />
-          {/* Sparkles in eyes */}
-          <circle cx="33" cy="97" r="1.5" fill="hsl(var(--background))" />
-          <circle cx="47" cy="97" r="1.5" fill="hsl(var(--background))" />
-          <circle cx="36" cy="101" r="0.8" fill="hsl(var(--background))" />
-          <circle cx="50" cy="101" r="0.8" fill="hsl(var(--background))" />
+          {/* Left eye */}
+          <ellipse cx="32" cy="98" rx="6" ry="7" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+          <ellipse cx="33" cy="99" rx="3.5" ry="4.5" fill="hsl(30 25% 25%)" />
+          <circle cx="31" cy="96" r="2" fill="hsl(var(--background))" />
+          <circle cx="34" cy="101" r="1" fill="hsl(var(--background))" />
+          
+          {/* Right eye */}
+          <ellipse cx="48" cy="98" rx="6" ry="7" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+          <ellipse cx="49" cy="99" rx="3.5" ry="4.5" fill="hsl(30 25% 25%)" />
+          <circle cx="47" cy="96" r="2" fill="hsl(var(--background))" />
+          <circle cx="50" cy="101" r="1" fill="hsl(var(--background))" />
         </motion.g>
         
+        {/* Excited eyebrows */}
+        <path d="M26 90 Q32 87 38 90" stroke="hsl(var(--foreground))" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        <path d="M42 90 Q48 87 54 90" stroke="hsl(var(--foreground))" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        
         {/* Excited open mouth */}
-        <ellipse cx="41" cy="112" rx="5" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+        <ellipse cx="40" cy="112" rx="6" ry="5" fill="hsl(0 40% 45%)" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
         
         {/* Rosy cheeks - extra rosy from excitement */}
         <motion.ellipse 
-          cx="25" cy="104" rx="5" ry="3" 
+          cx="22" cy="104" rx="6" ry="4" 
           fill="hsl(350 70% 75%)" 
           opacity="0.5"
           animate={{ opacity: [0.4, 0.6, 0.4] }}
           transition={{ duration: 1.5, repeat: Infinity }}
         />
         <motion.ellipse 
-          cx="57" cy="104" rx="5" ry="3" 
+          cx="58" cy="104" rx="6" ry="4" 
           fill="hsl(350 70% 75%)" 
           opacity="0.5"
           animate={{ opacity: [0.4, 0.6, 0.4] }}
           transition={{ duration: 1.5, repeat: Infinity }}
         />
         
-        {/* Body */}
-        <ellipse cx="40" cy="135" rx="12" ry="8" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        {/* Body - rounded */}
+        <ellipse cx="40" cy="138" rx="14" ry="10" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
         
-        {/* Arms reaching toward box */}
+        {/* Arm reaching toward box */}
         <motion.path 
-          d="M48 128 L65 115" 
+          d="M50 130 Q58 120 65 115" 
           className="stick-line" 
-          strokeWidth="2" 
+          strokeWidth="2.5" 
           strokeLinecap="round"
-          animate={{ d: ["M48 128 L65 115", "M48 128 L68 112", "M48 128 L65 115"] }}
+          fill="none"
+          animate={{ d: ["M50 130 Q58 120 65 115", "M50 130 Q60 118 68 112", "M50 130 Q58 120 65 115"] }}
           transition={{ duration: 1, repeat: Infinity }}
         />
-        <ellipse cx="67" cy="113" rx="3" ry="2.5" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+        {/* Hand - ellipse shape */}
+        <motion.ellipse 
+          cx="67" cy="113" 
+          rx="4" ry="3" 
+          fill="hsl(var(--background))" 
+          stroke="hsl(var(--foreground))" 
+          strokeWidth="1.5"
+          animate={{ cx: [67, 70, 67], cy: [113, 110, 113] }}
+          transition={{ duration: 1, repeat: Infinity }}
+        />
+        
+        {/* Other arm */}
+        <path d="M30 130 Q22 135 18 142" className="stick-line" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+        <ellipse cx="16" cy="144" rx="4" ry="3" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+        
+        {/* Legs */}
+        <path d="M34 146 L30 155" className="stick-line" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M46 146 L50 155" className="stick-line" strokeWidth="2.5" strokeLinecap="round" />
       </motion.g>
 
       {/* Labels */}

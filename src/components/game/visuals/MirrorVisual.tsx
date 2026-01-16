@@ -19,40 +19,61 @@ export function MirrorVisual({ className = '' }: MirrorVisualProps) {
       {/* Mirror surface - slightly tinted */}
       <rect x="60" y="25" width="80" height="95" fill="hsl(200 20% 96%)" rx="1" />
       
-      {/* Chibi reflection in mirror */}
+      {/* Warm chibi reflection in mirror */}
       <g opacity="0.75">
         {/* Head */}
-        <ellipse cx="100" cy="60" rx="20" ry="18" stroke="hsl(var(--foreground))" fill="hsl(var(--background))" strokeWidth="1.5" opacity="0.8" />
+        <ellipse cx="100" cy="58" rx="22" ry="20" stroke="hsl(var(--foreground))" fill="hsl(var(--background))" strokeWidth="1.5" opacity="0.85" />
         
-        {/* Hair */}
+        {/* Hair - FILLED warm brown */}
         <path 
-          d="M82 54 Q86 40 100 36 Q114 40 118 54 Q115 46 100 42 Q88 46 84 54 Z" 
+          d="M80 52 Q84 36 100 32 Q116 36 120 52 Q116 42 100 38 Q86 42 82 52 Z" 
           fill="hsl(30 25% 35%)"
           stroke="hsl(var(--foreground))"
           strokeWidth="1"
-          opacity="0.7"
+          opacity="0.8"
         />
+        {/* Hair highlight */}
+        <path d="M88 42 Q98 36 108 40" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.3" strokeLinecap="round" />
         
         {/* Nervous eyes looking at viewer */}
-        <ellipse cx="94" cy="58" rx="4" ry="5" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1" opacity="0.8" />
-        <ellipse cx="106" cy="58" rx="4" ry="5" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1" opacity="0.8" />
-        <ellipse cx="94" cy="59" rx="2" ry="3" fill="hsl(var(--foreground))" opacity="0.8" />
-        <ellipse cx="106" cy="59" rx="2" ry="3" fill="hsl(var(--foreground))" opacity="0.8" />
+        <ellipse cx="92" cy="56" rx="5" ry="6" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1" opacity="0.85" />
+        <ellipse cx="108" cy="56" rx="5" ry="6" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1" opacity="0.85" />
+        <ellipse cx="93" cy="57" rx="3" ry="4" fill="hsl(30 25% 25%)" opacity="0.85" />
+        <ellipse cx="109" cy="57" rx="3" ry="4" fill="hsl(30 25% 25%)" opacity="0.85" />
+        {/* Eye shines */}
+        <circle cx="91" cy="54" r="1.5" fill="hsl(var(--background))" opacity="0.85" />
+        <circle cx="107" cy="54" r="1.5" fill="hsl(var(--background))" opacity="0.85" />
+        <circle cx="94" cy="59" r="0.8" fill="hsl(var(--background))" opacity="0.85" />
+        <circle cx="110" cy="59" r="0.8" fill="hsl(var(--background))" opacity="0.85" />
+        
+        {/* Worried eyebrows */}
+        <path d="M86 48 Q92 51 98 49" stroke="hsl(var(--foreground))" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.7" />
+        <path d="M102 49 Q108 51 114 48" stroke="hsl(var(--foreground))" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.7" />
         
         {/* Nervous sweat */}
         <motion.path
-          d="M118 52 Q120 56 118 60 Q116 56 118 52Z"
+          d="M120 50 Q122 54 120 58 Q118 54 120 50Z"
           fill="hsl(200 80% 70%)"
           opacity="0.6"
           animate={{ y: [0, 3, 0], opacity: [0.4, 0.8, 0.4] }}
           transition={{ duration: 1.5, repeat: Infinity }}
         />
         
-        {/* Nervous smile */}
-        <path d="M94 72 Q100 70 106 72" stroke="hsl(var(--foreground))" fill="none" strokeWidth="1.5" opacity="0.7" />
+        {/* Nervous wavy smile */}
+        <path d="M94 70 Q100 68 106 70" stroke="hsl(var(--foreground))" fill="none" strokeWidth="1.5" opacity="0.7" strokeLinecap="round" />
+        
+        {/* Rosy cheeks */}
+        <ellipse cx="82" cy="62" rx="4" ry="2.5" fill="hsl(350 70% 75%)" opacity="0.35" />
+        <ellipse cx="118" cy="62" rx="4" ry="2.5" fill="hsl(350 70% 75%)" opacity="0.35" />
         
         {/* Body */}
-        <ellipse cx="100" cy="100" rx="14" ry="10" stroke="hsl(var(--foreground))" fill="hsl(var(--background))" strokeWidth="1.5" opacity="0.6" />
+        <ellipse cx="100" cy="98" rx="14" ry="10" stroke="hsl(var(--foreground))" fill="hsl(var(--background))" strokeWidth="1.5" opacity="0.6" />
+        
+        {/* Arms - with hands */}
+        <path d="M88 92 L78 100" stroke="hsl(var(--foreground))" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+        <ellipse cx="76" cy="102" rx="3" ry="2" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1" opacity="0.5" />
+        <path d="M112 92 L122 100" stroke="hsl(var(--foreground))" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+        <ellipse cx="124" cy="102" rx="3" ry="2" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1" opacity="0.5" />
       </g>
 
       {/* Audience behind (in reflection) - small chibi heads */}
@@ -108,30 +129,76 @@ export function MirrorVisual({ className = '' }: MirrorVisualProps) {
         <circle cx="176" cy="71" r="1.5" className="stick-fill" />
       </g>
 
-      {/* Marshmallow on plate in front of mirror */}
+      {/* Warm chibi child in front of mirror - nervous */}
       <motion.g
-        animate={{ y: [0, -2, 0] }}
+        animate={{ y: [0, -1, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
-        <ellipse cx="100" cy="145" rx="18" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
+        {/* Head */}
+        <ellipse cx="35" cy="115" rx="18" ry="16" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        
+        {/* Hair - FILLED warm brown */}
+        <path 
+          d="M19 109 Q22 96 35 92 Q48 96 51 109 Q48 100 35 96 Q24 100 21 109 Z" 
+          fill="hsl(30 25% 35%)"
+          stroke="hsl(var(--foreground))"
+          strokeWidth="1.5"
+        />
+        {/* Hair highlight */}
+        <path d="M25 100 Q33 94 41 98" stroke="hsl(var(--background))" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
+        
+        {/* Nervous wide eyes */}
+        <ellipse cx="29" cy="114" rx="4" ry="5" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+        <ellipse cx="41" cy="114" rx="4" ry="5" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+        <ellipse cx="30" cy="115" rx="2.5" ry="3" fill="hsl(30 25% 25%)" />
+        <ellipse cx="42" cy="115" rx="2.5" ry="3" fill="hsl(30 25% 25%)" />
+        {/* Eye shines */}
+        <circle cx="28" cy="112" r="1.5" fill="hsl(var(--background))" />
+        <circle cx="40" cy="112" r="1.5" fill="hsl(var(--background))" />
+        <circle cx="31" cy="117" r="0.8" fill="hsl(var(--background))" />
+        <circle cx="43" cy="117" r="0.8" fill="hsl(var(--background))" />
+        
+        {/* Nervous smile */}
+        <path d="M30 124 Q35 122 40 124" stroke="hsl(var(--foreground))" fill="none" strokeWidth="1.5" strokeLinecap="round" />
+        
+        {/* Rosy cheeks */}
+        <ellipse cx="22" cy="119" rx="4" ry="2.5" fill="hsl(350 70% 75%)" opacity="0.5" />
+        <ellipse cx="48" cy="119" rx="4" ry="2.5" fill="hsl(350 70% 75%)" opacity="0.5" />
+        
+        {/* Body */}
+        <ellipse cx="35" cy="142" rx="10" ry="8" className="stick-line" fill="hsl(var(--background))" strokeWidth="2" />
+        
+        {/* Arms */}
+        <path d="M27 138 L18 145" className="stick-line" strokeWidth="2" strokeLinecap="round" />
+        <ellipse cx="16" cy="147" rx="3" ry="2" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+        <path d="M43 138 L52 145" className="stick-line" strokeWidth="2" strokeLinecap="round" />
+        <ellipse cx="54" cy="147" rx="3" ry="2" fill="hsl(var(--background))" stroke="hsl(var(--foreground))" strokeWidth="1.5" />
+      </motion.g>
+
+      {/* Marshmallow on plate */}
+      <motion.g
+        animate={{ y: [0, -2, 0] }}
+        transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+      >
+        <ellipse cx="100" cy="148" rx="18" ry="4" className="stick-line" fill="hsl(var(--background))" strokeWidth="1.5" />
         {/* Kawaii marshmallow */}
         <path 
-          d="M90 142 Q87 135 89 128 Q91 124 100 122 Q109 124 111 128 Q113 135 110 142 Q106 145 100 145 Q94 145 90 142Z" 
+          d="M90 145 Q87 138 89 131 Q91 127 100 125 Q109 127 111 131 Q113 138 110 145 Q106 148 100 148 Q94 148 90 145Z" 
           stroke="hsl(30 20% 60%)" 
           fill="hsl(40 30% 96%)" 
           strokeWidth="1.5"
         />
-        {/* Tiny nervous face */}
-        <circle cx="95" cy="133" r="1.5" fill="hsl(30 25% 25%)" />
-        <circle cx="105" cy="133" r="1.5" fill="hsl(30 25% 25%)" />
+        {/* Kawaii face */}
+        <circle cx="95" cy="136" r="1.5" fill="hsl(30 25% 25%)" />
+        <circle cx="105" cy="136" r="1.5" fill="hsl(30 25% 25%)" />
         {/* Eye shines */}
-        <circle cx="94" cy="132" r="0.6" fill="hsl(0 0% 100%)" />
-        <circle cx="104" cy="132" r="0.6" fill="hsl(0 0% 100%)" />
+        <circle cx="94" cy="135" r="0.6" fill="hsl(0 0% 100%)" />
+        <circle cx="104" cy="135" r="0.6" fill="hsl(0 0% 100%)" />
         {/* Nervous wavy mouth */}
-        <path d="M96 138 Q98 140 100 138 Q102 136 104 138" stroke="hsl(30 25% 25%)" strokeWidth="1" fill="none" strokeLinecap="round" />
+        <path d="M96 141 Q98 143 100 141 Q102 139 104 141" stroke="hsl(30 25% 25%)" strokeWidth="1" fill="none" strokeLinecap="round" />
         {/* Rosy cheeks */}
-        <circle cx="90" cy="136" r="2.5" fill="hsl(350 70% 75%)" opacity="0.4" />
-        <circle cx="110" cy="136" r="2.5" fill="hsl(350 70% 75%)" opacity="0.4" />
+        <circle cx="90" cy="139" r="2.5" fill="hsl(350 70% 75%)" opacity="0.4" />
+        <circle cx="110" cy="139" r="2.5" fill="hsl(350 70% 75%)" opacity="0.4" />
       </motion.g>
     </svg>
   );
