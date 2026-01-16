@@ -3,7 +3,7 @@ import { useGameState } from '@/hooks/useGameState';
 import { GameHeader } from './GameHeader';
 import { StartScreen } from './StartScreen';
 import { ScenarioCard } from './ScenarioCard';
-import { TimerChallenge } from './TimerChallenge';
+import { Level10Void } from './Level10Void';
 import { ResultsCard } from './ResultsCard';
 
 export function GameContainer() {
@@ -11,14 +11,17 @@ export function GameContainer() {
     phase,
     sessionId,
     choices,
-    level7WaitTime,
+    level10IdleTime,
     startGame,
     makeChoice,
     advanceToNextLevel,
-    completeLevel7,
+    completeLevel10,
     restartGame,
     getResult,
     getCurrentLevel,
+    getCurrentPhase,
+    getLaterCount,
+    getNowCount,
   } = useGameState();
 
   const currentLevel = getCurrentLevel();
@@ -28,15 +31,15 @@ export function GameContainer() {
     if (phase === 'playing' && currentLevel) {
       return {
         current: currentLevel.id,
-        total: 6,
+        total: 10,
         title: currentLevel.title,
       };
     }
-    if (phase === 'timer') {
+    if (phase === 'void') {
       return {
-        current: 7,
-        total: 7,
-        title: 'The Final Test',
+        current: 10,
+        total: 10,
+        title: 'The Pause',
       };
     }
     return null;
@@ -65,11 +68,11 @@ export function GameContainer() {
           />
         )}
 
-        {phase === 'timer' && (
-          <TimerChallenge
-            key="timer"
+        {phase === 'void' && (
+          <Level10Void
+            key="void"
             sessionId={sessionId}
-            onComplete={completeLevel7}
+            onComplete={completeLevel10}
           />
         )}
 
@@ -77,8 +80,9 @@ export function GameContainer() {
           <ResultsCard
             key="results"
             archetype={getResult()}
-            choices={choices}
-            level7WaitTime={level7WaitTime}
+            laterCount={getLaterCount()}
+            nowCount={getNowCount()}
+            level10IdleTime={level10IdleTime}
             onRestart={restartGame}
           />
         )}

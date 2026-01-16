@@ -1,26 +1,26 @@
-import { useState, useCallback, useEffect } from 'react';
-import { levels, getArchetype, Archetype } from '@/lib/gameData';
+import { useState, useCallback } from 'react';
+import { levels, level10, getArchetype, Archetype, ChoiceRecord, Phase } from '@/lib/gameData';
 
-export type GamePhase = 'start' | 'playing' | 'timer' | 'results';
+export type GamePhase = 'start' | 'playing' | 'void' | 'results';
 export type Choice = 'now' | 'later';
 
 interface GameState {
   phase: GamePhase;
   currentLevel: number;
-  choices: (Choice | null)[];
+  choices: ChoiceRecord[];
   sessionId: string;
-  level7WaitTime: number | null;
-  passedLevel7: boolean;
+  level10IdleTime: number;
+  level10Clicked: boolean;
 }
 
 export function useGameState() {
   const [state, setState] = useState<GameState>(() => ({
     phase: 'start',
     currentLevel: 0,
-    choices: Array(6).fill(null),
+    choices: [],
     sessionId: crypto.randomUUID(),
-    level7WaitTime: null,
-    passedLevel7: false,
+    level10IdleTime: 0,
+    level10Clicked: false,
   }));
 
   const startGame = useCallback(() => {
@@ -28,17 +28,17 @@ export function useGameState() {
       ...prev,
       phase: 'playing',
       currentLevel: 0,
-      choices: Array(6).fill(null),
+      choices: [],
       sessionId: crypto.randomUUID(),
-      level7WaitTime: null,
-      passedLevel7: false,
+      level10IdleTime: 0,
+      level10Clicked: false,
     }));
   }, []);
 
   const makeChoice = useCallback((choice: Choice) => {
     setState(prev => {
-      const newChoices = [...prev.choices];
-      newChoices[prev.currentLevel] = choice;
+      const currentLevelData = levels[prev.currentLevel];
+      const newChoices = [...prev.choices, { levelId: currentLevelData.id, choice }];
       
       const nextLevel = prev.currentLevel + 1;
       const isLastLevel = nextLevel >= levels.length;
@@ -47,7 +47,7 @@ export function useGameState() {
         ...prev,
         choices: newChoices,
         currentLevel: isLastLevel ? prev.currentLevel : nextLevel,
-        phase: isLastLevel ? 'timer' : 'playing',
+        phase: isLastLevel ? 'void' : 'playing',
       };
     });
   }, []);
@@ -60,16 +60,16 @@ export function useGameState() {
       return {
         ...prev,
         currentLevel: isLastLevel ? prev.currentLevel : nextLevel,
-        phase: isLastLevel ? 'timer' : 'playing',
+        phase: isLastLevel ? 'void' : 'playing',
       };
     });
   }, []);
 
-  const completeLevel7 = useCallback((waitTime: number, passed: boolean) => {
+  const completeLevel10 = useCallback((idleTime: number) => {
     setState(prev => ({
       ...prev,
-      level7WaitTime: waitTime,
-      passedLevel7: passed,
+      level10IdleTime: idleTime,
+      level10Clicked: true,
       phase: 'results',
     }));
   }, []);
@@ -78,20 +78,24 @@ export function useGameState() {
     setState({
       phase: 'start',
       currentLevel: 0,
-      choices: Array(6).fill(null),
+      choices: [],
       sessionId: crypto.randomUUID(),
-      level7WaitTime: null,
-      passedLevel7: false,
+      level10IdleTime: 0,
+      level10Clicked: false,
     });
   }, []);
 
   const getLaterCount = useCallback((): number => {
-    return state.choices.filter(c => c === 'later').length;
+    return state.choices.filter(c => c.choice === 'later').length;
+  }, [state.choices]);
+
+  const getNowCount = useCallback((): number => {
+    return state.choices.filter(c => c.choice === 'now').length;
   }, [state.choices]);
 
   const getResult = useCallback((): Archetype => {
-    return getArchetype(getLaterCount(), state.passedLevel7);
-  }, [getLaterCount, state.passedLevel7]);
+    return getArchetype(state.choices, state.level10IdleTime, state.level10Clicked);
+  }, [state.choices, state.level10IdleTime, state.level10Clicked]);
 
   const getCurrentLevel = useCallback(() => {
     if (state.currentLevel < levels.length) {
@@ -100,15 +104,23 @@ export function useGameState() {
     return null;
   }, [state.currentLevel]);
 
+  const getCurrentPhase = useCallback((): Phase | null => {
+    const level = getCurrentLevel();
+    return level ? level.phase : null;
+  }, [getCurrentLevel]);
+
   return {
     ...state,
     startGame,
     makeChoice,
     advanceToNextLevel,
-    completeLevel7,
+    completeLevel10,
     restartGame,
     getLaterCount,
+    getNowCount,
     getResult,
     getCurrentLevel,
+    getCurrentPhase,
+    level10Data: level10,
   };
 }
