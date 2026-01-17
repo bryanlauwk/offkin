@@ -57,10 +57,14 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        "action-now": "hsl(var(--action-now))",
-        "action-now-foreground": "hsl(var(--action-now-foreground))",
-        "action-later": "hsl(var(--action-later))",
-        "action-later-foreground": "hsl(var(--action-later-foreground))",
+        cooperate: {
+          DEFAULT: "hsl(var(--cooperate))",
+          foreground: "hsl(var(--cooperate-foreground))",
+        },
+        defect: {
+          DEFAULT: "hsl(var(--defect))",
+          foreground: "hsl(var(--defect-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
