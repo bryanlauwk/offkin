@@ -1,118 +1,132 @@
 import { useState, useCallback } from 'react';
-import { levels, level10, getArchetype, Archetype, ChoiceRecord, Phase } from '@/lib/gameData';
+import { 
+  levels, 
+  getArchetype, 
+  getOpponentChoice, 
+  getOutcome, 
+  Archetype, 
+  Choice, 
+  RoundResult,
+  Outcome 
+} from '@/lib/gameData';
 
-export type GamePhase = 'start' | 'playing' | 'void' | 'toast' | 'results';
-export type Choice = 'now' | 'later';
+export type GamePhase = 'start' | 'playing' | 'thinking' | 'reveal' | 'results';
+export type { Choice } from '@/lib/gameData';
 
 interface GameState {
   phase: GamePhase;
   currentLevel: number;
-  choices: ChoiceRecord[];
+  results: RoundResult[];
   sessionId: string;
-  level10IdleTime: number;
-  level10Clicked: boolean;
-  toastWaitTime: number;
-  toastPassed: boolean;
+  pendingChoice: Choice | null;
+  pendingOpponentChoice: Choice | null;
+  pendingOutcome: Outcome | null;
 }
 
 export function useGameState() {
   const [state, setState] = useState<GameState>(() => ({
     phase: 'start',
     currentLevel: 0,
-    choices: [],
+    results: [],
     sessionId: crypto.randomUUID(),
-    level10IdleTime: 0,
-    level10Clicked: false,
-    toastWaitTime: 0,
-    toastPassed: false,
+    pendingChoice: null,
+    pendingOpponentChoice: null,
+    pendingOutcome: null,
   }));
 
   const startGame = useCallback(() => {
-    setState(prev => ({
-      ...prev,
+    setState({
       phase: 'playing',
       currentLevel: 0,
-      choices: [],
+      results: [],
       sessionId: crypto.randomUUID(),
-      level10IdleTime: 0,
-      level10Clicked: false,
-      toastWaitTime: 0,
-      toastPassed: false,
-    }));
+      pendingChoice: null,
+      pendingOpponentChoice: null,
+      pendingOutcome: null,
+    });
   }, []);
 
   const makeChoice = useCallback((choice: Choice) => {
     setState(prev => {
-      const currentLevelData = levels[prev.currentLevel];
-      const newChoices = [...prev.choices, { levelId: currentLevelData.id, choice }];
+      // Get opponent choice based on previous player choice
+      const previousChoice = prev.results.length > 0 
+        ? prev.results[prev.results.length - 1].playerChoice 
+        : null;
       
-      const nextLevel = prev.currentLevel + 1;
-      const isLastLevel = nextLevel >= levels.length;
+      const currentLevelData = levels[prev.currentLevel];
+      const opponentChoice = getOpponentChoice(currentLevelData.id, previousChoice);
+      const outcome = getOutcome(choice, opponentChoice);
       
       return {
         ...prev,
-        choices: newChoices,
-        currentLevel: isLastLevel ? prev.currentLevel : nextLevel,
-        phase: isLastLevel ? 'void' : 'playing',
+        phase: 'thinking',
+        pendingChoice: choice,
+        pendingOpponentChoice: opponentChoice,
+        pendingOutcome: outcome,
       };
     });
+  }, []);
+
+  const completeThinking = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      phase: 'reveal',
+    }));
   }, []);
 
   const advanceToNextLevel = useCallback(() => {
     setState(prev => {
+      if (!prev.pendingChoice || !prev.pendingOpponentChoice || !prev.pendingOutcome) {
+        return prev;
+      }
+
+      const currentLevelData = levels[prev.currentLevel];
+      const newResult: RoundResult = {
+        levelId: currentLevelData.id,
+        playerChoice: prev.pendingChoice,
+        opponentChoice: prev.pendingOpponentChoice,
+        outcome: prev.pendingOutcome,
+      };
+
+      const newResults = [...prev.results, newResult];
       const nextLevel = prev.currentLevel + 1;
       const isLastLevel = nextLevel >= levels.length;
-      
+
       return {
         ...prev,
+        results: newResults,
         currentLevel: isLastLevel ? prev.currentLevel : nextLevel,
-        phase: isLastLevel ? 'void' : 'playing',
+        phase: isLastLevel ? 'results' : 'playing',
+        pendingChoice: null,
+        pendingOpponentChoice: null,
+        pendingOutcome: null,
       };
     });
-  }, []);
-
-  const completeLevel10 = useCallback((idleTime: number) => {
-    setState(prev => ({
-      ...prev,
-      level10IdleTime: idleTime,
-      level10Clicked: true,
-      phase: 'toast',
-    }));
-  }, []);
-
-  const completeToastChallenge = useCallback((waitTime: number, passed: boolean) => {
-    setState(prev => ({
-      ...prev,
-      toastWaitTime: waitTime,
-      toastPassed: passed,
-      phase: 'results',
-    }));
   }, []);
 
   const restartGame = useCallback(() => {
     setState({
       phase: 'start',
       currentLevel: 0,
-      choices: [],
+      results: [],
       sessionId: crypto.randomUUID(),
-      level10IdleTime: 0,
-      level10Clicked: false,
-      toastWaitTime: 0,
-      toastPassed: false,
+      pendingChoice: null,
+      pendingOpponentChoice: null,
+      pendingOutcome: null,
     });
   }, []);
 
-  const getLaterCount = useCallback((): number => {
-    return state.choices.filter(c => c.choice === 'later').length;
-  }, [state.choices]);
+  const getCooperateCount = useCallback((): number => {
+    return state.results.filter(r => r.playerChoice === 'cooperate').length;
+  }, [state.results]);
 
-  const getNowCount = useCallback((): number => {
-    return state.choices.filter(c => c.choice === 'now').length;
-  }, [state.choices]);
+  const getDefectCount = useCallback((): number => {
+    return state.results.filter(r => r.playerChoice === 'defect').length;
+  }, [state.results]);
 
   const getResult = useCallback((): Archetype => {
-    return getArchetype(state.choices, state.level10IdleTime, state.level10Clicked);
-  }, [state.choices, state.level10IdleTime, state.level10Clicked]);
+    return getArchetype(state.results);
+  }, [state.results]);
 
   const getCurrentLevel = useCallback(() => {
     if (state.currentLevel < levels.length) {
@@ -121,24 +135,26 @@ export function useGameState() {
     return null;
   }, [state.currentLevel]);
 
-  const getCurrentPhase = useCallback((): Phase | null => {
-    const level = getCurrentLevel();
-    return level ? level.phase : null;
-  }, [getCurrentLevel]);
+  const getWinWinCount = useCallback((): number => {
+    return state.results.filter(r => r.outcome === 'win-win').length;
+  }, [state.results]);
+
+  const getBetrayedCount = useCallback((): number => {
+    return state.results.filter(r => r.outcome === 'they-betray').length;
+  }, [state.results]);
 
   return {
     ...state,
     startGame,
     makeChoice,
+    completeThinking,
     advanceToNextLevel,
-    completeLevel10,
-    completeToastChallenge,
     restartGame,
-    getLaterCount,
-    getNowCount,
+    getCooperateCount,
+    getDefectCount,
     getResult,
     getCurrentLevel,
-    getCurrentPhase,
-    level10Data: level10,
+    getWinWinCount,
+    getBetrayedCount,
   };
 }

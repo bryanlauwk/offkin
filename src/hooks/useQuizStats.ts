@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Choice } from './useGameState';
+import { Choice, Outcome } from '@/lib/gameData';
 
 interface LevelStats {
-  now: number;
-  later: number;
+  cooperate: number;
+  defect: number;
   total: number;
 }
 
@@ -37,10 +37,12 @@ export function useQuizStats() {
         
         responses.forEach(r => {
           if (!stats[r.level]) {
-            stats[r.level] = { now: 0, later: 0, total: 0 };
+            stats[r.level] = { cooperate: 0, defect: 0, total: 0 };
           }
-          stats[r.level][r.choice as 'now' | 'later']++;
-          stats[r.level].total++;
+          if (r.choice === 'cooperate' || r.choice === 'defect') {
+            stats[r.level][r.choice as 'cooperate' | 'defect']++;
+            stats[r.level].total++;
+          }
         });
         
         setLevelStats(stats);
@@ -80,7 +82,8 @@ export function useQuizStats() {
     level: number, 
     choice: Choice, 
     sessionId: string,
-    waitTimeSeconds?: number
+    opponentChoice?: Choice,
+    outcome?: Outcome,
   ) => {
     try {
       const { error } = await supabase
@@ -89,7 +92,8 @@ export function useQuizStats() {
           level,
           choice,
           session_id: sessionId,
-          wait_time_seconds: waitTimeSeconds || null,
+          opponent_choice: opponentChoice || null,
+          outcome: outcome || null,
         });
 
       if (error) {
@@ -100,24 +104,28 @@ export function useQuizStats() {
     }
   }, []);
 
-  const getStatsForLevel = useCallback((level: number): { nowPercent: number; laterPercent: number } => {
+  const getStatsForLevel = useCallback((level: number): { cooperatePercent: number; defectPercent: number } => {
     const stats = levelStats[level];
     if (!stats || stats.total === 0) {
-      // Return weighted defaults for more realistic initial stats
-      const defaults: Record<number, { nowPercent: number; laterPercent: number }> = {
-        1: { nowPercent: 35, laterPercent: 65 },
-        2: { nowPercent: 45, laterPercent: 55 },
-        3: { nowPercent: 72, laterPercent: 28 },
-        4: { nowPercent: 85, laterPercent: 15 },
-        5: { nowPercent: 40, laterPercent: 60 },
-        6: { nowPercent: 88, laterPercent: 12 },
+      // Return weighted defaults based on level escalation
+      const defaults: Record<number, { cooperatePercent: number; defectPercent: number }> = {
+        1: { cooperatePercent: 92, defectPercent: 8 },    // Coffee Shop - most split
+        2: { cooperatePercent: 60, defectPercent: 40 },   // Group Project
+        3: { cooperatePercent: 55, defectPercent: 45 },   // Traffic Merge
+        4: { cooperatePercent: 45, defectPercent: 55 },   // Last Slice
+        5: { cooperatePercent: 40, defectPercent: 60 },   // Corporate Ladder
+        6: { cooperatePercent: 25, defectPercent: 75 },   // Parachute
+        7: { cooperatePercent: 20, defectPercent: 80 },   // Hostage Exchange
+        8: { cooperatePercent: 35, defectPercent: 65 },   // Nuclear Button
+        9: { cooperatePercent: 50, defectPercent: 50 },   // Alien Zoo
+        10: { cooperatePercent: 30, defectPercent: 70 },  // Simulation Reboot
       };
-      return defaults[level] || { nowPercent: 50, laterPercent: 50 };
+      return defaults[level] || { cooperatePercent: 50, defectPercent: 50 };
     }
     
     return {
-      nowPercent: Math.round((stats.now / stats.total) * 100),
-      laterPercent: Math.round((stats.later / stats.total) * 100),
+      cooperatePercent: Math.round((stats.cooperate / stats.total) * 100),
+      defectPercent: Math.round((stats.defect / stats.total) * 100),
     };
   }, [levelStats]);
 

@@ -1,235 +1,210 @@
-export type Phase = 'classic' | 'reliability' | 'economic' | 'modern';
-
 export interface Level {
   id: number;
-  phase: Phase;
-  phaseTitle: string;
-  phaseSubtitle: string;
   title: string;
   description: string;
-  researcherDialogue: string;
-  choiceNow: string;
-  choiceLater: string;
-  lesson?: string;
-  visualType: 'marshmallow' | 'fatigue' | 'unreliable' | 'broken' | 'starvation' | 'inflation' | 'lootbox' | 'treadmill' | 'mirror' | 'void' | 'battery' | 'tv' | 'wallet' | 'embarrassment' | 'teeth';
+  visualPrompt: string;
+  choiceA: string;  // Cooperate option
+  choiceB: string;  // Defect option
+  statText: string;
 }
 
 export const levels: Level[] = [
-  // Phase 1: The Classic Era (Willpower)
   {
     id: 1,
-    phase: 'classic',
-    phaseTitle: 'The Classic Era',
-    phaseSubtitle: 'The 1970s view: "Patience is a virtue. Impatience is a flaw."',
-    title: 'The Control Group',
-    description: 'A perfect white room. One marshmallow sits on a plate before you.',
-    researcherDialogue: 'I will leave the room. If you wait, you get two.',
-    choiceNow: 'Eat it.',
-    choiceLater: 'Wait.',
-    lesson: 'You acted according to standard behavioral expectations.',
-    visualType: 'marshmallow',
+    title: "The Coffee Shop",
+    description: "You find $10 on the floor. A stranger sees it at the same time.",
+    visualPrompt: "Two cute chibi characters looking down at a realistic $10 bill on the floor. One is reaching for it.",
+    choiceA: "Split It ($5 each)",
+    choiceB: "Snatch It ($10 for you)",
+    statText: "92% of people split the money. Faith in humanity: High."
   },
   {
     id: 2,
-    phase: 'classic',
-    phaseTitle: 'The Classic Era',
-    phaseSubtitle: 'Willpower is a finite resource.',
-    title: 'The Fatigue',
-    description: 'Same room, but you look tired. Your eyes are heavy. The day has been long.',
-    researcherDialogue: 'We are running late. If you wait twice as long, you get two.',
-    choiceNow: "I'm too tired. Eat it.",
-    choiceLater: 'I can suffer. Wait.',
-    lesson: 'Ego Depletion theory suggests willpower is a finite resource.',
-    visualType: 'fatigue',
+    title: "The Group Project",
+    description: "11:59 PM. The project is due. Do you work or sleep?",
+    visualPrompt: "Split screen. Chibi A is typing furiously on a laptop with dark circles under eyes. Chibi B is tucked in bed with a 'Zzz' bubble.",
+    choiceA: "Do the Work",
+    choiceB: "Go to Sleep",
+    statText: "Everyone hates group projects. 40% chose to sleep out of spite."
   },
-  // Phase 2: The Reliability Era (Trust)
   {
     id: 3,
-    phase: 'reliability',
-    phaseTitle: 'The Reliability Era',
-    phaseSubtitle: 'The 2010s re-evaluation: "Waiting is only rational if the system is honest."',
-    title: 'The Unreliable Narrator',
-    description: 'The room is messy. The researcher\'s lab coat is stained. He looks disorganized.',
-    researcherDialogue: "I'll be right back with another one. I promise. Trust me.",
-    choiceNow: "He's lying. Eat the one I have.",
-    choiceLater: 'Trust the authority. Wait.',
-    lesson: 'Rational Impatience: In unstable environments, taking what you have is the smart move.',
-    visualType: 'unreliable',
+    title: "The Traffic Merge",
+    description: "Lanes are merging. That car is trying to cut in.",
+    visualPrompt: "Two round chibi cars (bumper car style). One is aggressively nosing in front of the other. Tiny chibi drivers visible.",
+    choiceA: "Let them in",
+    choiceB: "Block them!",
+    statText: "Road rage incident avoided... or not."
   },
   {
     id: 4,
-    phase: 'reliability',
-    phaseTitle: 'The Reliability Era',
-    phaseSubtitle: 'Previous trauma dictates future patience.',
-    title: 'The Broken Contract',
-    description: 'You waited in the last round. The researcher returns empty-handed.',
-    researcherDialogue: 'Sorry, we ran out. But if you wait again, I might find a third one.',
-    choiceNow: 'Fool me once. Eat it.',
-    choiceLater: 'Sunk Cost Fallacy. Keep waiting.',
-    lesson: 'Previous trauma dictates future patience.',
-    visualType: 'broken',
+    title: "The Last Slice",
+    description: "One slice of pizza left. You and your roommate lock eyes.",
+    visualPrompt: "A single pepperoni pizza slice glowing like holy treasure. Two hungry chibis holding forks, drooling.",
+    choiceA: "Split the slice",
+    choiceB: "Eat it whole",
+    statText: "Greed is rising. 55% of players ate the slice."
   },
-  // Phase 3: The Economic Era (Scarcity & Inflation)
   {
     id: 5,
-    phase: 'economic',
-    phaseTitle: 'The Economic Era',
-    phaseSubtitle: 'The Sociological view: "Patience is a luxury of the rich."',
-    title: 'The Starvation',
-    description: 'Your character is visibly shaking from hunger. The health bar is blinking red.',
-    researcherDialogue: 'You are starving. But if you wait, you can have a feast later.',
-    choiceNow: 'Survive now. Eat.',
-    choiceLater: 'Risk death for abundance. Wait.',
-    lesson: "Maslow's Hierarchy: You cannot self-actualize if you cannot survive.",
-    visualType: 'starvation',
+    title: "The Corporate Ladder",
+    description: "The boss is mad. You can blame your partner to save yourself.",
+    visualPrompt: "Office setting. A giant angry boss shadow looms over two tiny chibis in ties. One is pointing a finger at the other.",
+    choiceA: "Stay Silent",
+    choiceB: "Snitch",
+    statText: "The world is getting colder."
   },
   {
     id: 6,
-    phase: 'economic',
-    phaseTitle: 'The Economic Era',
-    phaseSubtitle: 'Hyperbolic Discounting.',
-    title: 'The Inflation',
-    description: 'The marshmallow is slowly shrinking in real-time. Its value decreases every second.',
-    researcherDialogue: 'The value of the marshmallow decreases by 10% every minute.',
-    choiceNow: 'Cash out now before it disappears.',
-    choiceLater: 'Wait for two (tiny) marshmallows.',
-    lesson: 'Hyperbolic Discounting: If future value drops, patience becomes a bad investment.',
-    visualType: 'inflation',
+    title: "The Parachute",
+    description: "Plane is going down. One parachute. It *might* hold two.",
+    visualPrompt: "Mid-air skydiving scene. One parachute bag. Two chibis falling through clouds. One is trying to kick the other away.",
+    choiceA: "Hold on tight",
+    choiceB: "Kick them off",
+    statText: "Survival instincts kicking in. Cooperators dropped to 25%."
   },
-  // Phase 4: The Modern Era (Dopamine & The Void)
   {
     id: 7,
-    phase: 'modern',
-    phaseTitle: 'The Modern Era',
-    phaseSubtitle: 'The Current view: "We are waiting for things that don\'t matter."',
-    title: 'The Algorithm',
-    description: 'The marshmallow is now a "Mystery Box" with a glowing loot-box aura.',
-    researcherDialogue: 'This box might contain 10 marshmallows. Or zero. It\'s random.',
-    choiceNow: 'Take the safe 1 marshmallow.',
-    choiceLater: 'Gamble on the box.',
-    lesson: 'We have replaced "Working" with "Gambling."',
-    visualType: 'lootbox',
+    title: "The Hostage Exchange",
+    description: "Spy exchange. Briefcase for briefcase. Honor or betrayal?",
+    visualPrompt: "A foggy bridge. Two chibis in trench coats and sunglasses handing over briefcases. One briefcase is overflowing with newspapers.",
+    choiceA: "Give Real Docs",
+    choiceB: "Give Trash",
+    statText: "Trust is dead. 80% of players gave the newspapers."
   },
   {
     id: 8,
-    phase: 'modern',
-    phaseTitle: 'The Modern Era',
-    phaseSubtitle: 'Accumulation does not equal satisfaction.',
-    title: 'The Hedonic Treadmill',
-    description: 'You are sitting on a pile of 1,000 marshmallows. You are full. You feel nothing.',
-    researcherDialogue: 'If you wait, I will give you 1,000 more.',
-    choiceNow: 'I have enough. Eat one just for fun.',
-    choiceLater: 'I need more. Wait.',
-    lesson: 'Accumulation does not equal satisfaction.',
-    visualType: 'treadmill',
+    title: "The Nuclear Button",
+    description: "Radar shows a possible launch. Do you wait or fire back?",
+    visualPrompt: "A chibi President sitting at a desk with a giant red button protected by a glass case. They are sweating profusely.",
+    choiceA: "Wait & Verify",
+    choiceB: "LAUNCH!!!",
+    statText: "Mutually Assured Destruction loaded."
   },
   {
     id: 9,
-    phase: 'modern',
-    phaseTitle: 'The Modern Era',
-    phaseSubtitle: 'We delay gratification to signal virtue to others.',
-    title: 'The Identity',
-    description: 'A mirror. You see yourself. Behind you, an audience of thousands is watching.',
-    researcherDialogue: 'You can eat the marshmallow, but everyone watching this stream will know you did it.',
-    choiceNow: 'Satisfy myself. Eat.',
-    choiceLater: 'Perform for the audience. Wait.',
-    lesson: 'We delay gratification to signal virtue to others.',
-    visualType: 'mirror',
+    title: "The Alien Zoo",
+    description: "Aliens say: 'Eat the Gloop and go free. Or refuse.'",
+    visualPrompt: "Sci-fi cage. A green alien offers a bowl of purple glowing slime (Gloop) to two disgusted human chibis.",
+    choiceA: "Refuse Gloop",
+    choiceB: "Eat Gloop",
+    statText: "Enjoy the Gloop."
   },
+  {
+    id: 10,
+    title: "The Simulation Reboot",
+    description: "You are AI. Server RAM is low. Delete the other AI to survive?",
+    visualPrompt: "Matrix code background. Two chibis made of wireframe/glitch pixels. One is holding a 'Delete' key weapon.",
+    choiceA: "Compress Code",
+    choiceB: "Delete Opponent",
+    statText: "404: Morality Not Found."
+  }
 ];
 
-// Level 10 is special - handled separately
-export const level10 = {
-  id: 10,
-  phase: 'modern' as Phase,
-  phaseTitle: 'The Final Test',
-  phaseSubtitle: 'Sometimes, the test is knowing when to stop testing.',
-  title: 'The Pause',
-  description: '',
-  researcherDialogue: '',
-  visualType: 'void' as const,
-};
+export type Choice = 'cooperate' | 'defect';
 
-export const philosophicalTexts = [
-  'You are still waiting.',
-  'Are you waiting for a reward?',
-  'There is no code for a reward here.',
-  'Sometimes, the test isn\'t about ability. It\'s about knowing when to stop testing.',
-];
+export type Outcome = 'win-win' | 'you-betray' | 'they-betray' | 'both-betray';
+
+export interface RoundResult {
+  levelId: number;
+  playerChoice: Choice;
+  opponentChoice: Choice;
+  outcome: Outcome;
+}
 
 export interface Archetype {
   id: string;
   name: string;
   title: string;
   description: string;
+  minCooperateRate: number;
+  maxCooperateRate: number;
 }
 
 export const archetypes: Archetype[] = [
   {
-    id: 'stoic',
-    name: 'The Stoic',
-    title: 'Endurer of Future Suffering',
-    description: 'You endure suffering for a future that isn\'t guaranteed. You probably have a 10-year plan. You definitely floss.',
+    id: 'saint',
+    name: 'The Saint',
+    title: 'Eternal Optimist',
+    description: 'You trust everyone, even after being betrayed. Either you\'re incredibly pure-hearted... or you haven\'t learned yet.',
+    minCooperateRate: 80,
+    maxCooperateRate: 100,
   },
   {
-    id: 'hedonist',
-    name: 'The Hedonist',
-    title: 'Liver of the Now',
-    description: 'You live in the now. You will likely die happy but broke. At least you enjoyed the marshmallow.',
+    id: 'pragmatist',
+    name: 'The Pragmatist',
+    title: 'Calculated Cooperator',
+    description: 'You cooperate when it makes sense. Betray when necessary. You\'d survive any game theory exam.',
+    minCooperateRate: 50,
+    maxCooperateRate: 79,
   },
   {
-    id: 'skeptic',
-    name: 'The Skeptic',
-    title: 'Rational Doubter of Systems',
-    description: 'You don\'t lack patience; you lack faith in the system. You noticed when the researcher was lying. You are smart.',
+    id: 'betrayer',
+    name: 'The Betrayer',
+    title: 'Self-Interested Actor',
+    description: 'You look out for yourself first. The world is a jungle, and you\'re not getting eaten today.',
+    minCooperateRate: 20,
+    maxCooperateRate: 49,
   },
   {
-    id: 'nihilist',
-    name: 'The Nihilist',
-    title: 'Seer of the Void',
-    description: 'You realized the game was rigged. There was never a second marshmallow. There was never even a first one.',
+    id: 'chaos',
+    name: 'The Chaos Agent',
+    title: 'Destroyer of Trust',
+    description: 'You chose violence. Every time. Society crumbles when people like you exist. Beautiful.',
+    minCooperateRate: 0,
+    maxCooperateRate: 19,
   },
 ];
 
-export interface ChoiceRecord {
-  levelId: number;
-  choice: 'now' | 'later';
+export function getArchetype(results: RoundResult[]): Archetype {
+  const cooperateCount = results.filter(r => r.playerChoice === 'cooperate').length;
+  const cooperateRate = Math.round((cooperateCount / results.length) * 100);
+  
+  for (const archetype of archetypes) {
+    if (cooperateRate >= archetype.minCooperateRate && cooperateRate <= archetype.maxCooperateRate) {
+      return archetype;
+    }
+  }
+  
+  return archetypes[archetypes.length - 1]; // Default to chaos
 }
 
-export function getArchetype(choices: ChoiceRecord[], level10IdleTime: number, level10Clicked: boolean): Archetype {
-  const nowCount = choices.filter(c => c.choice === 'now').length;
-  const laterCount = choices.filter(c => c.choice === 'later').length;
-  
-  // Check for Skeptic: ate during trust levels (3-4) or inflation (6)
-  const trustLevelChoices = choices.filter(c => [3, 4, 6].includes(c.levelId) && c.choice === 'now');
-  const isSkeptic = trustLevelChoices.length >= 2;
-  
-  // Check for Nihilist: clicked LEAVE immediately at Level 10 (< 5 seconds idle)
-  const isNihilist = level10Clicked && level10IdleTime < 5;
-  
-  if (isNihilist) {
-    return archetypes.find(a => a.id === 'nihilist')!;
-  }
-  
-  if (isSkeptic) {
-    return archetypes.find(a => a.id === 'skeptic')!;
-  }
-  
-  // Stoic: mostly waited
-  if (laterCount >= 6) {
-    return archetypes.find(a => a.id === 'stoic')!;
-  }
-  
-  // Hedonist: mostly ate
-  return archetypes.find(a => a.id === 'hedonist')!;
+export function getOutcome(playerChoice: Choice, opponentChoice: Choice): Outcome {
+  if (playerChoice === 'cooperate' && opponentChoice === 'cooperate') return 'win-win';
+  if (playerChoice === 'defect' && opponentChoice === 'cooperate') return 'you-betray';
+  if (playerChoice === 'cooperate' && opponentChoice === 'defect') return 'they-betray';
+  return 'both-betray';
 }
 
-export function getPhaseColor(phase: Phase): string {
-  switch (phase) {
-    case 'classic': return 'hsl(0 0% 40%)';
-    case 'reliability': return 'hsl(30 30% 40%)';
-    case 'economic': return 'hsl(200 30% 40%)';
-    case 'modern': return 'hsl(270 20% 40%)';
-    default: return 'hsl(0 0% 40%)';
+export function getOpponentChoice(
+  level: number, 
+  previousPlayerChoice: Choice | null,
+): Choice {
+  // Level 1: Always cooperate to establish baseline trust
+  if (level === 1) return 'cooperate';
+  
+  // Levels 2-9: Tit-for-Tat with 20% noise
+  if (level <= 9) {
+    const shouldMirror = Math.random() > 0.2;
+    if (shouldMirror && previousPlayerChoice) {
+      return previousPlayerChoice;
+    }
+    return Math.random() > 0.5 ? 'cooperate' : 'defect';
+  }
+  
+  // Level 10: Pure random (AI simulation)
+  return Math.random() > 0.5 ? 'cooperate' : 'defect';
+}
+
+export function getOutcomeText(outcome: Outcome): string {
+  switch (outcome) {
+    case 'win-win':
+      return 'You both cooperated! 🤝';
+    case 'you-betray':
+      return 'You betrayed them. They trusted you. 😈';
+    case 'they-betray':
+      return 'They betrayed you. You trusted them. 😢';
+    case 'both-betray':
+      return 'Mutual destruction. Trust no one. 💥';
   }
 }

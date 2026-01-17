@@ -3,54 +3,62 @@ import { useGameState } from '@/hooks/useGameState';
 import { GameHeader } from './GameHeader';
 import { StartScreen } from './StartScreen';
 import { ScenarioCard } from './ScenarioCard';
-import { Level10Void } from './Level10Void';
-import { ToastChallenge } from './ToastChallenge';
+import { ThinkingPhase, RevealCard } from './ThinkingPhase';
 import { ResultsCard } from './ResultsCard';
+import { useQuizStats } from '@/hooks/useQuizStats';
+import { levels } from '@/lib/gameData';
 
 export function GameContainer() {
   const {
     phase,
     sessionId,
-    choices,
-    level10IdleTime,
-    toastWaitTime,
-    toastPassed,
+    currentLevel,
+    pendingOutcome,
     startGame,
     makeChoice,
+    completeThinking,
     advanceToNextLevel,
-    completeLevel10,
-    completeToastChallenge,
     restartGame,
     getResult,
     getCurrentLevel,
-    getCurrentPhase,
-    getLaterCount,
-    getNowCount,
+    getCooperateCount,
+    getDefectCount,
+    getWinWinCount,
+    getBetrayedCount,
+    pendingChoice,
+    pendingOpponentChoice,
   } = useGameState();
 
-  const currentLevel = getCurrentLevel();
+  const { submitResponse } = useQuizStats();
+
+  const levelData = getCurrentLevel();
+
+  // Submit to database when choice is made
+  const handleChoice = async (choice: Parameters<typeof makeChoice>[0]) => {
+    makeChoice(choice);
+  };
+
+  // Handle thinking complete - also submit to database
+  const handleThinkingComplete = async () => {
+    if (pendingChoice && pendingOpponentChoice && pendingOutcome && levelData) {
+      await submitResponse(
+        levelData.id,
+        pendingChoice,
+        sessionId,
+        pendingOpponentChoice,
+        pendingOutcome
+      );
+    }
+    completeThinking();
+  };
 
   // Determine level info for header
   const getLevelInfo = () => {
-    if (phase === 'playing' && currentLevel) {
+    if ((phase === 'playing' || phase === 'thinking' || phase === 'reveal') && levelData) {
       return {
-        current: currentLevel.id,
-        total: 11,
-        title: currentLevel.title,
-      };
-    }
-    if (phase === 'void') {
-      return {
-        current: 10,
-        total: 11,
-        title: 'The Pause',
-      };
-    }
-    if (phase === 'toast') {
-      return {
-        current: 11,
-        total: 11,
-        title: 'The Final Test',
+        current: levelData.id,
+        total: 10,
+        title: levelData.title,
       };
     }
     return null;
@@ -69,29 +77,29 @@ export function GameContainer() {
           <StartScreen key="start" onStart={startGame} />
         )}
 
-        {phase === 'playing' && currentLevel && (
+        {phase === 'playing' && levelData && (
           <ScenarioCard
-            key={`level-${currentLevel.id}`}
-            level={currentLevel}
+            key={`level-${levelData.id}`}
+            level={levelData}
             sessionId={sessionId}
-            onChoice={makeChoice}
+            onChoice={handleChoice}
+          />
+        )}
+
+        {phase === 'thinking' && (
+          <ThinkingPhase
+            key="thinking"
+            onComplete={handleThinkingComplete}
+          />
+        )}
+
+        {phase === 'reveal' && pendingOutcome && levelData && (
+          <RevealCard
+            key="reveal"
+            outcome={pendingOutcome}
+            levelId={levelData.id}
+            statText={levelData.statText}
             onAdvance={advanceToNextLevel}
-          />
-        )}
-
-        {phase === 'void' && (
-          <Level10Void
-            key="void"
-            sessionId={sessionId}
-            onComplete={completeLevel10}
-          />
-        )}
-
-        {phase === 'toast' && (
-          <ToastChallenge
-            key="toast"
-            sessionId={sessionId}
-            onComplete={completeToastChallenge}
           />
         )}
 
@@ -99,11 +107,10 @@ export function GameContainer() {
           <ResultsCard
             key="results"
             archetype={getResult()}
-            laterCount={getLaterCount()}
-            nowCount={getNowCount()}
-            level10IdleTime={level10IdleTime}
-            toastWaitTime={toastWaitTime}
-            toastPassed={toastPassed}
+            cooperateCount={getCooperateCount()}
+            defectCount={getDefectCount()}
+            winWinCount={getWinWinCount()}
+            betrayedCount={getBetrayedCount()}
             onRestart={restartGame}
           />
         )}

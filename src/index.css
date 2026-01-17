@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    /* The Absurd Marshmallow Test - Academic Paper meets MS Paint */
+    /* The Trust Fall - Soft pastels with harsh action colors */
     --background: 0 0% 100%;
     --foreground: 0 0% 0%;
 
@@ -19,30 +19,30 @@
     --primary: 0 0% 0%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 96%;
+    --secondary: 150 50% 95%;
     --secondary-foreground: 0 0% 0%;
 
-    --muted: 0 0% 96%;
+    --muted: 200 60% 96%;
     --muted-foreground: 0 0% 40%;
 
-    --accent: 0 0% 96%;
+    --accent: 350 60% 96%;
     --accent-foreground: 0 0% 0%;
 
-    /* Action Colors - Hard, unapologetic */
-    --destructive: 0 100% 50%;
+    /* Action Colors - Cooperate vs Defect */
+    --destructive: 0 75% 50%;
     --destructive-foreground: 0 0% 100%;
     
-    --action-now: 0 100% 50%;
-    --action-now-foreground: 0 0% 100%;
+    --cooperate: 145 60% 45%;
+    --cooperate-foreground: 0 0% 100%;
     
-    --action-later: 240 100% 50%;
-    --action-later-foreground: 0 0% 100%;
+    --defect: 0 75% 50%;
+    --defect-foreground: 0 0% 100%;
 
     --border: 0 0% 0%;
     --input: 0 0% 0%;
     --ring: 0 0% 0%;
 
-    --radius: 0px;
+    --radius: 8px;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 0 0% 20%;
