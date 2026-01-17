@@ -53,39 +53,63 @@ export function useSound() {
     playTone(800, 0.1, 'square', 0.2);
   }, [playTone]);
 
-  const playChoiceNow = useCallback(() => {
-    // Buzzer sound - descending tones
-    playTone(400, 0.15, 'sawtooth', 0.25);
-    setTimeout(() => playTone(300, 0.15, 'sawtooth', 0.2), 100);
-    setTimeout(() => playTone(200, 0.2, 'sawtooth', 0.15), 200);
+  // Cooperate sound - satisfying "Pop!" / "Ding!"
+  const playCooperate = useCallback(() => {
+    playTone(880, 0.15, 'sine', 0.3);  // A5
+    setTimeout(() => playTone(1108, 0.2, 'sine', 0.25), 80); // C#6
   }, [playTone]);
 
-  const playChoiceLater = useCallback(() => {
-    // Heavenly choir - ascending tones
-    playTone(523, 0.3, 'sine', 0.2); // C5
-    setTimeout(() => playTone(659, 0.3, 'sine', 0.2), 100); // E5
-    setTimeout(() => playTone(784, 0.4, 'sine', 0.2), 200); // G5
-    setTimeout(() => playTone(1047, 0.5, 'sine', 0.15), 300); // C6
+  // Defect sound - comical "Bonk"
+  const playDefect = useCallback(() => {
+    playTone(200, 0.1, 'square', 0.3);
+    setTimeout(() => playTone(150, 0.15, 'sawtooth', 0.25), 50);
   }, [playTone]);
 
-  const playTick = useCallback(() => {
-    playTone(1000, 0.05, 'square', 0.1);
-  }, [playTone]);
-
-  const playVictory = useCallback(() => {
-    // Fanfare
-    const notes = [523, 659, 784, 1047, 784, 1047];
+  // Win-Win outcome - confetti celebration
+  const playWinWin = useCallback(() => {
+    const notes = [523, 659, 784, 1047];
     notes.forEach((freq, i) => {
-      setTimeout(() => playTone(freq, 0.2, 'triangle', 0.25), i * 150);
+      setTimeout(() => playTone(freq, 0.2, 'sine', 0.25), i * 100);
     });
   }, [playTone]);
 
-  const playFail = useCallback(() => {
-    // Sad trombone
+  // You Betray - evil laugh
+  const playYouBetray = useCallback(() => {
+    playTone(349, 0.15, 'sawtooth', 0.2);
+    setTimeout(() => playTone(440, 0.15, 'sawtooth', 0.2), 100);
+    setTimeout(() => playTone(349, 0.2, 'sawtooth', 0.15), 200);
+  }, [playTone]);
+
+  // They Betray - sad trombone
+  const playTheyBetray = useCallback(() => {
     playTone(392, 0.3, 'sawtooth', 0.2);
     setTimeout(() => playTone(370, 0.3, 'sawtooth', 0.2), 300);
     setTimeout(() => playTone(349, 0.3, 'sawtooth', 0.2), 600);
     setTimeout(() => playTone(330, 0.5, 'sawtooth', 0.2), 900);
+  }, [playTone]);
+
+  // Both Betray - explosion chaos
+  const playBothBetray = useCallback(() => {
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => {
+        playTone(100 + Math.random() * 200, 0.1, 'sawtooth', 0.15);
+      }, i * 50);
+    }
+    setTimeout(() => playTone(80, 0.3, 'square', 0.2), 250);
+  }, [playTone]);
+
+  // Gloop eating sound (Level 9)
+  const playGloop = useCallback(() => {
+    for (let i = 0; i < 4; i++) {
+      setTimeout(() => {
+        playTone(150 + Math.random() * 100, 0.15, 'sine', 0.2);
+      }, i * 100);
+    }
+  }, [playTone]);
+
+  // Thinking suspense tick
+  const playTick = useCallback(() => {
+    playTone(600, 0.05, 'square', 0.1);
   }, [playTone]);
 
   const setEnabled = useCallback((enabled: boolean) => {
@@ -94,11 +118,14 @@ export function useSound() {
 
   return {
     playClick,
-    playChoiceNow,
-    playChoiceLater,
+    playCooperate,
+    playDefect,
+    playWinWin,
+    playYouBetray,
+    playTheyBetray,
+    playBothBetray,
+    playGloop,
     playTick,
-    playVictory,
-    playFail,
     setEnabled,
   };
 }

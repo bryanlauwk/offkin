@@ -20,6 +20,8 @@ export type Database = {
           created_at: string
           id: string
           level: number
+          opponent_choice: string | null
+          outcome: string | null
           session_id: string
           wait_time_seconds: number | null
         }
@@ -28,6 +30,8 @@ export type Database = {
           created_at?: string
           id?: string
           level: number
+          opponent_choice?: string | null
+          outcome?: string | null
           session_id: string
           wait_time_seconds?: number | null
         }
@@ -36,6 +40,8 @@ export type Database = {
           created_at?: string
           id?: string
           level?: number
+          opponent_choice?: string | null
+          outcome?: string | null
           session_id?: string
           wait_time_seconds?: number | null
         }
