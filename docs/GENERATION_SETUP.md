@@ -28,3 +28,8 @@ Secrets belong exclusively in the Edge Function environment, never VITE_* or sou
 - Proposal briefs remain device-only downloads. No emails or payments are sent.
 
 Sources used for the integration contract: https://docs.lovable.dev/features/ai and https://tanstack.com/ai/latest/docs/adapters/lovable . Exact model availability and output contract need the real activation test above.
+
+
+## Premium clicker pivot
+
+The current prompt is `form-premium-clickers-v1.0`. Historical `brick_concepts` table and bucket names are retained to avoid a destructive migration. Versioned search cache keys separate newly generated clicker concepts from prior brick concepts. Existing shared concept URLs can still open their original result. The 12 curated clicker images are static assets and do not need the generation service. This GitHub update does not activate or deploy the backend.
