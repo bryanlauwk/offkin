@@ -118,12 +118,12 @@
 
   /* Button styles matching the design doc */
   .btn-now {
-    @apply bg-action-now text-action-now-foreground paper-border font-semibold 
+    @apply bg-defect text-defect-foreground paper-border font-semibold 
            transition-transform hover:scale-[1.02] active:scale-[0.98];
   }
 
   .btn-later {
-    @apply bg-action-later text-action-later-foreground paper-border font-semibold 
+    @apply bg-cooperate text-cooperate-foreground paper-border font-semibold 
            transition-colors hover:brightness-110 active:brightness-90;
   }
 
@@ -229,3 +229,4 @@
     animation: timer-pulse 1s ease-in-out infinite;
   }
 }
+
