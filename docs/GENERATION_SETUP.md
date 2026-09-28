@@ -32,4 +32,4 @@ Sources used for the integration contract: https://docs.lovable.dev/features/ai 
 
 ## Premium clicker pivot
 
-The current prompt is `form-premium-clickers-v1.0`. Historical `brick_concepts` table and bucket names are retained to avoid a destructive migration. Versioned search cache keys separate newly generated clicker concepts from prior brick concepts. Existing shared concept URLs can still open their original result. The 12 curated clicker images are static assets and do not need the generation service. This GitHub update does not activate or deploy the backend.
+The current prompt is `form-premium-clickers-v1.1`. Historical `brick_concepts` table and bucket names are retained to avoid a destructive migration. Versioned search cache keys separate newly generated clicker concepts from prior brick concepts. Existing shared concept URLs can still open their original result. The 12 curated clicker images are static assets and do not need the generation service. This GitHub update does not activate or deploy the backend.

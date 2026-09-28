@@ -1,0 +1,53 @@
+{
+  "version": "gallery-curation-2026-09-29",
+  "mode": "built-in image generation",
+  "approvedBenchmarks": [
+    "KLDEX",
+    "STIVE",
+    "Grab",
+    "DHL"
+  ],
+  "sharedBrief": "Premium palm-sized 9–12cm corporate desk clicker. Business ritual expressed through chunky pressable objects or a robust lever. Matte 3D-printed assembled plastic over purchased switches, believable clearance, restrained assembly. No generic logo buttons, fragile clutter or static sprawling dioramas. Whole object centred in a square three-quarter front studio view with breathing room, ivory/light grey seamless background and soft contact shadows. No UI, prices, captions, hands or packaging. Unofficial concept, not validated CAD.",
+  "concepts": [
+    {
+      "id": "boh",
+      "brand": "BOH",
+      "design": "BOH tea brand. A rich forest-green and ivory tea-tasting tray shaped as two broad overlapping tea leaves. A small stout terracotta teapot is stationary at back, with thick safe handle integrated into its body. At front two generously rounded ivory tea cups filled with amber tea are independent pressable caps seated in thick green leaf-shaped saucers with visible black switch travel gaps; a third chunky sculpted green tea-leaf cap to left. One joined asymmetrical tray, not generic rectangular keyboard. Warm tea ritual character, only 3-4 chunky functional elements. Small BOH wordmark on tray."
+    },
+    {
+      "id": "secretrecipe",
+      "brand": "Secret Recipe",
+      "design": "Secret Recipe cake cafe. A compact deep-red patisserie tasting tray, three large sculptural cake-slice caps in a pleasing triangular arrangement: chocolate layered wedge, strawberry cream wedge with one stout strawberry top, and a cheesecake wedge. Each slice has smooth simple contrasting layer bands, no tiny sprinkles. Distinct cake silhouettes and visible travel gap beneath each matching thick ivory cake plate, concealed mechanical switches. Short elegant red back panel holds a cream menu card, no glass case. Premium appetising rounded matte plastic; playful slice selection ritual. Small Secret Recipe wordmark on front."
+    },
+    {
+      "id": "farmfresh",
+      "brand": "Farm Fresh",
+      "design": "Farm Fresh dairy. A playful compact ivory pasture-shaped tray with restrained grass-green inset. Left a stout cream milk churn with terracotta lid that presses, middle a chunky red-and-cream milk carton cap tilted very slightly toward a milk glass on right, milk glass cream fill is pressable too. NO floating liquid stream. Three substantial elements all captive on the tray with visible guided plunger gaps. One bold cow spot motif on churn and very short embossed grass detail on tray. No cows figurines or miniature barn. Small Farm Fresh wordmark. Charming farm-to-breakfast transformation."
+    },
+    {
+      "id": "starbucks",
+      "brand": "Starbucks",
+      "design": "Starbucks coffee. Beautiful compact forest-green manual coffee lever press desk toy on an organically rounded ivory drip tray. Left stout curved lever arches above a tiny espresso cup, visible short metal pivot at side and black spring housed under lever, lever operates hidden switch, akin a tactile artisan press. Right a separate large chunky ivory takeaway coffee cup with green sleeve is the second pressable cap. Integrated drip tray gives coherent ritual, lever and cup big and satisfying. Only two focal actions, no myriad espresso machine dials, no loose accessories. Small Starbucks wordmark on front."
+    },
+    {
+      "id": "mcdonalds",
+      "brand": "McDonald’s",
+      "design": "McDonald's. A compact playful red rounded takeaway serving tray desk clicker holding three functional thick sculptural caps, a layered cheeseburger with rounded golden bun, a red carton with 5 very chunky fused golden fries, a short cream drink cup with red lid and NO straw. Each has its own visible switch travel gap, a distinct silhouette and proportions echo a delightful meal as three clicks. Restrained 4 colour matte printed plastic with simple burger layers, no realistic food texture, no thin sesame seeds. Small golden arches emblem moulded on tray front only. Every element attached, no restaurant diorama."
+    },
+    {
+      "id": "fujifilm",
+      "brand": "FUJIFILM",
+      "design": "FUJIFILM photography. Create an inventive small mint-green and ivory photo-making desk clicker sculpture, NOT a direct replica camera. An abstract rounded chunky viewfinder arch sits on left over a black circular shutter cap that presses vertically. On right a thick ivory instant-photo tile with simple orange sun and blue mountain picture stands at a slight angle in a broad mint output slot with obvious black spring-loaded press travel gap below. Photo tile captive and thick, not paper; no electronics or actual photo printing. Coherent L-shaped low plinth connecting capture to printed memory. Tiny FUJIFILM wordmark. Personality like a tiny physical photo ritual, 2 actions."
+    },
+    {
+      "id": "dyson",
+      "brand": "Dyson",
+      "design": "Dyson engineering. Design a compact purple and warm-grey desk clicker shaped as a playful cleaning ritual: on left chunky horizontal orange ribbed roller inside a stout purple vacuum-head-shaped pressable cap; on right a squat smoked-clear cylindrical chamber containing a fixed amber spiral, topped with a thick purple piston cap. Both visibly mounted on guided switches on a low curved warm-grey connected base. No long vacuum handle, no miniature upright machine, no delicate components, no real suction, the cyclone is a static graphic insert. Sculptural lively silhouettes, no generic buttons. Small Dyson wordmark on front."
+    },
+    {
+      "id": "marriott",
+      "brand": "Marriott",
+      "design": "Marriott hospitality. A premium compact burgundy and ivory concierge desk clicker. A generous brass-coloured domed service bell is the primary pressable cap at left, separated from its ivory base by a clear switch travel gap. At right a stout burgundy room-key sleeve holds an ivory thick key tile with small embossed key icon; tile is a second vertical spring-loaded click cap. A rounded low desk plinth with a subtly ribbed front joins them, with a single small suitcase relief at one side, no hotel buildings or tiny people. Premium warm welcome check-in ritual, restrained matte burgundy ivory gold printed plastic. Small Marriott wordmark."
+    }
+  ]
+}

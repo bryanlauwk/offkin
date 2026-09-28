@@ -41,3 +41,5 @@
 @media(max-width:380px){.brick-studio .cards{grid-template-columns:1fr}}
 
 .brick-studio .hero-price{font-size:12px;color:#68745a;letter-spacing:.2px;margin:-12px 0 26px}
+
+.brick-studio .dot-grab{background:#00b14f}.brick-studio .dot-dhl{background:#e7b523}.brick-studio .feature-picker{flex-wrap:wrap}
