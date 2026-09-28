@@ -1,1 +1,4 @@
 project_id = "cpmksomijohojpdxedzt"
+
+[functions.generate-concept]
+verify_jwt = false
