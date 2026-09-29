@@ -243,7 +243,7 @@ export default function Index() {
             <div className="concept-preview">
               <div className="preview-card">
                 <div className="preview-image">
-                  <img src={selected.image || `/clicker-assets/${selected.id}.webp`} alt={`${selected.brand} — ${selected.title}, an independent clicker concept`} />
+                  <img src={('image' in selected && selected.image) || `/clicker-assets/${selected.id}.webp`} alt={`${selected.brand} — ${selected.title}, an independent clicker concept`} />
                   <span>Custom clicker</span>
                 </div>
                 <div className="preview-meta">
