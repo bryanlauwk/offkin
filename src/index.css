@@ -1,35 +1,32 @@
-@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Inter:wght@400;500;600&family=Courier+Prime:wght@400;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* The Trust Fall - Soft pastels with harsh action colors */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
+    --background: 225 100% 98%;
+    --foreground: 222 24% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
+    --card-foreground: 222 24% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
+    --popover-foreground: 222 24% 18%;
 
-    --primary: 0 0% 0%;
+    --primary: 221 98% 57%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 150 50% 95%;
-    --secondary-foreground: 0 0% 0%;
+    --secondary: 221 100% 95%;
+    --secondary-foreground: 221 70% 40%;
 
-    --muted: 200 60% 96%;
-    --muted-foreground: 0 0% 40%;
+    --muted: 220 38% 96%;
+    --muted-foreground: 220 10% 43%;
 
-    --accent: 350 60% 96%;
-    --accent-foreground: 0 0% 0%;
+    --accent: 46 100% 65%;
+    --accent-foreground: 222 24% 18%;
 
     /* Action Colors - Cooperate vs Defect */
-    --destructive: 0 75% 50%;
+    --destructive: 0 100% 71%;
     --destructive-foreground: 0 0% 100%;
     
     --cooperate: 145 60% 45%;
@@ -38,9 +35,12 @@
     --defect: 0 75% 50%;
     --defect-foreground: 0 0% 100%;
 
-    --border: 0 0% 0%;
-    --input: 0 0% 0%;
-    --ring: 0 0% 0%;
+    --border: 221 25% 88%;
+    --input: 221 25% 88%;
+    --ring: 221 98% 57%;
+
+    --shadow-soft: 0 20px 55px hsl(221 35% 30% / 0.10);
+    --shadow-focus: 0 18px 45px hsl(221 98% 57% / 0.16);
 
     --radius: 8px;
 
@@ -88,11 +88,11 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', Arial, sans-serif;
+    font-family: 'Figtree', Arial, sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Merriweather', 'Times New Roman', serif;
+    font-family: 'Outfit', Arial, sans-serif;
   }
 
   .font-mono, code, .font-data {
