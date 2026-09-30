@@ -7,24 +7,25 @@ import { concepts } from './clicker-concepts';
 import { editions, formats, type Edition, type GiftFormat, parseSelection } from '../../supabase/functions/generate-concept/options';
 import { makeBrief, type CollectibleConcept } from '@/lib/collectible-brief';
 import './brick-gifts.css';
+import { normalizeCompanyWebsite } from '@/lib/company-website';
 
 type SiteSettings = { logoUrl: string; logoLink: string; siteTitle: string };
-const defaultSettings: SiteSettings = { logoUrl: '', logoLink: '/', siteTitle: 'Brandkin' };
+const defaultSettings: SiteSettings = { logoUrl: '', logoLink: '/', siteTitle: 'BRIQ2.0' };
 const sampleConcepts: CollectibleConcept[] = concepts.map(c => ({ ...c, edition: 'everyday', format: 'clicker', image: `/clicker-assets/${c.id}.webp` }));
 
 export default function Index() {
   const [params, setParams] = useSearchParams();
   const [generated, setGenerated] = useState<CollectibleConcept | null>(null);
   const [settings, setSettings] = useState(defaultSettings);
-  const [edition, setEdition] = useState<Edition>('hero');
-  const [format, setFormat] = useState<GiftFormat>('bricks');
+  const [edition, setEdition] = useState<Edition>('everyday');
+  const [format, setFormat] = useState<GiftFormat>('clicker');
   const [query, setQuery] = useState('');
   const [context, setContext] = useState('');
   const [needsContext, setNeedsContext] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [quantity, setQuantity] = useState('100');
-  const [budget, setBudget] = useState('80');
+  const [budget, setBudget] = useState('100');
   const [date, setDate] = useState('');
   const [occasion, setOccasion] = useState('Client appreciation');
   const [agency, setAgency] = useState('');
@@ -46,7 +47,7 @@ export default function Index() {
       data.forEach(setting => {
         if (setting.key === 'logo_url') next.logoUrl = setting.value || '';
         if (setting.key === 'logo_link') next.logoLink = setting.value || '/';
-        if (setting.key === 'site_title') next.siteTitle = setting.value || defaultSettings.siteTitle;
+        if (setting.key === 'site_title') next.siteTitle = !setting.value || ['form.', 'brandkin', 'stive'].includes(setting.value.trim().toLowerCase()) ? defaultSettings.siteTitle : setting.value;
       });
       setSettings(next);
     });
@@ -54,7 +55,7 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    document.title = selected ? `${selected.title} — ${settings.siteTitle}` : `${settings.siteTitle} — Make your client's brand worth keeping`;
+    document.title = selected ? `${selected.title} — ${settings.siteTitle}` : `${settings.siteTitle} — Your business DNA. Made collectible.`;
     setShareStatus('');
     setImageFailed(false);
     window.scrollTo(0, 0);
@@ -108,6 +109,8 @@ export default function Index() {
   async function search(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
+    const website = normalizeCompanyWebsite(query);
+    if (!website) { setStatus('Enter a valid company website, such as company.com.'); return; }
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -119,7 +122,7 @@ export default function Index() {
       setStatus('This is taking longer than expected. Please try again.');
     }, 220000);
     try {
-      const data = await callGenerator({ brand: query.trim(), context: context.trim(), edition, format }, controller.signal);
+      const data = await callGenerator({ brand: website, context: context.trim(), edition, format }, controller.signal);
       if (controller.signal.aborted) return;
       if (data.needsContext) {
         setNeedsContext(true);
@@ -146,7 +149,7 @@ export default function Index() {
 
   function download() {
     if (!selected) return;
-    const brief = makeBrief(selected, { agency, quantity, budget, date, occasion, clientReady });
+    const brief = makeBrief(selected, { agency, quantity, budget: String(Math.max(100, Number(budget) || 100)), date, occasion, clientReady });
     const url = URL.createObjectURL(new Blob([brief], { type: 'text/plain' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -171,7 +174,7 @@ export default function Index() {
     <div className="brick-studio">
       <header className="studio-header">
         <a className="studio-logo" href={settings.logoLink || '/'} aria-label={`${settings.siteTitle} home`}>
-          {settings.logoUrl ? <img src={settings.logoUrl} alt={settings.siteTitle} /> : <span>{settings.siteTitle.toLowerCase()}<span className="logo-dot">.</span></span>}
+          {settings.logoUrl ? <img src={settings.logoUrl} alt={settings.siteTitle} /> : <span>{settings.siteTitle}</span>}
         </a>
         <span className="header-caption">Your client's story. A gift worth keeping.</span>
         <Button asChild variant="ghost" size="sm" className="settings-link"><Link to="/admin" aria-label="Settings"><Settings aria-hidden="true" /><span>Settings</span></Link></Button>
@@ -181,29 +184,29 @@ export default function Index() {
         <main className="creation-home">
           <section className="prompt-block" aria-labelledby="creation-title">
             <p className="welcome">THE COLLECTIBLE STUDIO FOR AGENCIES</p>
-            <h1 id="creation-title">Make their brand<br /><span>worth keeping.</span></h1>
-            <p className="prompt-copy">Turn a client's story into custom bricks, clickers, and miniatures. Start with a concept. Leave with something you can pitch.</p>
+            <h1 id="creation-title">Your business DNA.<br /> Made collectible.</h1>
+            <p className="prompt-copy">Enter your company website to create a collectible inspired by what your business does.</p>
             <form onSubmit={search} className="creation-form" aria-busy={busy}>
               <fieldset disabled={busy} className="brand-fieldset">
-                <legend>01 / Start with your client's brand</legend>
-                <div className="brand-search"><Search aria-hidden="true" /><label className="sr" htmlFor="brand">Company name or website</label><input id="brand" placeholder="Company name or website" value={query} onChange={e => setQuery(e.target.value)} required minLength={2} maxLength={120} autoComplete="off" /></div>
+                <legend>01 / Start with your company website</legend>
+                <div className="brand-search"><Search aria-hidden="true" /><label className="sr" htmlFor="brand">Company website</label><input id="brand" placeholder="Your company website, e.g. company.com" value={query} onChange={e => setQuery(e.target.value)} required minLength={2} maxLength={120} autoComplete="url" inputMode="url" /></div>
                 <details open={needsContext || undefined} className="brand-context"><summary>Add the story and brand details <span>Optional</span></summary><label htmlFor="brand-context">What should this gift say about your client?</label><textarea id="brand-context" maxLength={600} value={context} onChange={e => setContext(e.target.value)} placeholder="Their colours, signature product, a real milestone, or the people you want to celebrate…" /><p>Use a website as a brand identifier. Add key facts here for an accurate story; this does not research the website.</p></details>
               </fieldset>
               <fieldset disabled={busy} className="edition-fieldset"><legend>02 / Choose the story</legend><div className="edition-grid">{Object.entries(editions).map(([key, value], index) => <label key={key} className={`edition-option ${edition === key ? 'is-selected' : ''}`}><input type="radio" name="edition" value={key} checked={edition === key} onChange={() => chooseEdition(key as Edition)} /><span className="edition-number">0{index + 1}</span><strong>{value.label}</strong><span>{value.description}</span><small>{value.intent}<ArrowRight aria-hidden="true" /></small></label>)}</div></fieldset>
               <fieldset disabled={busy} className="format-fieldset"><legend>03 / Pick the object</legend><div className="format-grid">{Object.entries(formats).map(([key, value]) => <label key={key} className={`format-option ${format === key ? 'is-selected' : ''} ${edition === 'icon' && key === 'clicker' ? 'is-disabled' : ''}`}><input type="radio" name="format" value={key} checked={format === key} disabled={edition === 'icon' && key === 'clicker'} onChange={() => setFormat(key as GiftFormat)} /><span><strong>{value.label}</strong><small>{edition === 'icon' && key === 'clicker' ? 'Choose a story with interaction' : value.description}</small></span></label>)}</div></fieldset>
-              <Button type="submit" disabled={busy} size="lg" className="generate-button">{busy ? <LoaderCircle className="spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{busy ? 'Creating your concept' : 'Create a collectible concept'}<ArrowRight aria-hidden="true" /></Button>
+              <Button type="submit" disabled={busy} size="lg" className="generate-button">{busy ? <LoaderCircle className="spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{busy ? 'Creating your concept' : 'Create collectible'}<ArrowRight aria-hidden="true" /></Button>
             </form>
             <div className={`creation-status ${busy ? 'is-busy' : ''}`} role="status" aria-live="polite">{status && <span>{status}</span>}{busy && <Button variant="ghost" size="sm" type="button" onClick={stopWaiting}>Stop</Button>}</div>
             <div className="example-row"><span>Explore clicker examples</span>{sampleConcepts.slice(0, 4).map(c => <Button key={c.id} type="button" variant="outline" size="sm" disabled={busy} onClick={() => { setStatus(''); setParams({ brand: c.id }); }}>{c.brand}</Button>)}</div>
           </section>
-          <aside className="collection-reference"><img src="/brandkin-collection.png" alt="Four fictional Rimba Coffee gift concepts: collectible cup, brick coffee stall, hand-cranked roasting model, and coffee-machine clicker with phone stand" /><div><span className="reference-label">ONE BRAND. FOUR WAYS TO TELL ITS STORY.</span><h2>A little world, built around your client.</h2><p>Rimba Coffee is a fictional example. Explore the range, then create one direction for your own client.</p></div><p className="fine-print">Independent visual concepts. Design review and a physical sample come before production.</p></aside>
+          <aside className="collection-reference"><img src="/brandkin-collection.png" alt="Four fictional Rimba Coffee gift concepts: collectible cup, brick coffee stall, hand-cranked roasting model, and coffee-machine clicker with phone stand" /><div><span className="reference-label">ONE BRAND. FOUR WAYS TO TELL ITS STORY.</span><h2>A little world, built around your client.</h2><p>Rimba Coffee is a fictional example. Explore the range, then create one direction for your own client.</p></div><p className="fine-print">Designs from RM100 per piece. Design fees are separate. Final pricing follows design review and a physical sample.</p></aside>
         </main>
       ) : (
-        <main className="result-page"><Button variant="ghost" className="back-link" onClick={createAnother}>← Create another edition</Button><section className="result-shell" aria-labelledby="concept-title"><div className="concept-story"><div className="result-kicker"><Check aria-hidden="true" />{editions[selected.edition].label} edition · {formats[selected.format].label}</div><p className="brand-name">{selected.brand}</p><h1 id="concept-title">{selected.title}</h1><p className="concept-copy">{selected.story}</p>{selected.interaction && <div className="interaction-card"><span><Sparkles aria-hidden="true" />The recipient's experience</span><p>{selected.interaction}</p></div>}
-          <form id="proposal" onSubmit={event => { event.preventDefault(); dialog.current?.showModal(); }}><h2>Make it pitch-ready.</h2><p className="proposal-intro">Add your project details. Choose what your client sees.</p><label>Your agency <span>(optional)</span><input maxLength={120} value={agency} onChange={e => setAgency(e.target.value)} placeholder="Prepared by your agency" /></label><div className="order-grid"><label>Planning quantity<input type="number" min="1" max="100000" step="1" required value={quantity} onChange={e => setQuantity(e.target.value)} /></label><label>Target per gift (RM)<input type="number" min="1" max="100000" step="1" required value={budget} onChange={e => setBudget(e.target.value)} /></label></div><p className="budget-note">Your target, not a quote. Design and sample fees are separate.</p><label>Occasion<select value={occasion} onChange={e => setOccasion(e.target.value)}>{['Client appreciation','Employee onboarding','Product launch','Company anniversary','Event giveaway'].map(value => <option key={value}>{value}</option>)}</select></label><label>Requested delivery <span>(optional)</span><input type="date" min={minDate} value={date} onChange={e => setDate(e.target.value)} /></label><label className="export-option"><input type="checkbox" checked={clientReady} onChange={e => setClientReady(e.target.checked)} /><span><strong>Client-facing brief</strong><small>Leave out the internal budget and studio branding.</small></span></label><Button className="purchase-button" size="lg" type="submit"><Download aria-hidden="true" />Prepare {clientReady ? 'client concept' : 'internal brief'}<ArrowRight aria-hidden="true" /></Button><p className="form-note">Download for review. Nothing is submitted or ordered.</p></form></div>
+        <main className="result-page"><Button variant="ghost" className="back-link" onClick={createAnother}>← Create another edition</Button><section className="result-shell" aria-labelledby="concept-title"><div className="concept-story"><div className="result-kicker"><Check aria-hidden="true" />{!conceptId && <span>Curated example concept · </span>}{editions[selected.edition].label} edition · {formats[selected.format].label}</div><p className="brand-name">{selected.brand}</p><h1 id="concept-title">{selected.title}</h1><section aria-labelledby="business-dna-title" className="business-dna"><h2 id="business-dna-title">How it captures your business DNA</h2><p className="concept-copy">{selected.story}</p></section>{selected.interaction && <div className="interaction-card"><span><Sparkles aria-hidden="true" />The recipient's experience</span><p>{selected.interaction}</p></div>}
+          <form id="proposal" onSubmit={event => { event.preventDefault(); dialog.current?.showModal(); }}><h2>Make it pitch-ready.</h2><p className="proposal-intro">Add your project details. Choose what your client sees.</p><label>Your agency <span>(optional)</span><input maxLength={120} value={agency} onChange={e => setAgency(e.target.value)} placeholder="Prepared by your agency" /></label><div className="order-grid"><label>Planning quantity<input type="number" min="1" max="100000" step="1" required value={quantity} onChange={e => setQuantity(e.target.value)} /></label><label>Target per piece (RM)<input type="number" min="100" max="100000" step="1" required value={budget} onChange={e => setBudget(e.target.value)} /></label></div><p className="budget-note">Minimum RM100 per piece. Your target is not a quote. Design and sample fees are separate.</p><label>Occasion<select value={occasion} onChange={e => setOccasion(e.target.value)}>{['Client appreciation','Employee onboarding','Product launch','Company anniversary','Event giveaway'].map(value => <option key={value}>{value}</option>)}</select></label><label>Requested delivery <span>(optional)</span><input type="date" min={minDate} value={date} onChange={e => setDate(e.target.value)} /></label><label className="export-option"><input type="checkbox" checked={clientReady} onChange={e => setClientReady(e.target.checked)} /><span><strong>Client-facing brief</strong><small>Leave out the internal budget and studio branding.</small></span></label><Button className="purchase-button" size="lg" type="submit"><Download aria-hidden="true" />Prepare {clientReady ? 'client concept' : 'internal brief'}<ArrowRight aria-hidden="true" /></Button><p className="form-note">Download for review. Nothing is submitted or ordered.</p></form></div>
           <div className="concept-preview"><div className="preview-card"><div className="preview-image">{imageFailed ? <p className="image-error">The image could not load. Your concept brief is still available.</p> : <img src={selected.image} onError={() => setImageFailed(true)} alt={`${selected.brand} — ${selected.title}, an independent ${formats[selected.format].label.toLowerCase()} concept`} />}<span>{formats[selected.format].label} concept</span></div><div className="preview-meta"><div><p>{selected.brand}</p><strong>{selected.title}</strong></div></div></div><div className="secondary-actions"><Button type="button" variant="outline" onClick={share}><Share2 aria-hidden="true" />Copy concept link</Button></div><p className="share-status" role="status">{shareStatus}</p><ol className="production-steps"><li>Concept direction</li><li>Design review & quotation</li><li>Physical sample approval</li><li>Production</li></ol><p className="fine-print">Independent concept, not an official commission.<br />Construction, pricing, and delivery require review.</p></div></section></main>
       )}
-      <dialog ref={dialog} aria-labelledby="brief-title"><Button className="dialog-close" variant="ghost" size="icon" aria-label="Close" onClick={() => dialog.current?.close()}><X aria-hidden="true" /></Button><p className="dialog-kicker">Ready for review</p><h2 id="brief-title">Your {clientReady ? 'client concept' : 'internal brief'} is ready.</h2><p>{selected?.brand} · {selected?.title}<br />{quantity} pieces{!clientReady && ` · RM${budget} target each`}</p><p className="dialog-note">{clientReady ? 'Your agency name is included if provided. Internal budget and studio branding are omitted.' : 'Includes your target budget for internal planning.'} This downloads a text brief; nothing is sent and no order is placed.</p><Button className="dialog-download" size="lg" onClick={download}><Download aria-hidden="true" />Download {clientReady ? 'client concept' : 'internal brief'}</Button></dialog>
+      <dialog ref={dialog} aria-labelledby="brief-title"><Button className="dialog-close" variant="ghost" size="icon" aria-label="Close" onClick={() => dialog.current?.close()}><X aria-hidden="true" /></Button><p className="dialog-kicker">Ready for review</p><h2 id="brief-title">Your {clientReady ? 'client concept' : 'internal brief'} is ready.</h2><p>{selected?.brand} · {selected?.title}<br />{quantity} pieces{!clientReady && ` · RM${Math.max(100, Number(budget) || 100)} target each`}</p><p className="dialog-note">{clientReady ? 'Your agency name is included if provided. Internal budget and studio branding are omitted.' : 'Includes your target budget for internal planning.'} This downloads a text brief; nothing is sent and no order is placed.</p><Button className="dialog-download" size="lg" onClick={download}><Download aria-hidden="true" />Download {clientReady ? 'client concept' : 'internal brief'}</Button></dialog>
     </div>
   );
 }

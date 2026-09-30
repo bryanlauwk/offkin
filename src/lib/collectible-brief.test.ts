@@ -14,7 +14,7 @@ describe('agency briefs', () => {
     expect(brief).toContain('does not place an order');
   });
   it('labels internal budget as a target rather than a quote', () => {
-    expect(makeBrief(concept, { ...details, clientReady: false })).toContain('Target unit budget: RM87 (not a quote; design and sample fees excluded)');
+    expect(makeBrief(concept, { ...details, clientReady: false })).toContain('Target unit budget: RM100 (not a quote; design and sample fees excluded)');
   });
   it('does not invent an agency identity or delivery commitment', () => {
     const brief = makeBrief(concept, { ...details, agency: ' ' });
