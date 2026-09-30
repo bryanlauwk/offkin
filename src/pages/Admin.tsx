@@ -108,7 +108,7 @@ export default function Admin() {
                 Login
               </Button>
               <Link to="/" className="block text-center text-sm text-muted-foreground hover:underline">
-                ← Back to quiz
+                ← Back to studio
               </Link>
             </form>
           </CardContent>
@@ -148,7 +148,7 @@ export default function Admin() {
                     placeholder="https://example.com/logo.png"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Leave empty to use the default "M" logo
+                    Leave empty to use the site title as a wordmark
                   </p>
                 </div>
 
@@ -194,7 +194,7 @@ export default function Admin() {
                     id="siteTitle"
                     value={siteTitle}
                     onChange={(e) => setSiteTitle(e.target.value)}
-                    placeholder="The Absurd Marshmallow Test"
+                    placeholder="Brandkin"
                   />
                 </div>
               </CardContent>
