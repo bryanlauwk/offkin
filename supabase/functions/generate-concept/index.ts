@@ -4,6 +4,9 @@ import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from '
 import { BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION } from './prompt.ts';
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Cache-Control':'no-store'}});
 const hash = async (s:string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');
+// Temporary owner-requested test waiver. Set BRICK_ENFORCE_DAILY_LIMITS=true to restore caps.
+// Only an absent setting or explicit false bypasses quotas; unknown values fail closed.
+const dailyLimitsEnforced = () => (Deno.env.get('BRICK_ENFORCE_DAILY_LIMITS') ?? 'false') !== 'false';
 class Failure extends Error { constructor(public status:number, message:string){super(message);} }
 Deno.serve(async req => {
  if(req.method==='OPTIONS')return json({});
@@ -13,7 +16,7 @@ Deno.serve(async req => {
   const db=createClient(url,service);
   const {error}=await db.from('brick_concepts').select('id,edition,format,interaction,source_url,source_title').limit(0);
   const enabled=Boolean(Deno.env.get('LOVABLE_API_KEY'))&&Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
-  return json({ready:!error&&enabled,verification:'Configuration and schema only; website transport and AI providers need a live test.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
+  return json({ready:!error&&enabled,daily_limits_enforced:dailyLimitsEnforced(),verification:'Configuration and schema only; website transport and AI providers need a live test.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
  }
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try {
@@ -27,7 +30,7 @@ Deno.serve(async req => {
   const selection=parseSelection(input);
   if(!input.id && !selection)return json({error:'Choose a valid edition and format. Icon is available as a brick build or miniature.'},400);
   const url=Deno.env.get('SUPABASE_URL');const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if(!url||!service)throw new Failure(503,'Concept generation is being connected. Please explore our sample concepts.');
+  if(!url||!service)throw new Failure(503,'Concept generation is being connected. Please try again later.');
   const db=createClient(url,service);
   const deliver=async(row:{id:string;brand:string;title:string;story:string;image_path:string;edition?:Edition;format?:GiftFormat;interaction?:string;source_url?:string;source_title?:string})=>{
    const {data,error}=await db.storage.from('brick-concepts').createSignedUrl(row.image_path,3600);
@@ -46,16 +49,18 @@ Deno.serve(async req => {
   let websiteUrl: string;
   try { websiteUrl=validatePublicWebsiteUrl(brand).href; } catch(error) { return json({error:error instanceof Error?error.message:'Enter a public company website.'},400); }
   const key=Deno.env.get('LOVABLE_API_KEY');const enabled=Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
-  if(!input.inspectWebsite&&(!key||!enabled))throw new Failure(503,'Live generation is not available yet. Please explore our sample concepts.');
+  if(!input.inspectWebsite&&(!key||!enabled))throw new Failure(503,'Live generation is not available yet. Please try again later.');
   const cacheKey=await hash(JSON.stringify([PROMPT_VERSION,websiteUrl,context,selection!.edition,selection!.format]));
   const {data:cached,error:cacheError}=await db.from('brick_concepts').select('id,brand,title,story,image_path,edition,format,interaction,source_url,source_title').eq('cache_key',cacheKey).maybeSingle();
   if(cacheError)throw new Failure(503,'Concept generation is being set up. Please try again later.');
   if(cached&&!input.inspectWebsite)return await deliver(cached);
-  // Platform-forwarded IP is an abuse hint; the atomic global cap is the hard cost bound.
-  const client=await hash(service+':'+(req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'unknown'));
-  const {data:allowed,error:limitError}=await db.rpc('reserve_brick_generation',{client_key:client});
-  if(limitError)throw new Failure(503,'Concept generation is temporarily unavailable.');
-  if(!allowed)throw new Failure(429,'Today’s concept limit has been reached. Try again tomorrow or explore our examples.');
+  if(dailyLimitsEnforced()) {
+   // Platform-forwarded IP is an abuse hint; the atomic global cap bounds paid attempts.
+   const client=await hash(service+':'+(req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'unknown'));
+   const {data:allowed,error:limitError}=await db.rpc('reserve_brick_generation',{client_key:client});
+   if(limitError)throw new Failure(503,'Concept generation is temporarily unavailable.');
+   if(!allowed)throw new Failure(429,'Today’s concept limit has been reached. Try again tomorrow.');
+  }
   let website: {url:string;title:string;excerpt:string}|null=null;
   try { website=await readCompanyWebsite(websiteUrl); }
   catch(error) {

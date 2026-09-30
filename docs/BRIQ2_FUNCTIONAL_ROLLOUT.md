@@ -12,7 +12,7 @@ Deploy `generate-concept` with `index.ts`, `options.ts`, `prompt.ts`, and `websi
 
 GET `/functions/v1/generate-concept` performs configuration/schema readiness checks without calling the AI provider, reserving quota, or generating a concept. A ready response establishes configuration/schema presence, not model/provider compatibility or successful generation. An authorized live generation is still required.
 
-After authorized deployment, POST `{ "brand": "https://company.com", "inspectWebsite": true }` to test the pinned website reader without an AI call or image generation. This uses one request reservation but does not require AI activation. It must return a real source excerpt before automatic website-reading support is claimed.
+After authorized deployment, POST `{ "brand": "https://company.com", "inspectWebsite": true }` to test the pinned website reader without an AI call or image generation. This reserves an attempt only when daily limits are enabled and does not require AI activation. It must return a real source excerpt before automatic website-reading support is claimed.
 
 After authorized deployment and usage approval:
 1. Check GET readiness.
@@ -25,7 +25,7 @@ After authorized deployment and usage approval:
 
 The website reader only accepts public HTTPS domains, validates DNS destinations and redirects, bounds time/bytes, rejects non-text media, and treats page content as untrusted evidence. It must fail closed if its pinned secure transport is unavailable in the deployed edge runtime; no unpinned fallback is acceptable. In that case the UI requests a short user-provided business summary and does not claim the website was read.
 
-URL syntax is validated before a quota reservation. Other failed/ambiguous attempts, including blocked website reads, consume a reservation to bound anonymous outbound work. A fallback summary retry uses another of the three per-client daily attempts. The hard global cap remains thirty attempts per UTC day; each attempt makes at most one text and one image request. The IP-derived client key is an abuse hint, not authentication. No automatic model retries are made.
+When daily limits are enabled, URL syntax is validated before a quota reservation. Other failed/ambiguous attempts, including blocked website reads, consume a reservation to bound anonymous outbound work. A fallback summary retry uses another of the three per-client daily attempts. In that mode the hard global cap is thirty attempts per UTC day; each attempt makes at most one text and one image request. The IP-derived client key is an abuse hint, not authentication. No automatic model retries are made.
 
 Stop cancels browser waiting; backend calls use the request abort signal when propagated by the platform. Provider work already accepted may still finish and incur usage. The UI states this explicitly. New navigation cannot be overwritten by an old response.
 
@@ -39,3 +39,11 @@ Run `npm ci`, `npm run build`, `npx tsc --noEmit -p tsconfig.app.json`, `npm tes
 The first hosted test proved Node-compatible `https.request` did not work in the target Deno runtime. The repair uses native `Deno.connect` to a validated literal address, then native `Deno.startTls` for the original hostname with normal certificate verification. A thin Duplex adapter feeds the official Node.js Undici 7.30.0 HTTP client, so HTTP framing is handled by its maintained parser rather than handwritten parsing. There is no generic-fetch fallback, custom production trust root, or disabled TLS check.
 
 `tests/native-https-smoke.ts` exercises actual TLS locally using a disposable self-signed test fixture certificate. The production code does not accept certificate inputs. Generate a CA:false certificate for company.invalid outside the repo, then run the script with a Deno2.6 runtime and the cert/key paths. The tested Deno2.6.8 runtime passed success and rejection cases for certificate hostname, chunked bodies, oversized headers/body, compressed responses, cancellation, redirect preservation, conflicting framing, invalid chunks and truncated bodies. The exact target runtime still needs an authorized hosted inspectWebsite test; local success does not establish production readiness.
+
+## Temporary testing waiver (owner requested)
+
+Daily limits are temporarily waived by default in source. An absent `BRICK_ENFORCE_DAILY_LIMITS` or explicit `false` skips the reservation RPC entirely. Set `BRICK_ENFORCE_DAILY_LIMITS=true` in the backend runtime to restore the existing 3/client and 30/global daily caps. Unknown values also enforce caps. GET readiness reports `daily_limits_enforced`. No quota records are deleted, reset or modified while waived; tables and permissions are unchanged.
+
+This endpoint is publicly reachable. A single intended tester is not access control: others can consume AI credits while the caps are waived. There is no aggregate spend ceiling in this mode. `BRICK_GENERATION_ENABLED` remains the independent kill switch; validation, public-address DNS pinning/TLS checks, size limits, timeouts, cache and the one-text/one-image-per-attempt limit remain. Restore daily caps before wider use. No automatic retries or extra test loops are introduced.
+
+Git sync updates source only. The deployed backend retains its existing daily policy until an authorized function deployment applies this change. Verify readiness after deployment rather than infer live policy from Git.

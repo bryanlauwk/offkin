@@ -27,6 +27,7 @@ try {
  const generate=body=>send(JSON.stringify(body));
  assert.equal((await send('', 'OPTIONS')).status,200);
  assert.equal((await send('', 'GET')).status,200);
+ assert.equal((await (await send('', 'GET')).json()).daily_limits_enforced,false);
  assert.equal(providerCalls,0);
  assert.equal((await send('x'.repeat(12001))).status,413);
  for(const raw of ['{','null','[]','{"brand":"X"}'])assert.equal((await send(raw)).status,400);
@@ -34,7 +35,7 @@ try {
  assert.equal(providerCalls,0);
  assert.equal((await generate({brand:'not-a-website'})).status,400);assert.equal(reservations,0);
  env.BRICK_GENERATION_ENABLED='false'; assert.equal((await generate({brand:'rimba.com'})).status,503);
- env.BRICK_GENERATION_ENABLED='true'; limit=false; assert.equal((await generate({brand:'rimba.com'})).status,429); assert.equal(providerCalls,0);
+ env.BRICK_GENERATION_ENABLED='true'; env.BRICK_ENFORCE_DAILY_LIMITS='true'; limit=false; assert.equal((await generate({brand:'rimba.com'})).status,429); assert.equal(providerCalls,0);
  limit=true; assert.equal((await (await generate({brand:'unknown.com'})).json()).needsContext,true); assert.equal(providerCalls,1);
  globalThis.websiteBlocked=true;
  const before=providerCalls; assert.equal((await (await generate({brand:'blocked.com'})).json()).needsContext,true); assert.equal(providerCalls,before);
@@ -55,5 +56,23 @@ try {
  assert.equal((await (await generate({brand:'https://rimba.com',inspectWebsite:true})).json()).website.title,'Rimba Coffee');assert.equal(providerCalls,callsBeforeInspect);env.BRICK_GENERATION_ENABLED='true';
  await generate({brand:'https://rimba.com/BrandA'});await generate({brand:'https://rimba.com/branda'});assert.equal(providerCalls,11);
  await generate({brand:'https://rimba.com/BrandA'});assert.equal(providerCalls,11);
- console.log('Backend contract passed: validation, disabled service, rate limits, context, successful generation, edition/format cache separation, saved links, and legacy defaults.');
+ // Waiver does not reserve, reset, or delete quota history, even when stored caps are exhausted.
+ const beforeWaiver=reservations;limit=false;
+ for(const flag of [undefined,'false']) {
+  if(flag===undefined)delete env.BRICK_ENFORCE_DAILY_LIMITS;else env.BRICK_ENFORCE_DAILY_LIMITS=flag;
+  assert.equal((await (await send('', 'GET')).json()).daily_limits_enforced,false);
+  const result=await generate({brand:'https://waived.example/'+String(flag)});
+  assert.equal(result.status,200);assert.ok((await result.json()).concept);
+  assert.equal(reservations,beforeWaiver);
+ }
+ env.BRICK_GENERATION_ENABLED='false';const callsBeforeDisabled=providerCalls;
+ assert.equal((await generate({brand:'https://disabled.example'})).status,503);assert.equal(providerCalls,callsBeforeDisabled);
+ env.BRICK_GENERATION_ENABLED='true';
+ for(const flag of ['true','misspelled']) {
+  env.BRICK_ENFORCE_DAILY_LIMITS=flag;
+  assert.equal((await (await send('', 'GET')).json()).daily_limits_enforced,true);
+  assert.equal((await generate({brand:'https://capped.example/'+flag})).status,429);
+ }
+ assert.equal(providerCalls,callsBeforeDisabled);
+ console.log('Backend contract passed: validation, disabled service, temporary waiver, restored rate limits, context, successful generation, edition/format cache separation, saved links, and legacy defaults.');
 } finally { await rm(temp,{recursive:true,force:true}); }
