@@ -29,17 +29,17 @@ describe('BRIQ2.0 website-first creation', () => {
   });
   it('labels sample-company explanations and validates minimum budget', async () => {
     render(<MemoryRouter initialEntries={['/?brand=stive']}><Index /></MemoryRouter>);
-    expect(screen.getByText('Curated example concept')).toBeInTheDocument();
+    expect(screen.getByText(/Curated example concept/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How it captures your business DNA' })).toBeInTheDocument();
     const budget = screen.getByLabelText('Target per piece (RM)') as HTMLInputElement;
     fireEvent.change(budget, { target: { value: '50' } });
     expect(budget.checkValidity()).toBe(false);
     expect(screen.queryByText(/RM50/)).not.toBeInTheDocument();
-    expect(screen.getByText('From RM100 / piece')).toBeInTheDocument();
+    expect(screen.getByText(/Minimum RM100 per piece/)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('link', { name: 'BRIQ2.0 home' })).toBeInTheDocument());
   });
   it('submits a company website and displays its generated business story', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ concept: { id: 'fresh', brand: 'Example', title: 'The Packing Ritual', story: 'Parcel caps translate the company’s delivery business into a tactile sorting ritual.', image: '/example.png' } })));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ concept: { id: 'fresh', edition: 'everyday', format: 'clicker', brand: 'Example', title: 'The Packing Ritual', story: 'Parcel caps translate the company’s delivery business into a tactile sorting ritual.', image: '/example.png' } })));
     vi.stubGlobal('fetch', fetchMock);
     render(<MemoryRouter><Index /></MemoryRouter>);
     fireEvent.change(screen.getByLabelText('Company website'), { target: { value: 'example.com' } });

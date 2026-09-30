@@ -30,6 +30,20 @@ Secrets belong exclusively in the Edge Function environment, never VITE_* or sou
 Sources used for the integration contract: https://docs.lovable.dev/features/ai and https://tanstack.com/ai/latest/docs/adapters/lovable . Exact model availability and output contract need the real activation test above.
 
 
-## Premium clicker pivot
+## Historical premium clicker pivot
 
-The current prompt is `form-premium-clickers-v1.1`. Historical `brick_concepts` table and bucket names are retained to avoid a destructive migration. Versioned search cache keys separate newly generated clicker concepts from prior brick concepts. Existing shared concept URLs can still open their original result. The 12 curated clicker images are static assets and do not need the generation service. This GitHub update does not activate or deploy the backend.
+The previous prompt was `form-premium-clickers-v1.1`. Historical `brick_concepts` table and bucket names are retained to avoid a destructive migration. Versioned search cache keys separate newly generated clicker concepts from prior brick concepts. Existing shared concept URLs can still open their original result. The 12 curated clicker images are static assets and do not need the generation service. This GitHub update does not activate or deploy the backend.
+
+
+## Brandkin agency collectible editions
+
+Current prompt version: `brandkin-collectibles-v2`. Apply `20260930090000_collectible_editions.sql` after the original migration, then deploy `generate-concept` with `options.ts` and `prompt.ts`. Deploy the frontend after the new backend. GitHub sync does not perform the database or function deployment.
+
+- Requests carry `edition` (`icon`, `hero`, `inside`, `everyday`) and `format` (`bricks`, `miniature`, `clicker`). Icon + clicker is rejected. Missing values retain the legacy Everyday/clicker defaults.
+- Cache keys include edition and format. Saved concepts retain those choices and the recipient interaction. Old rows receive Everyday/clicker defaults.
+- The new migration upgrades only the former `form.` site title; other admin-configured branding remains authoritative.
+- New concepts are still limited by the existing three uncached requests per client/day and thirty globally. Choosing multiple editions creates separate requests. Review usage requirements before scaling; this change does not raise spend limits.
+- Client-facing text exports include the agency name if provided and omit internal budget and studio branding. Internal exports clearly label target budgets, not quotes. The concept-link web page remains studio-branded. No proposal sending or order-taking integration is added.
+- The Rimba Coffee board is a generated fictional reference image, not a real customer or manufacturing validation.
+
+Local verification: `npm ci --legacy-peer-deps` (the existing lockfile omits testing-library peer dependencies), `npm run build`, `npx tsc --noEmit -p tsconfig.app.json`, `npm test`, `node tests/generation-contract.mjs`. Backend contract tests use fake services and do not spend model credits. A live provider smoke test is still required after deployment.
