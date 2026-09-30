@@ -73,7 +73,7 @@ Deno.serve(async req => {
   let design;try{design=JSON.parse(text.choices?.[0]?.message?.content||'');}catch{throw new Failure(502,'We could not resolve this brand. Add a short description and retry.');}
   if(design.needsContext===true)return json({needsContext:true,message:'Tell us what your brand does and its main colours so the concept feels like you.'});
   if(design.needsContext!==false||!['brand','title','story','interaction','design'].every(k=>typeof design[k]==='string'&&design[k].length>0&&design[k].length<=1500))throw new Failure(502,'Please add a short brand description and retry.');
-  const result=await ai('images/generations',{model:Deno.env.get('BRICK_IMAGE_MODEL')||'openai/gpt-image-2',prompt:IMAGE_PROMPT+'\n'+designDirection(selection!)+'\nDesign brief JSON:\n'+JSON.stringify(design),n:1,size:'1024x1024',response_format:'b64_json'});
+  const result=await ai('images/generations',{model:Deno.env.get('BRICK_IMAGE_MODEL')||'openai/gpt-image-2',prompt:IMAGE_PROMPT+'\n'+designDirection(selection!)+'\nDesign brief JSON:\n'+JSON.stringify(design),n:1,size:'1024x1024'});
   const b64=result.data?.[0]?.b64_json;
   if(typeof b64!=='string'||b64.length>14000000)throw new Failure(502,'The image could not be completed. Please retry.');
   const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
