@@ -48,6 +48,14 @@ describe('BRIQ2.0 website-first creation', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).brand).toBe('https://example.com');
     expect(screen.getByText(/Parcel caps translate/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'How it captures your business DNA' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '← Create another edition' }));
+    expect(screen.getByLabelText('Company website')).toHaveValue('example.com');
+  });
+  it('starts with an empty website when returning from a curated example', async () => {
+    render(<MemoryRouter initialEntries={['/?brand=stive']}><Index /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: '← Create another edition' }));
+    expect(screen.getByLabelText('Company website')).toHaveValue('');
+    await waitFor(() => expect(screen.getByRole('link', { name: 'BRIQ2.0 home' })).toBeInTheDocument());
   });
   it('stops a pending request and lets the user edit and retry', async () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));

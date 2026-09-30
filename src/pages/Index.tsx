@@ -166,7 +166,8 @@ export default function Index() {
   function createAnother() {
     request.current?.abort();
     setBusy(false); setStatus('');
-    if (selected) { setQuery(selected.brand); setEdition(selected.edition); setFormat(selected.format); }
+    setQuery(previous => normalizeCompanyWebsite(previous) ? previous : '');
+    if (selected) { setEdition(selected.edition); setFormat(selected.format); }
     setParams({});
   }
 
