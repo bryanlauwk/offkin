@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import './brick-gifts.css';
 import { concepts } from './clicker-concepts';
+import { normalizeCompanyWebsite } from '@/lib/company-website';
 
 type Concept = { id: string; brand: string; title: string; story: string; image?: string; interaction?: string };
 
@@ -14,7 +15,7 @@ type SiteSettings = {
   siteTitle: string;
 };
 
-const defaultSettings: SiteSettings = { logoUrl: '', logoLink: '/', siteTitle: 'form.' };
+const defaultSettings: SiteSettings = { logoUrl: '', logoLink: '/', siteTitle: 'BRIQ2.0' };
 
 export default function Index() {
   const [params, setParams] = useSearchParams();
@@ -44,7 +45,7 @@ export default function Index() {
       data.forEach(setting => {
         if (setting.key === 'logo_url') next.logoUrl = setting.value || '';
         if (setting.key === 'logo_link') next.logoLink = setting.value || '/';
-        if (setting.key === 'site_title') next.siteTitle = setting.value || 'form.';
+        if (setting.key === 'site_title') next.siteTitle = !setting.value || ['form.', 'brandkin', 'stive'].includes(setting.value.trim().toLowerCase()) ? defaultSettings.siteTitle : setting.value;
       });
       setSettings(next);
     });
@@ -52,10 +53,10 @@ export default function Index() {
   }, []);
 
   useEffect(() => {
-    document.title = selected ? `${selected.title} — form.` : 'form. — Create a brand collectible';
+    document.title = selected ? `${selected.title} — ${settings.siteTitle}` : `${settings.siteTitle} — Your business DNA. Made collectible.`;
     setShareStatus('');
     window.scrollTo(0, 0);
-  }, [selected]);
+  }, [selected, settings.siteTitle]);
 
   async function callGenerator(body: object, signal: AbortSignal) {
     const url = import.meta.env.VITE_SUPABASE_URL;
@@ -76,6 +77,7 @@ export default function Index() {
     setBusy(true);
     setStatus('Bringing your concept back…');
     callGenerator({ id: conceptId }, controller.signal).then(data => {
+      if (controller.signal.aborted) return;
       if (!data.concept) throw new Error('This concept could not be loaded.');
       setGenerated(data.concept);
       setStatus('');
@@ -92,7 +94,9 @@ export default function Index() {
   async function search(event: FormEvent) {
     event.preventDefault();
     if (busy) return;
-    const name = query.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    const website = normalizeCompanyWebsite(query);
+    if (!website) { setStatus('Enter a valid company website, such as company.com.'); return; }
+    const name = website.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
     const compact = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
     const match = concepts.find(c => compact(name) === compact(c.id) || compact(name) === compact(c.brand) || name.startsWith(c.id + '.'));
     if (match && !context.trim()) {
@@ -111,7 +115,7 @@ export default function Index() {
       setStatus('This is taking longer than expected. Please try again.');
     }, 220000);
     try {
-      const data = await callGenerator({ brand: query.trim(), context }, controller.signal);
+      const data = await callGenerator({ brand: website, context }, controller.signal);
       if (controller.signal.aborted) return;
       if (data.needsContext) {
         setNeedsContext(true);
@@ -119,6 +123,7 @@ export default function Index() {
       } else if (data.concept) {
         setGenerated(data.concept);
         setParams({ concept: data.concept.id });
+        setNeedsContext(false);
         setStatus('');
       } else throw new Error('The concept could not be completed. Please retry.');
     } catch (error) {
@@ -137,11 +142,11 @@ export default function Index() {
 
   function download() {
     if (!selected) return;
-    const brief = `FORM — CUSTOM CLICKER BRIEF\n\nBrand: ${selected.brand}\nConcept: ${selected.title}\nPlanning quantity: ${quantity}\nTarget unit budget: RM${budget} (design fee excluded)\nEvent date: ${date || 'To be confirmed'}\n\n${selected.story}\n\nRequested proposal: refined concept, click mechanism, 3D-printed construction, finishing and packaging options, quotation and timeline.\n\nThis brief has not been sent. Independent concept, not an official commission. Pricing, switch fit, print strength, durability and delivery require review before production.`;
+    const brief = `${settings.siteTitle} — CUSTOM COLLECTIBLE BRIEF\n\nBrand: ${selected.brand}\nConcept: ${selected.title}\nPlanning quantity: ${quantity}\nTarget unit budget: RM${Math.max(100, Number(budget) || 100)} (design fee excluded)\nEvent date: ${date || 'To be confirmed'}\n\nHow this captures your business DNA\n${selected.story}\n\nRequested proposal: refined concept, click mechanism, 3D-printed construction, finishing and packaging options, quotation and timeline.\n\nThis brief has not been sent. Independent concept, not an official commission. Pricing, switch fit, print strength, durability and delivery require review before production.`;
     const url = URL.createObjectURL(new Blob([brief], { type: 'text/plain' }));
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `form-${selected.id}-gift-brief.txt`;
+    anchor.download = `briq2-${selected.id}-gift-brief.txt`;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -156,13 +161,13 @@ export default function Index() {
   }
 
   const logo = settings.logoUrl
-    ? <img src={settings.logoUrl} alt={settings.siteTitle || 'form.'} />
-    : <span>{settings.siteTitle || 'form.'}</span>;
+    ? <img src={settings.logoUrl} alt={settings.siteTitle || defaultSettings.siteTitle} />
+    : <span>{settings.siteTitle || defaultSettings.siteTitle}</span>;
 
   return (
     <div className="brick-studio">
       <header className="studio-header">
-        <a className="studio-logo" href={settings.logoLink || '/'} aria-label="Form home">{logo}</a>
+        <a className="studio-logo" href={settings.logoLink || '/'} aria-label={`${settings.siteTitle} home`}>{logo}</a>
         <Button asChild variant="ghost" size="sm" className="settings-link">
           <Link to="/admin"><Settings aria-hidden="true" /> <span>Settings</span></Link>
         </Button>
@@ -173,32 +178,30 @@ export default function Index() {
           <section className="prompt-block" aria-labelledby="creation-title">
             <div className="spark-mark"><Sparkles aria-hidden="true" /></div>
             <p className="welcome">A tiny object with your whole brand story inside.</p>
-            <h1 id="creation-title">What should we turn<br />into a collectible?</h1>
-            <p className="prompt-copy">Enter a company or website. We’ll dream up a custom clicker your clients will actually want to keep.</p>
+            <h1 id="creation-title">Your business DNA.<br /> Made collectible.</h1>
+            <p className="prompt-copy">Enter your company website to create a collectible inspired by what your business does.</p>
 
             <form className="brand-search" onSubmit={search} aria-busy={busy}>
               <Search aria-hidden="true" />
-              <label className="sr" htmlFor="brand">Company name or website</label>
-              <input id="brand" placeholder="Try KLDEX, Grab, or your website" value={query} onChange={event => setQuery(event.target.value)} required maxLength={120} disabled={busy} autoComplete="organization" />
+              <label className="sr" htmlFor="brand">Company website</label>
+              <input id="brand" placeholder="Your company website, e.g. company.com" value={query} onChange={event => setQuery(event.target.value)} required maxLength={120} disabled={busy} autoComplete="url" inputMode="url" />
               <Button type="submit" disabled={busy} size="lg">
                 {busy ? <LoaderCircle className="spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}
-                {busy ? 'Creating' : 'Generate'}
+                {busy ? 'Creating' : 'Create collectible'}
               </Button>
             </form>
 
             <div className="example-row" aria-label="Example brands">
-              <span>Try an example</span>
+              <span>Explore sample companies</span>
               {concepts.slice(0, 4).map(concept => (
-                <Button key={concept.id} asChild variant="outline" size="sm">
-                  <Link to={`?brand=${concept.id}`}>{concept.brand}</Link>
-                </Button>
+                <Button key={concept.id} type="button" variant="outline" size="sm" disabled={busy} onClick={() => { setStatus(''); setParams({ brand: concept.id }); }}>{concept.brand}</Button>
               ))}
             </div>
 
             <details open={needsContext || undefined} className="brand-context">
               <summary>Add brand details <span>Optional</span></summary>
               <label htmlFor="brand-context">What do you do, and what makes the brand recognizable?</label>
-              <textarea id="brand-context" maxLength={600} value={context} disabled={busy} onChange={event => setContext(event.target.value)} placeholder="We’re a Malaysian coffee roaster known for forest green packaging and slow-roasted beans." />
+              <textarea id="brand-context" maxLength={600} value={context} disabled={busy} onChange={event => setContext(event.target.value)} placeholder="We’re a Malaysian coffee roaster known for forest green packaging and slow-roasted beans." /><p className="form-note">Your website identifies your company; it is not automatically browsed. Add a short description for a more accurate concept.</p>
             </details>
 
             <div className={`creation-status ${busy ? 'is-busy' : ''}`} role="status" aria-live="polite">
@@ -207,7 +210,7 @@ export default function Index() {
               {busy && <Button variant="ghost" size="sm" type="button" onClick={stopWaiting}>Stop</Button>}
             </div>
           </section>
-          <p className="fine-print">Independent, AI-assisted concepts. Every design is reviewed and sampled before production.</p>
+          <p className="fine-print">Designs from RM100 per piece. Design fees are separate. Final pricing follows design review and a physical sample.</p>
         </main>
       ) : (
         <main className="result-page">
@@ -217,10 +220,10 @@ export default function Index() {
 
           <section className="result-shell" aria-labelledby="concept-title">
             <div className="concept-story">
-              <div className="result-kicker"><Check aria-hidden="true" /> Your concept is ready</div>
+              <div className="result-kicker"><Check aria-hidden="true" /> {conceptId ? 'Your concept is ready' : 'Curated example concept'}</div>
               <p className="brand-name">{selected.brand}</p>
               <h1 id="concept-title">{selected.title}</h1>
-              <p className="concept-copy">{selected.story}</p>
+              <section aria-labelledby="business-dna-title" className="business-dna"><h2 id="business-dna-title">How it captures your business DNA</h2><p className="concept-copy">{selected.story}</p></section>
 
               {selected.interaction && (
                 <div className="interaction-card">
@@ -232,11 +235,11 @@ export default function Index() {
               <form id="proposal" onSubmit={event => { event.preventDefault(); dialog.current?.showModal(); }}>
                 <div className="order-grid">
                   <label>Quantity<input type="number" min="1" max="100000" step="1" required value={quantity} onChange={event => setQuantity(event.target.value)} /></label>
-                  <label>Budget per piece<select value={budget} onChange={event => setBudget(event.target.value)}><option value="50">RM50 · Signature</option><option value="100">RM100 · Collector</option></select></label>
+                  <label>Target per piece (RM)<input type="number" min="100" max="100000" step="1" required value={budget} onChange={event => setBudget(event.target.value)} /></label>
                 </div>
                 <label>Needed by <span>(optional)</span><input type="date" min={minDate} value={date} onChange={event => setDate(event.target.value)} /></label>
                 <Button className="purchase-button" size="lg" type="submit"><ShoppingBag aria-hidden="true" /> Get purchase proposal <ArrowRight aria-hidden="true" /></Button>
-                <p className="form-note">No payment yet. We’ll confirm design, sample, final price, and delivery first.</p>
+                <p className="form-note">Minimum RM100 per piece. Design fees are separate. Your target is not a quote; final price and delivery follow review.</p>
               </form>
             </div>
 
@@ -248,7 +251,7 @@ export default function Index() {
                 </div>
                 <div className="preview-meta">
                   <div><p>{selected.brand}</p><strong>{selected.title}</strong></div>
-                  <span>From RM{budget}</span>
+                  <span>From RM100 / piece</span>
                 </div>
               </div>
               <div className="secondary-actions">
@@ -266,7 +269,7 @@ export default function Index() {
         <div className="dialog-icon"><ShoppingBag aria-hidden="true" /></div>
         <p className="dialog-kicker">Ready for the next step</p>
         <h2 id="brief-title">Your purchase brief is ready.</h2>
-        <p>{selected?.brand} · {selected?.title}<br />{quantity} pieces · RM{budget} target each{date ? ` · Needed by ${date}` : ''}</p>
+        <p>{selected?.brand} · {selected?.title}<br />{quantity} pieces · RM{Math.max(100, Number(budget) || 100)} target each{date ? ` · Needed by ${date}` : ''}</p>
         <p className="dialog-note">Download it now to review or share. This does not place an order or take payment.</p>
         <Button className="dialog-download" size="lg" onClick={download}><Download aria-hidden="true" /> Download purchase brief</Button>
       </dialog>
