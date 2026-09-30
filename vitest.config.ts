@@ -11,6 +11,6 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: { "npm:undici@7.30.0": "undici", "@": path.resolve(__dirname, "./src") },
   },
 });

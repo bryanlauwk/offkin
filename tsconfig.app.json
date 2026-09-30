@@ -26,6 +26,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "npm:undici@7.30.0": [
+        "./node_modules/undici"
       ]
     }
   },

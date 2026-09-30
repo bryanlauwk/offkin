@@ -38,6 +38,7 @@ try {
  limit=true; assert.equal((await (await generate({brand:'unknown.com'})).json()).needsContext,true); assert.equal(providerCalls,1);
  globalThis.websiteBlocked=true;
  const before=providerCalls; assert.equal((await (await generate({brand:'blocked.com'})).json()).needsContext,true); assert.equal(providerCalls,before);
+ const inspectFailed=await (await generate({brand:'blocked.com',context:'A company summary.',inspectWebsite:true})).json();assert.equal(inspectFailed.verified,false);assert.equal(providerCalls,before);
  globalThis.websiteBlocked=false;
  ambiguous=false;
  const first=await (await generate({brand:'rimba.com',edition:'hero',format:'bricks'})).json();
