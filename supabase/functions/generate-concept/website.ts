@@ -195,6 +195,12 @@ export function pinnedWebsiteRequestOptions(url: URL, addresses: readonly string
 export const fetchPinnedWebsite: WebsiteTransport = async (input, init, addresses) => {
   const url = validatePublicWebsiteUrl(input);
   const options = pinnedWebsiteRequestOptions(url, addresses);
+  const runtime = (globalThis as unknown as { Deno?: import('./native-https.ts').NativeTlsRuntime }).Deno;
+  if (runtime) {
+    if (typeof runtime.connect !== 'function' || typeof runtime.startTls !== 'function') throw new WebsiteReadError(503, 'Secure website reading is unavailable. Add a short company description to continue.');
+    const { fetchNativePinnedWebsite } = await import('./native-https.ts');
+    return fetchNativePinnedWebsite(url, String(options.hostname), init.signal ?? AbortSignal.timeout(6000), runtime);
+  }
   let request: typeof import('node:https').request;
   let checkServerIdentity: typeof import('node:tls').checkServerIdentity;
   try {

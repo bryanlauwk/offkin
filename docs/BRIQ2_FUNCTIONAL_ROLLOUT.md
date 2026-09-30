@@ -32,3 +32,10 @@ Stop cancels browser waiting; backend calls use the request abort signal when pr
 ## Verification
 
 Run `npm ci`, `npm run build`, `npx tsc --noEmit -p tsconfig.app.json`, `npm test`, `node tests/generation-contract.mjs`, and `npm run lint`. Unit/contract tests mock paid providers; passing them does not establish live deployment. Existing Fast Refresh/hook lint warnings are non-fatal.
+
+
+## Native Deno transport repair
+
+The first hosted test proved Node-compatible `https.request` did not work in the target Deno runtime. The repair uses native `Deno.connect` to a validated literal address, then native `Deno.startTls` for the original hostname with normal certificate verification. A thin Duplex adapter feeds the official Node.js Undici 7.30.0 HTTP client, so HTTP framing is handled by its maintained parser rather than handwritten parsing. There is no generic-fetch fallback, custom production trust root, or disabled TLS check.
+
+`tests/native-https-smoke.ts` exercises actual TLS locally using a disposable self-signed test fixture certificate. The production code does not accept certificate inputs. Generate a CA:false certificate for company.invalid outside the repo, then run the script with a Deno2.6 runtime and the cert/key paths. The tested Deno2.6.8 runtime passed success and rejection cases for certificate hostname, chunked bodies, oversized headers/body, compressed responses, cancellation, redirect preservation, conflicting framing, invalid chunks and truncated bodies. The exact target runtime still needs an authorized hosted inspectWebsite test; local success does not establish production readiness.

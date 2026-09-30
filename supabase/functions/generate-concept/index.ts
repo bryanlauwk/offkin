@@ -62,7 +62,7 @@ Deno.serve(async req => {
    if(error instanceof WebsiteReadError && error.status===400)return json({error:error.message},400);
    if(!context)return json({needsContext:true,message:'We could not read that public website. Add a short business summary so we can create an accurate concept without guessing.'});
   }
-  if(input.inspectWebsite===true)return json({website,verification:'Website text fetched without AI generation.'});
+  if(input.inspectWebsite===true)return json({website,verified:Boolean(website),verification:website?'Website text fetched without AI generation.':'Website could not be read; no AI generation was attempted.'});
   async function ai(path:string,body:unknown){
    if(req.signal.aborted)throw new Failure(499,'The request was cancelled.');
    const response=await fetch('https://ai.gateway.lovable.dev/v1/'+path,{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Lovable-API-Key':key!,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([req.signal,AbortSignal.timeout(100000)])});
