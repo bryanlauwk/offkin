@@ -20,7 +20,7 @@ globalThis.fetch = async(url,init)=>{
  const data=url.endsWith('images/generations') ? {data:[{b64_json:Buffer.from([137,80,78,71]).toString('base64')}]} : {choices:[{message:{content:JSON.stringify(ambiguous ? {needsContext:true} : {needsContext:false,brand:'rimba.com',title:'Coffee collectible',story:'A proposed brand story.',interaction:'Build and display.',design:'A substantial coffee stall.'})}}]};
  return new Response(JSON.stringify(data),{status:200});
 };
-await build({entryPoints:['supabase/functions/generate-concept/index.ts'],bundle:true,format:'esm',platform:'node',outfile:join(temp,'edge.mjs'),plugins:[{name:'mock-db',setup(b){b.onResolve({filter:/website\.ts$/},()=>({path:'website',namespace:'website'}));b.onLoad({filter:/.*/,namespace:'website'},()=>({contents:`export function validatePublicWebsiteUrl(input){if(!input.includes('.'))throw new Error('Invalid website');return new URL(input.startsWith('http')?input:'https://'+input);} export class WebsiteReadError extends Error {} export async function readCompanyWebsite(input){ if(globalThis.websiteBlocked)throw new Error('blocked');return {url:'https://rimba.example',title:'Rimba Coffee',excerpt:'A coffee roaster.'}; }`,loader:'js'}));b.onResolve({filter:/https:\/\/esm.sh/},()=>({path:'mock',namespace:'mock'}));b.onLoad({filter:/.*/,namespace:'mock'},()=>({contents:'export const createClient=()=>globalThis.testDB;',loader:'js'}));}}]});
+await build({entryPoints:['supabase/functions/generate-concept/index.ts'],bundle:true,format:'esm',platform:'node',outfile:join(temp,'edge.mjs'),plugins:[{name:'mock-db',setup(b){b.onResolve({filter:/website\.ts$/},()=>({path:'website',namespace:'website'}));b.onLoad({filter:/.*/,namespace:'website'},()=>({contents:`export function validatePublicWebsiteUrl(input){if(!input.includes('.'))throw new Error('Invalid website');return new URL(input.startsWith('http')?input:'https://'+input);} export class WebsiteReadError extends Error {} export async function readCompanyWebsite(input){ globalThis.websiteReads=(globalThis.websiteReads||0)+1; if(globalThis.websiteBlocked)throw new Error('blocked');return {url:'https://rimba.example',title:'Rimba Coffee',excerpt:'A coffee roaster.'}; }`,loader:'js'}));b.onResolve({filter:/https:\/\/esm.sh/},()=>({path:'mock',namespace:'mock'}));b.onLoad({filter:/.*/,namespace:'mock'},()=>({contents:'export const createClient=()=>globalThis.testDB;',loader:'js'}));}}]});
 try {
  await import(pathToFileURL(join(temp,'edge.mjs')));
  const send=(body,method='POST')=>handler(new Request('https://test.invalid',{method,body:method==='POST'?body:undefined}));
@@ -74,5 +74,27 @@ try {
   assert.equal((await generate({brand:'https://capped.example/'+flag})).status,429);
  }
  assert.equal(providerCalls,callsBeforeDisabled);
+ // A confirmed summary skips all fetching, without permitting malformed websites or losing exact wording.
+ delete env.BRICK_ENFORCE_DAILY_LIMITS;
+ const readsBeforeSummary=globalThis.websiteReads;globalThis.websiteBlocked=true;
+ const exactWording='  Made for YOU!\nSince 2020  ';
+ const customerContext=JSON.stringify({business:'A print studio.',exactWording,placement:'On the base',interaction:'Display only'});
+ const summaryResult=await (await generate({brand:'https://summary.example',context:customerContext,summaryOnly:true})).json();
+ assert.ok(summaryResult.concept);assert.equal(summaryResult.concept.sourceUrl,'');assert.equal(globalThis.websiteReads,readsBeforeSummary);
+ assert.equal(JSON.parse(prompts.at(-2).messages[1].content).context,customerContext);
+ assert.ok(prompts.at(-1).prompt.includes(JSON.stringify({context:customerContext})));
+ assert.equal((await generate({brand:'invalid',context:customerContext,summaryOnly:true})).status,400);
+ assert.equal((await generate({brand:'https://summary.example',summaryOnly:'true'})).status,400);
+ const callsBeforeEmpty=providerCalls;
+ assert.equal((await (await generate({brand:'https://summary.example',summaryOnly:true})).json()).needsContext,true);assert.equal(providerCalls,callsBeforeEmpty);
+ // Evidence modes cannot reuse one another's cached concept, in either insertion order.
+ globalThis.websiteBlocked=false;
+ for(const summaryFirst of [true,false]) {
+  const request={brand:'https://mode-'+summaryFirst+'.example',context:'A business story.'};
+  const a=await (await generate({...request,summaryOnly:summaryFirst})).json();
+  const b=await (await generate({...request,summaryOnly:!summaryFirst})).json();
+  assert.notEqual(a.concept.id,b.concept.id);
+  assert.equal(Boolean(a.concept.sourceUrl),!summaryFirst);assert.equal(Boolean(b.concept.sourceUrl),summaryFirst);
+ }
  console.log('Backend contract passed: validation, disabled service, temporary waiver, restored rate limits, context, successful generation, edition/format cache separation, saved links, and legacy defaults.');
 } finally { await rm(temp,{recursive:true,force:true}); }

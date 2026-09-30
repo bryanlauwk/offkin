@@ -16,7 +16,7 @@ Deno.serve(async req => {
   const db=createClient(url,service);
   const {error}=await db.from('brick_concepts').select('id,edition,format,interaction,source_url,source_title').limit(0);
   const enabled=Boolean(Deno.env.get('LOVABLE_API_KEY'))&&Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
-  return json({ready:!error&&enabled,daily_limits_enforced:dailyLimitsEnforced(),verification:'Configuration and schema only; website transport and AI providers need a live test.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
+  return json({ready:!error&&enabled,daily_limits_enforced:dailyLimitsEnforced(),capabilities:{summary_only:true},verification:'Configuration and schema only; website transport and AI providers need a live test.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
  }
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try {
@@ -26,6 +26,7 @@ Deno.serve(async req => {
   const raw=new TextDecoder().decode(bytesIn); if(raw.length>3000) return json({error:'Please shorten your brand brief.'},400);
   let input; try{input=JSON.parse(raw);}catch{return json({error:'Invalid request.'},400);}
   if(!input || typeof input!=='object' || Array.isArray(input))return json({error:'Invalid request.'},400);
+  if(input.summaryOnly!==undefined && typeof input.summaryOnly!=='boolean')return json({error:'Invalid story request.'},400);
   if(input.inspectWebsite!==undefined && typeof input.inspectWebsite!=='boolean')return json({error:'Invalid inspection request.'},400);
   const selection=parseSelection(input);
   if(!input.id && !selection)return json({error:'Choose a valid edition and format. Icon is available as a brick build or miniature.'},400);
@@ -50,7 +51,7 @@ Deno.serve(async req => {
   try { websiteUrl=validatePublicWebsiteUrl(brand).href; } catch(error) { return json({error:error instanceof Error?error.message:'Enter a public company website.'},400); }
   const key=Deno.env.get('LOVABLE_API_KEY');const enabled=Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
   if(!input.inspectWebsite&&(!key||!enabled))throw new Failure(503,'Live generation is not available yet. Please try again later.');
-  const cacheKey=await hash(JSON.stringify([PROMPT_VERSION,websiteUrl,context,selection!.edition,selection!.format]));
+  const cacheKey=await hash(JSON.stringify([PROMPT_VERSION,websiteUrl,context,Boolean(input.summaryOnly),selection!.edition,selection!.format]));
   const {data:cached,error:cacheError}=await db.from('brick_concepts').select('id,brand,title,story,image_path,edition,format,interaction,source_url,source_title').eq('cache_key',cacheKey).maybeSingle();
   if(cacheError)throw new Failure(503,'Concept generation is being set up. Please try again later.');
   if(cached&&!input.inspectWebsite)return await deliver(cached);
@@ -62,7 +63,8 @@ Deno.serve(async req => {
    if(!allowed)throw new Failure(429,'Today’s concept limit has been reached. Try again tomorrow.');
   }
   let website: {url:string;title:string;excerpt:string}|null=null;
-  try { website=await readCompanyWebsite(websiteUrl); }
+  if(input.summaryOnly===true && !context)return json({needsContext:true,message:'Tell us what your business does so we can start with your story.'});
+  try { if(input.summaryOnly!==true)website=await readCompanyWebsite(websiteUrl); }
   catch(error) {
    if(error instanceof WebsiteReadError && error.status===400)return json({error:error.message},400);
    if(!context)return json({needsContext:true,message:'We could not read that public website. Add a short business summary so we can create an accurate concept without guessing.'});
@@ -78,7 +80,7 @@ Deno.serve(async req => {
   let design;try{design=JSON.parse(text.choices?.[0]?.message?.content||'');}catch{throw new Failure(502,'We could not resolve this brand. Add a short description and retry.');}
   if(design.needsContext===true)return json({needsContext:true,message:'Tell us what your brand does and its main colours so the concept feels like you.'});
   if(design.needsContext!==false||!['brand','title','story','interaction','design'].every(k=>typeof design[k]==='string'&&design[k].length>0&&design[k].length<=1500))throw new Failure(502,'Please add a short brand description and retry.');
-  const result=await ai('images/generations',{model:Deno.env.get('BRICK_IMAGE_MODEL')||'openai/gpt-image-2',prompt:IMAGE_PROMPT+'\n'+designDirection(selection!)+'\nDesign brief JSON:\n'+JSON.stringify(design),n:1,size:'1024x1024'});
+  const result=await ai('images/generations',{model:Deno.env.get('BRICK_IMAGE_MODEL')||'openai/gpt-image-2',prompt:IMAGE_PROMPT+'\n'+designDirection(selection!)+'\nDesign brief JSON:\n'+JSON.stringify(design)+'\nOriginal customer direction JSON (preserve exactWording verbatim, no added wording):\n'+JSON.stringify({context}),n:1,size:'1024x1024'});
   const b64=result.data?.[0]?.b64_json;
   if(typeof b64!=='string'||b64.length>14000000)throw new Failure(502,'The image could not be completed. Please retry.');
   const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));

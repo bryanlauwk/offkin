@@ -1,43 +1,30 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowRight, Check, Download, LoaderCircle, Search, Share2, Sparkles, X } from 'lucide-react';
+import { Download, LoaderCircle, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { CreationConversation } from '@/components/CreationConversation';
 import { supabase } from '@/integrations/supabase/client';
-import { editions, formats, type Edition, type GiftFormat, parseSelection } from '../../supabase/functions/generate-concept/options';
-import { makeBrief, type CollectibleConcept } from '@/lib/collectible-brief';
+import type { CollectibleConcept } from '@/lib/collectible-brief';
+import { requestConcept } from '@/lib/concept-api';
+import { emptyDraft, loadCreationDraft, saveCreationDraft, type CreationDraft } from '@/lib/creation-journey';
 import './brick-gifts.css';
-import { normalizeCompanyWebsite } from '@/lib/company-website';
 
 type SiteSettings = { logoUrl: string; logoLink: string; siteTitle: string };
-const defaultSettings: SiteSettings = { logoUrl: '', logoLink: '/', siteTitle: 'BRIQ2.0' };
-
+const defaultSettings: SiteSettings = { logoUrl: '', logoLink: '/', siteTitle: 'DIORAMINI' };
 export default function Index() {
   const [params, setParams] = useSearchParams();
   const [generated, setGenerated] = useState<CollectibleConcept | null>(null);
+  const [draft, setDraft] = useState<CreationDraft>();
   const [settings, setSettings] = useState(defaultSettings);
-  const [edition, setEdition] = useState<Edition>('inside');
-  const [format, setFormat] = useState<GiftFormat>('miniature');
-  const [query, setQuery] = useState('');
-  const [context, setContext] = useState('');
-  const [needsContext, setNeedsContext] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
-  const [quantity, setQuantity] = useState('100');
-  const [budget, setBudget] = useState('100');
-  const [date, setDate] = useState('');
-  const [occasion, setOccasion] = useState('Client appreciation');
-  const [agency, setAgency] = useState('');
-  const [clientReady, setClientReady] = useState(true);
   const [shareStatus, setShareStatus] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const request = useRef<AbortController | null>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
   const conceptId = params.get('concept');
   const selected = conceptId && generated?.id === conceptId ? generated : undefined;
-  const today = new Date();
-  const minDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-
   useEffect(() => {
     let active = true;
     supabase.from('site_settings').select('key, value').then(({ data }) => {
@@ -46,192 +33,36 @@ export default function Index() {
       data.forEach(setting => {
         if (setting.key === 'logo_url') next.logoUrl = setting.value || '';
         if (setting.key === 'logo_link') next.logoLink = !setting.value || setting.value === 'https://example.com' ? '/' : setting.value;
-        if (setting.key === 'site_title') next.siteTitle = !setting.value || ['form.', 'brandkin', 'stive', 'the absurd marshmallow test'].includes(setting.value.trim().toLowerCase()) ? defaultSettings.siteTitle : setting.value;
-      });
-      setSettings(next);
-    });
-    return () => { active = false; };
+        if (setting.key === 'site_title') next.siteTitle = !setting.value || ['briq2.0', 'briq', 'form.', 'brandkin', 'stive', 'the absurd marshmallow test'].includes(setting.value.trim().toLowerCase()) ? defaultSettings.siteTitle : setting.value;
+      }); setSettings(next);
+    }); return () => { active = false; };
   }, []);
-
   useEffect(() => {
     document.title = selected ? `${selected.title} — ${settings.siteTitle}` : `${settings.siteTitle} — Your business DNA. Made collectible.`;
-    setShareStatus('');
-    setImageFailed(false);
-    window.scrollTo(0, 0);
+    setImageFailed(false); setShareStatus(''); window.scrollTo(0, 0);
   }, [selected, settings.siteTitle]);
-
-  async function callGenerator(body: { id?: string; brand?: string; context?: string; edition?: Edition; format?: GiftFormat }, signal: AbortSignal) {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-    if (!url || !key) throw new Error('Live generation is being connected. Please try again later.');
-    const response = await fetch(`${url}/functions/v1/generate-concept`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key }, body: JSON.stringify(body), signal,
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'Generation is not available right now. Please try again later.');
-    if (data.concept) {
-      if (body.edition && (data.concept.edition !== body.edition || data.concept.format !== body.format)) {
-        throw new Error('This direction is not available from the generator yet. Please try again later.');
-      }
-      const selection = parseSelection(data.concept);
-      if (!selection) throw new Error('This concept has an unsupported edition or format. Please try again.');
-      data.concept = { ...data.concept, ...selection };
-    }
-    return data;
-  }
-
-  useEffect(() => {
-    request.current?.abort();
-    setBusy(false);
-  }, [params]);
-
+  useEffect(() => { setEditing(false); setStatus(''); if (generated?.id !== conceptId) setDraft(conceptId ? loadCreationDraft(conceptId) : undefined); }, [conceptId, generated?.id]);
   useEffect(() => {
     if (!conceptId || generated?.id === conceptId) return;
-    const controller = new AbortController();
-    request.current = controller;
-    setBusy(true);
-    setStatus('Bringing your concept back…');
-    callGenerator({ id: conceptId }, controller.signal).then(data => {
+    const controller = new AbortController(); request.current = controller; setBusy(true); setStatus('Opening your miniature…');
+    const timer = window.setTimeout(() => controller.abort(), 30000);
+    requestConcept({ id: conceptId }, controller.signal).then(data => {
       if (controller.signal.aborted) return;
-      if (!data.concept) throw new Error('This concept could not be loaded.');
-      setGenerated(data.concept);
-      setStatus('');
-    }).catch(error => {
-      if (!controller.signal.aborted) setStatus(error.message);
-    }).finally(() => {
-      if (!controller.signal.aborted) setBusy(false);
-    });
-    return () => controller.abort();
+      if (!data.concept) throw new Error('This concept could not be found.');
+      setBusy(false); setGenerated(data.concept); setStatus('');
+    }).catch(() => { if (!controller.signal.aborted) setStatus('We couldn’t open this concept. Please try again.'); })
+      .finally(() => { clearTimeout(timer); if (request.current === controller) { setBusy(false); if (controller.signal.aborted) setStatus('This is taking longer than expected. Please try again.'); } });
+    return () => { request.current = null; clearTimeout(timer); controller.abort(); };
   }, [conceptId, generated?.id, loadAttempt]);
-  useEffect(() => () => request.current?.abort(), []);
-
-  function chooseEdition(value: Edition) {
-    setEdition(value);
-    if (value === 'icon' && format === 'clicker') setFormat('miniature');
-  }
-
-  async function search(event: FormEvent) {
-    event.preventDefault();
-    if (busy) return;
-    const website = normalizeCompanyWebsite(query);
-    if (!website) { setStatus('Enter a valid company website, such as company.com.'); return; }
-    request.current?.abort();
-    const controller = new AbortController();
-    request.current = controller;
-    setBusy(true);
-    setStatus('Reading the business story and creating your collectible…');
-    const timeout = window.setTimeout(() => {
-      controller.abort();
-      setBusy(false);
-      setStatus('This is taking longer than expected. Please try again.');
-    }, 220000);
-    try {
-      const data = await callGenerator({ brand: website, context: context.trim(), edition, format }, controller.signal);
-      if (controller.signal.aborted) return;
-      if (data.needsContext) {
-        setNeedsContext(true);
-        setStatus(data.message);
-      } else if (data.concept) {
-        setGenerated(data.concept);
-        setParams({ concept: data.concept.id });
-        setNeedsContext(false);
-        setStatus('');
-      } else throw new Error('The concept could not be completed. Please retry.');
-    } catch (error) {
-      if (!controller.signal.aborted) setStatus(error instanceof Error ? error.message : 'Could not reach the generator. Please retry.');
-    } finally {
-      clearTimeout(timeout);
-      if (!controller.signal.aborted) setBusy(false);
-    }
-  }
-
-  function stopWaiting() {
-    request.current?.abort();
-    setBusy(false);
-    setStatus('Stopped waiting. You can edit and try again. Work already started on the server may still finish.');
-  }
-
+  function createAnother() { request.current?.abort(); setBusy(false); setStatus(''); setEditing(false); setDraft(undefined); setParams({}); }
   function download() {
     if (!selected) return;
-    const brief = makeBrief(selected, { agency, quantity, budget: String(Math.max(100, Number(budget) || 100)), date, occasion, clientReady });
-    const url = URL.createObjectURL(new Blob([brief], { type: 'text/plain' }));
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${selected.id}-${clientReady ? 'client-concept' : 'internal-brief'}.txt`;
-    anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const text = [`${selected.brand} — ${selected.title}`, selected.story, selected.interaction || '', ...(draft ? [`Business story: ${draft.business}`, `Object: ${draft.item}`, `Audience: ${draft.audience}`, `Exact wording: ${JSON.stringify(draft.wording)}`, `Placement: ${draft.placement}`, `Style: ${draft.style}`, `Interaction: ${draft.interaction}`] : []), ...(selected.sourceUrl ? [`Website: ${selected.sourceUrl}`] : []), 'Visual concept. Artwork and lettering are confirmed before production. Final design, construction and pricing follow design review and a physical sample.', 'From RM100 per piece. Design fees are separate.'].filter(Boolean).join('\n\n');
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${selected.id}-my-miniature.txt`; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-
-  async function share() {
-    try { await navigator.clipboard.writeText(window.location.href); setShareStatus('Concept link copied. Your agency and budget details are not included.'); }
-    catch { setShareStatus('Copy the link from your address bar.'); }
-  }
-
-  function createAnother() {
-    request.current?.abort();
-    setBusy(false); setStatus('');
-    setQuery(previous => normalizeCompanyWebsite(previous) ? previous : '');
-    setEdition('inside'); setFormat('miniature'); setNeedsContext(false); setContext('');
-    setParams({});
-  }
-
-  return (
-    <div className="brick-studio">
-      <a className="skip-link" href="#main-content">Skip to content</a>
-      <header className="studio-header">
-        <a className="studio-logo" href={settings.logoLink || '/'} aria-label={`${settings.siteTitle} home`}>
-          {settings.logoUrl ? <img src={settings.logoUrl} alt={settings.siteTitle} /> : <><span className="brand-symbol" aria-hidden="true"><i /><i /><i /></span><span>{settings.siteTitle}</span></>}
-        </a>
-        <span className="header-caption">THE COLLECTIBLE DESIGN STUDIO</span>
-      </header>
-
-      {!selected ? (
-        <main id="main-content" className="creation-home">
-          <div className="hero-layout">
-          <section className="prompt-block" aria-labelledby="creation-title">
-            <p className="welcome">SMALL OBJECT. DISTINCTLY YOURS.</p>
-            <h1 id="creation-title">Your business DNA.<br /> Made collectible.</h1>
-            <p className="prompt-copy">Turn what your business does into a miniature worth keeping. Start with your company website.</p>
-            <form onSubmit={search} className="creation-form single-search-form" aria-busy={busy}>
-              <div className="brand-search">
-                <Search aria-hidden="true" />
-                <label className="sr" htmlFor="brand">Company website</label>
-                <input id="brand" placeholder="Your company website" value={query} onChange={e => { setQuery(e.target.value); setContext(''); setNeedsContext(false); }} required minLength={2} maxLength={120} autoComplete="url" inputMode="url" disabled={busy} />
-                <Button type="submit" disabled={busy} size="lg" aria-label={busy ? 'Creating your concept' : 'Create collectible'}>{busy ? <LoaderCircle className="spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}</Button>
-              </div>
-              {needsContext && <div className="brand-context context-request"><label htmlFor="brand-context">Tell us a little about the business</label><textarea id="brand-context" maxLength={600} value={context} disabled={busy} onChange={e => setContext(e.target.value)} placeholder="What do you make or do? What should the collectible celebrate?" /><p>We need a few details to avoid guessing. Add them, then try again.</p><Button type="submit" disabled={busy}>Try again with these details</Button></div>}
-            </form>
-            <div className={`creation-status ${busy ? 'is-busy' : ''}`} role="status" aria-live="polite">{status && <span>{status}</span>}{conceptId && !busy && status && <Button variant="outline" type="button" onClick={() => setLoadAttempt(value => value + 1)}>Try loading again</Button>}{busy && <Button variant="ghost" size="sm" type="button" onClick={stopWaiting}>Stop</Button>}</div>
-
-          </section>
-          <aside className="material-study" aria-hidden="true">
-            <div className="study-caption"><span>FORM / STORY / IDENTITY</span><span>BRIQ — 02</span></div>
-            <svg className="study-form" viewBox="0 0 440 430" fill="none">
-              <defs><linearGradient id="form-face" x1="110" y1="140" x2="340" y2="370" gradientUnits="userSpaceOnUse"><stop stopColor="#e1dcd1" /><stop offset="1" stopColor="#bcb5a7" /></linearGradient><linearGradient id="form-top" x1="90" y1="160" x2="320" y2="110" gradientUnits="userSpaceOnUse"><stop stopColor="#f9f7ef" /><stop offset="1" stopColor="#e7e1d5" /></linearGradient></defs>
-              <path d="M32 334L218 426L414 326M26 254L220 350L420 250M80 186L80 355M362 175L362 352" stroke="currentColor" strokeOpacity=".12" />
-              <ellipse cx="226" cy="350" rx="133" ry="27" fill="#302b23" opacity=".07" />
-              <path d="M91 226L226 159L356 224L220 293Z" fill="url(#form-top)" stroke="#c9c2b5" /><path d="M91 226L220 293V345L91 279Z" fill="url(#form-face)" stroke="#c9c2b5" /><path d="M220 293L356 224V277L220 345Z" fill="#aaa395" stroke="#a39c90" />
-              <path d="M91 151L226 84L356 149L220 218Z" fill="url(#form-top)" stroke="#c9c2b5" /><path d="M91 151L220 218V256L91 190Z" fill="url(#form-face)" stroke="#c9c2b5" /><path d="M220 218L356 149V187L220 256Z" fill="#aaa395" stroke="#a39c90" />
-              <path d="M159 81L227 47L293 80L224 115Z" fill="#f16a42" /><path d="M159 81L224 115V164L159 130Z" fill="#d94f29" /><path d="M224 115L293 80V130L224 164Z" fill="#ae3e20" />
-              <path d="M57 128H75M66 119V137M364 294H382M373 285V303" stroke="currentColor" strokeOpacity=".5" /><path d="M225 13V30M225 373V401" stroke="currentColor" strokeOpacity=".28" strokeDasharray="3 4" />
-            </svg>
-            <div className="study-caption"><span>AN IDEA TAKES SHAPE</span><span>↗</span></div>
-          </aside>
-          </div>
-          <ol className="studio-process" aria-label="From website to miniature">
-            <li><span>01</span><div><strong>Start with your story</strong><p>One website. The details that make your business yours.</p></div></li>
-            <li><span>02</span><div><strong>Give it a new form</strong><p>A miniature concept, with the business idea behind it.</p></div></li>
-            <li><span>03</span><div><strong>Make it worth keeping</strong><p>Refine the direction. Review a physical sample before production.</p></div></li>
-          </ol>
-          <footer className="studio-footer"><p>DESIGNED AROUND YOUR BUSINESS</p><p className="fine-print">Designs from RM100 per piece. Design fees are separate.<br />Final pricing follows design review and a physical sample.</p></footer>
-        </main>
-      ) : (
-        <main id="main-content" className="result-page"><Button variant="ghost" className="back-link" onClick={createAnother}>← Create another edition</Button><section className="result-shell" aria-labelledby="concept-title"><div className="concept-story"><div className="result-kicker"><Check aria-hidden="true" />{editions[selected.edition].label} edition · {formats[selected.format].label}</div><p className="brand-name">{selected.brand}</p><h1 id="concept-title">{selected.title}</h1><section aria-labelledby="business-dna-title" className="business-dna"><h2 id="business-dna-title">How it captures your business DNA</h2><p className="concept-copy">{selected.story}</p>{selected.sourceUrl && /^https?:\/\//i.test(selected.sourceUrl) && <p className="source-note">Based on <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">{selected.sourceTitle || 'company website'}</a>. Please review the interpretation.</p>}</section>{selected.interaction && <div className="interaction-card"><span><Sparkles aria-hidden="true" />The recipient's experience</span><p>{selected.interaction}</p></div>}
-          <details className="refinement-panel"><summary>Refine this concept</summary><form onSubmit={search} aria-busy={busy}><p>Keep the business story and explore another direction. Each new generation uses AI credits.</p>{!normalizeCompanyWebsite(query) && <label>Company website<input value={query} onChange={e => setQuery(e.target.value)} placeholder="company.com" required disabled={busy} /></label>}<label>What would you change?<textarea maxLength={600} value={context} onChange={e => setContext(e.target.value)} placeholder="More realistic, a different colour, or a specific business detail…" disabled={busy} /></label><label>Story<select value={edition} onChange={e => chooseEdition(e.target.value as Edition)} disabled={busy}>{Object.entries(editions).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</select></label><label>Object<select value={format} onChange={e => setFormat(e.target.value as GiftFormat)} disabled={busy}>{Object.entries(formats).map(([key, value]) => <option key={key} value={key} disabled={edition === 'icon' && key === 'clicker'}>{value.label}</option>)}</select></label><Button type="submit" disabled={busy}>{busy ? 'Creating your concept' : 'Create refined concept'}</Button></form><div role="status" aria-live="polite">{status}{busy && <Button variant="ghost" type="button" onClick={stopWaiting}>Stop</Button>}</div></details>
-          <form id="proposal" onSubmit={event => { event.preventDefault(); dialog.current?.showModal(); }}><h2>Make it pitch-ready.</h2><p className="proposal-intro">Add your project details. Choose what your client sees.</p><label>Your agency <span>(optional)</span><input maxLength={120} value={agency} onChange={e => setAgency(e.target.value)} placeholder="Prepared by your agency" /></label><div className="order-grid"><label>Planning quantity<input type="number" min="1" max="100000" step="1" required value={quantity} onChange={e => setQuantity(e.target.value)} /></label><label>Target per piece (RM)<input type="number" min="100" max="100000" step="1" required value={budget} onChange={e => setBudget(e.target.value)} /></label></div><p className="budget-note">Minimum RM100 per piece. Your target is not a quote. Design and sample fees are separate.</p><label>Occasion<select value={occasion} onChange={e => setOccasion(e.target.value)}>{['Client appreciation','Employee onboarding','Product launch','Company anniversary','Event giveaway'].map(value => <option key={value}>{value}</option>)}</select></label><label>Requested delivery <span>(optional)</span><input type="date" min={minDate} value={date} onChange={e => setDate(e.target.value)} /></label><label className="export-option"><input type="checkbox" checked={clientReady} onChange={e => setClientReady(e.target.checked)} /><span><strong>Client-facing brief</strong><small>Leave out the internal budget and studio branding.</small></span></label><Button className="purchase-button" size="lg" type="submit"><Download aria-hidden="true" />Prepare {clientReady ? 'client concept' : 'internal brief'}<ArrowRight aria-hidden="true" /></Button><p className="form-note">Download for review. Nothing is submitted or ordered.</p></form></div>
-          <div className="concept-preview"><div className="preview-card"><div className="preview-image">{imageFailed ? <p className="image-error">The image could not load. Your concept brief is still available.</p> : <img src={selected.image} onError={() => setImageFailed(true)} alt={`${selected.brand} — ${selected.title}, an independent ${formats[selected.format].label.toLowerCase()} concept`} />}<span>{formats[selected.format].label} concept</span></div><div className="preview-meta"><div><p>{selected.brand}</p><strong>{selected.title}</strong></div></div></div><div className="secondary-actions"><Button type="button" variant="outline" onClick={share}><Share2 aria-hidden="true" />Copy concept link</Button></div><p className="share-status" role="status">{shareStatus}</p><ol className="production-steps"><li>Concept direction</li><li>Design review & quotation</li><li>Physical sample approval</li><li>Production</li></ol><p className="fine-print">Independent concept, not an official commission.<br />Construction, pricing, and delivery require review.</p></div></section></main>
-      )}
-      <dialog ref={dialog} aria-labelledby="brief-title"><Button className="dialog-close" variant="ghost" size="icon" aria-label="Close" onClick={() => dialog.current?.close()}><X aria-hidden="true" /></Button><p className="dialog-kicker">Ready for review</p><h2 id="brief-title">Your {clientReady ? 'client concept' : 'internal brief'} is ready.</h2><p>{selected?.brand} · {selected?.title}<br />{quantity} pieces{!clientReady && ` · RM${Math.max(100, Number(budget) || 100)} target each`}</p><p className="dialog-note">{clientReady ? 'Your agency name is included if provided. Internal budget and studio branding are omitted.' : 'Includes your target budget for internal planning.'} This downloads a text brief; nothing is sent and no order is placed.</p><Button className="dialog-download" size="lg" onClick={download}><Download aria-hidden="true" />Download {clientReady ? 'client concept' : 'internal brief'}</Button></dialog>
-    </div>
-  );
+  async function share() { try { await navigator.clipboard.writeText(window.location.href); setShareStatus('Your concept link is copied.'); } catch { setShareStatus('You can copy the link from your address bar.'); } }
+  return <div className="brick-studio"><a className="skip-link" href="#main-content">Skip to content</a><header className="studio-header"><a className="studio-logo" href={settings.logoLink || '/'} aria-label={`${settings.siteTitle} home`}>{settings.logoUrl ? <img src={settings.logoUrl} alt={settings.siteTitle} /> : <><span className="brand-symbol" aria-hidden="true"><i /><i /><i /></span><span>{settings.siteTitle}</span></>}</a><span className="header-caption">THE COLLECTIBLE DESIGN STUDIO</span></header>
+    {conceptId && !selected ? <main id="main-content" className="conversation-page"><h1>Your miniature</h1><p role="status">{busy && <LoaderCircle className="spin" aria-hidden="true" />}{status}</p><div className="chat-actions">{!busy && <Button onClick={() => setLoadAttempt(value => value + 1)}>Try loading again</Button>}<Button variant="ghost" onClick={createAnother}>Start a new story</Button></div></main> : !selected || editing ? <CreationConversation key={editing ? `refine-${conceptId}` : 'create'} initialDraft={editing ? draft || { ...emptyDraft, website: selected?.sourceUrl || '', business: '', summaryOnly: true } : undefined} directionMissing={editing && !draft} navigationKey={params.toString()} onExit={editing ? () => setEditing(false) : undefined} onGenerated={(concept, answers) => { saveCreationDraft(concept.id, answers); setGenerated(concept); setDraft(answers); setEditing(false); setParams({ concept: concept.id }); }} /> : <main id="main-content" className="result-page"><Button variant="ghost" className="back-link" onClick={createAnother}>← Start a new story</Button><section className="result-shell" aria-labelledby="concept-title"><div className="concept-story"><p className="result-kicker">YOUR FIRST LOOK</p><p className="brand-name">{selected.brand}</p><h1 id="concept-title">{selected.title}</h1><section className="business-dna" aria-labelledby="business-dna-title"><h2 id="business-dna-title">Your business, in miniature</h2><p className="concept-copy">{selected.story}</p>{selected.sourceUrl && /^https?:\/\//i.test(selected.sourceUrl) && <p className="source-note">Inspired by <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">{selected.sourceTitle || 'your website'}</a> and your direction.</p>}</section>{selected.interaction && <div className="interaction-card"><span>A small moment to enjoy</span><p>{selected.interaction}</p></div>}<div className="result-actions"><Button onClick={() => setEditing(true)}>Let’s refine it<ArrowIcon /></Button><Button variant="outline" onClick={download}><Download aria-hidden="true" />Save my concept</Button><Button variant="ghost" onClick={share}><Share2 aria-hidden="true" />Share concept</Button></div><p className="share-status" role="status">{shareStatus}</p><p className="result-disclaimer">A visual concept to refine together. Artwork and lettering are confirmed before production.</p><p className="fine-print">From RM100 per piece. Design fees are separate. Final pricing and construction follow design review and a physical sample.</p></div><div className="concept-preview"><div className="preview-card"><div className="preview-image">{imageFailed ? <p className="image-error">The image couldn’t load. You can still save your story below.</p> : <img src={selected.image} alt={`${selected.brand} — ${selected.title}, a miniature design concept`} onError={() => setImageFailed(true)} />}<span>Concept preview</span></div><div className="preview-meta"><p>{selected.brand}</p><strong>{selected.title}</strong></div></div><p className="fine-print">From your business story to something worth keeping.</p></div></section></main>}
+  </div>;
 }
+function ArrowIcon() { return <span aria-hidden="true">↗</span>; }
