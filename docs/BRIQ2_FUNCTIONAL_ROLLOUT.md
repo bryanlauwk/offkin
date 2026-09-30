@@ -1,6 +1,6 @@
 # BRIQ2.0 functional rollout
 
-The homepage starts with one website field. Story and format options appear only after a concept, under refinement. The default remains Everyday / Clicker pending a product-direction decision. The admin route is removed from the public app because its previous client-side password was not real authentication; no account or database permissions are changed by that UI removal.
+The homepage starts with one website field. Story and format options appear only after a concept, under refinement. The default is Inside / Miniature: the business process becomes the product, with a click only when it imitates a real action. Printing is outsourced initially. The admin route is removed from the public app because its previous client-side password was not real authentication; no account or database permissions are changed by that UI removal.
 
 ## Backend prerequisites
 

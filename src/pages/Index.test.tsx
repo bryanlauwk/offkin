@@ -39,7 +39,7 @@ describe('BRIQ2.0 website-first creation', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: 'BRIQ2.0 home' })).toBeInTheDocument());
   });
   it('submits a company website and displays its generated business story', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ concept: { id: 'fresh', edition: 'everyday', format: 'clicker', brand: 'Example', title: 'The Packing Ritual', story: 'Parcel caps translate the company’s delivery business into a tactile sorting ritual.', image: '/example.png' } })));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ concept: { id: 'fresh', edition: 'inside', format: 'miniature', brand: 'Example', title: 'The Packing Ritual', story: 'Parcel caps translate the company’s delivery business into a tactile sorting ritual.', image: '/example.png' } })));
     vi.stubGlobal('fetch', fetchMock);
     render(<MemoryRouter><Index /></MemoryRouter>);
     fireEvent.change(screen.getByLabelText('Company website'), { target: { value: 'example.com' } });
@@ -93,8 +93,8 @@ it('does not replace a newer navigation with an old generation response', async 
   fireEvent.change(screen.getByLabelText('Company website'), { target: { value: 'example.com' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create collectible' }));
   fireEvent.click(screen.getByRole('link', { name: 'Navigate to sample' }));
-  await screen.findByRole('heading', { name: 'The Idea Press' });
-  complete!(new Response(JSON.stringify({ concept: { id: 'late', edition: 'everyday', format: 'clicker', brand: 'Late', title: 'Late result', story: 'Late story' } })));
+  await screen.findByRole('heading', { name: 'The Order-to-Object Studio' });
+  complete!(new Response(JSON.stringify({ concept: { id: 'late', edition: 'inside', format: 'miniature', brand: 'Late', title: 'Late result', story: 'Late story' } })));
   await waitFor(() => expect(screen.queryByRole('heading', { name: 'Late result' })).not.toBeInTheDocument());
 });
 

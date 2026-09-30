@@ -11,14 +11,14 @@ import { normalizeCompanyWebsite } from '@/lib/company-website';
 
 type SiteSettings = { logoUrl: string; logoLink: string; siteTitle: string };
 const defaultSettings: SiteSettings = { logoUrl: '', logoLink: '/', siteTitle: 'BRIQ2.0' };
-const sampleConcepts: CollectibleConcept[] = concepts.map(c => ({ ...c, edition: 'everyday', format: 'clicker', image: `/clicker-assets/${c.id}.webp` }));
+const sampleConcepts: CollectibleConcept[] = concepts.map(c => ({ ...c, edition: c.id === 'stive' ? 'inside' : 'everyday', format: c.id === 'stive' ? 'miniature' : 'clicker', image: c.id === 'stive' ? '/miniature-assets/stive-commerce-v1.webp' : `/clicker-assets/${c.id}.webp` }));
 
 export default function Index() {
   const [params, setParams] = useSearchParams();
   const [generated, setGenerated] = useState<CollectibleConcept | null>(null);
   const [settings, setSettings] = useState(defaultSettings);
-  const [edition, setEdition] = useState<Edition>('everyday');
-  const [format, setFormat] = useState<GiftFormat>('clicker');
+  const [edition, setEdition] = useState<Edition>('inside');
+  const [format, setFormat] = useState<GiftFormat>('miniature');
   const [query, setQuery] = useState('');
   const [context, setContext] = useState('');
   const [needsContext, setNeedsContext] = useState(false);
@@ -173,7 +173,7 @@ export default function Index() {
     request.current?.abort();
     setBusy(false); setStatus('');
     setQuery(previous => normalizeCompanyWebsite(previous) ? previous : '');
-    setEdition('everyday'); setFormat('clicker'); setNeedsContext(false); setContext('');
+    setEdition('inside'); setFormat('miniature'); setNeedsContext(false); setContext('');
     setParams({});
   }
 
