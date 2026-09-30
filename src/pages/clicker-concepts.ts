@@ -11,10 +11,10 @@ export const concepts = [
   {
     "id": "stive",
     "brand": "STIVE",
-    "title": "The Idea Press",
+    "title": "The Order-to-Object Studio",
     "tag": "Make something of your imagination.",
-    "story": "An orange creative press turns the journey from artwork to printed object into a collectible. The lever makes the brand’s act of creation something you can feel.",
-    "interaction": "Lower the lever for a controlled, satisfying click.",
+    "story": "A compact personalisation workstation connects an online order, an orange print press and a ready-to-ship parcel. It captures STIVE’s e-commerce journey from a customer’s idea to a personalised product.",
+    "interaction": "Follow the order-to-print-to-parcel journey. A press action is optional and requires a validated mechanism.",
     "region": "Malaysia"
   },
   {

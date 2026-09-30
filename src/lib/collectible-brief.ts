@@ -1,5 +1,5 @@
 import { editions, formats, type Selection } from '../../supabase/functions/generate-concept/options';
-export type CollectibleConcept = Selection & { id: string; brand: string; title: string; story: string; image?: string; interaction?: string };
+export type CollectibleConcept = Selection & { id: string; brand: string; title: string; story: string; image?: string; interaction?: string; sourceUrl?: string; sourceTitle?: string };
 export type BriefDetails = { agency: string; quantity: string; budget: string; date: string; occasion: string; clientReady: boolean };
 export function makeBrief(concept: CollectibleConcept, details: BriefDetails) {
   return [
@@ -8,6 +8,7 @@ export function makeBrief(concept: CollectibleConcept, details: BriefDetails) {
     `Concept: ${concept.title}`,
     `Edition: ${editions[concept.edition].label}\nFormat: ${formats[concept.format].label}`,
     concept.story,
+    ...(concept.sourceUrl ? [`Business source: ${concept.sourceUrl}`] : []),
     `Recipient experience: ${concept.interaction || 'To be refined during design review.'}`,
     `Occasion: ${details.occasion}\nPlanning quantity: ${details.quantity}\nRequested delivery: ${details.date || 'To be confirmed'}`,
     ...(!details.clientReady ? [`INTERNAL PLANNING ONLY\nTarget unit budget: RM${Math.max(100, Number(details.budget) || 100)} (not a quote; design and sample fees excluded)`] : []),

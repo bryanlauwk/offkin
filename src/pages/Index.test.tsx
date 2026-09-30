@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Index from './Index';
 
@@ -39,7 +39,7 @@ describe('BRIQ2.0 website-first creation', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: 'BRIQ2.0 home' })).toBeInTheDocument());
   });
   it('submits a company website and displays its generated business story', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ concept: { id: 'fresh', edition: 'everyday', format: 'clicker', brand: 'Example', title: 'The Packing Ritual', story: 'Parcel caps translate the company’s delivery business into a tactile sorting ritual.', image: '/example.png' } })));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ concept: { id: 'fresh', edition: 'inside', format: 'miniature', brand: 'Example', title: 'The Packing Ritual', story: 'Parcel caps translate the company’s delivery business into a tactile sorting ritual.', image: '/example.png' } })));
     vi.stubGlobal('fetch', fetchMock);
     render(<MemoryRouter><Index /></MemoryRouter>);
     fireEvent.change(screen.getByLabelText('Company website'), { target: { value: 'example.com' } });
@@ -66,4 +66,50 @@ describe('BRIQ2.0 website-first creation', () => {
     expect(screen.getByLabelText('Company website')).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Create collectible' })).toBeEnabled();
   });
+});
+
+it('starts with one website field and no upfront format or story selector', async () => {
+  render(<MemoryRouter><Index /></MemoryRouter>);
+  expect(screen.getAllByRole('textbox')).toHaveLength(1);
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('link', { name: 'BRIQ2.0 home' })).toBeInTheDocument());
+});
+
+it('asks for business context only when generation needs it', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ needsContext: true, message: 'Please add a short business summary.' }))));
+  render(<MemoryRouter><Index /></MemoryRouter>);
+  fireEvent.change(screen.getByLabelText('Company website'), { target: { value: 'example.com' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create collectible' }));
+  await screen.findByLabelText('Tell us a little about the business');
+  expect(screen.getByRole('button', { name: 'Try again with these details' })).toBeEnabled();
+});
+
+it('does not replace a newer navigation with an old generation response', async () => {
+  let complete: (value: Response) => void;
+  vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { complete = resolve; })));
+  render(<MemoryRouter><Link to="/?brand=stive">Navigate to sample</Link><Index /></MemoryRouter>);
+  fireEvent.change(screen.getByLabelText('Company website'), { target: { value: 'example.com' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create collectible' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Navigate to sample' }));
+  await screen.findByRole('heading', { name: 'The Order-to-Object Studio' });
+  complete!(new Response(JSON.stringify({ concept: { id: 'late', edition: 'inside', format: 'miniature', brand: 'Late', title: 'Late result', story: 'Late story' } })));
+  await waitFor(() => expect(screen.queryByRole('heading', { name: 'Late result' })).not.toBeInTheDocument());
+});
+
+it('allows a failed shared concept to be loaded again', async () => {
+  vi.stubGlobal('fetch', vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'Temporarily unavailable' }), { status: 503 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ concept: { id: 'saved', edition: 'everyday', format: 'clicker', brand: 'Saved', title: 'Saved concept', story: 'A saved business story.' } }))));
+  render(<MemoryRouter initialEntries={['/?concept=saved']}><Index /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Try loading again' }));
+  await screen.findByRole('heading', { name: 'Saved concept' });
+});
+
+it('replaces the verified legacy quiz title with BRIQ2.0', async () => {
+  settings.title = 'The Absurd Marshmallow Test';
+  render(<MemoryRouter><Index /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByRole('link', { name: 'BRIQ2.0 home' })).toBeInTheDocument());
+  expect(screen.queryByText('The Absurd Marshmallow Test')).not.toBeInTheDocument();
 });
