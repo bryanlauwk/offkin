@@ -1,6 +1,6 @@
-# BRIQ2.0 functional rollout
+# DIORAMINI functional rollout
 
-The homepage starts with one website field. Story and format options appear only after a concept, under refinement. The default is Inside / Miniature: the business process becomes the product, with a click only when it imitates a real action. Printing is outsourced initially. The admin route is removed from the public app because its previous client-side password was not real authentication; no account or database permissions are changed by that UI removal.
+The homepage starts with one website field. It performs a no-AI website inspection, shows a clearly attributed excerpt when available, and asks the customer to confirm their business story. Four short conversation steps collect the story, miniature or diorama and audience, exact wording and placement, then style and meaningful optional interaction. Only the final Create action requests a generated concept. Display-only requests use Icon / Miniature; requested meaningful interactions use Inside / Miniature: the business process becomes the product, with a click only when it imitates a real action. Printing is outsourced initially. The admin route is removed from the public app because its previous client-side password was not real authentication; no account or database permissions are changed by that UI removal.
 
 ## Backend prerequisites
 
@@ -47,3 +47,13 @@ Daily limits are temporarily waived by default in source. An absent `BRICK_ENFOR
 This endpoint is publicly reachable. A single intended tester is not access control: others can consume AI credits while the caps are waived. There is no aggregate spend ceiling in this mode. `BRICK_GENERATION_ENABLED` remains the independent kill switch; validation, public-address DNS pinning/TLS checks, size limits, timeouts, cache and the one-text/one-image-per-attempt limit remain. Restore daily caps before wider use. No automatic retries or extra test loops are introduced.
 
 Git sync updates source only. The deployed backend retains its existing daily policy until an authorized function deployment applies this change. Verify readiness after deployment rather than infer live policy from Git.
+
+## Conversation rollout and backward compatibility
+
+Frontend source now uses DIORAMINI and the agreed headline. Legacy default site titles map to the new name; custom titles are preserved. No project/repository/domain/legal account rename is included. The result offers story, refine, save and share; no agency or internal-budget form is shown. Exact wording is retained verbatim in the conversation, JSON direction and downloaded concept. No artwork-upload control exists; customers bring finished artwork to design review. Image lettering is still confirmed before production.
+
+The no-AI inspectWebsite call is supported by the existing deployed function. Ordinary unreadable sites already allow a customer context fallback. The new backend adds summaryOnly, which skips website retrieval after explicit customer confirmation, preserving URL syntax validation and all other safeguards. For an unsafe-address400 the frontend checks GET capabilities.summary_only before offering that fallback; old deployments without this capability ask for another public HTTPS homepage. No unsafe redirects are followed.
+
+Deploying these Git changes is separately required to enable summaryOnly on previously rejected sites, new DIORAMINI generation prompts, and passing the original customer wording directly into the image prompt. Until deployed, the existing generator receives the complete customer direction as its supported context string, but the stronger new prompt rules must not be claimed live. No AI generation was used for local verification.
+
+Original direction is kept per concept in this browser after successful creation, including verbatim lettering, for refresh and refinement. A shared concept opened on another device still restores the server-saved concept, but asks for the original design details again before a new version; it does not invent or claim to retain missing wording. Description-only and website-grounded generation have separate cache keys.
