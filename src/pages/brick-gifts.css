@@ -268,3 +268,19 @@
 
 .business-dna h2 { margin: 24px 0 0; font-size: 16px; line-height: 1.4; }
 .business-dna .concept-copy { margin-top: 10px; }
+
+/* One entry point; choices move to refinement after the first concept. */
+.creation-home { display: flex; flex-direction: column; align-items: center; justify-content: center; max-width: 900px; gap: 20px; padding-top: 64px; padding-bottom: 80px; }
+.creation-home .prompt-block { text-align: center; }
+.creation-home .prompt-copy { margin: 22px auto 32px; }
+.single-search-form { width: min(100%, 690px); margin: 0 auto; }
+.single-search-form .brand-search { width: 100%; border-radius: 22px; padding: 10px 12px 10px 22px; }
+.single-search-form .brand-search input { min-width: 0; flex: 1; }
+.single-search-form .brand-search button { width: 48px; flex: 0 0 48px; height: 48px; padding: 0; border-radius: 15px; }
+.creation-home .example-row, .creation-home .creation-status { justify-content: center; }
+.context-request, .refinement-panel { text-align: left; padding: 20px; margin-top: 20px; border: 1px solid var(--studio-line); border-radius: 14px; }
+.refinement-panel summary { cursor: pointer; font-weight: 600; }
+.refinement-panel p { font-size: 13px; color: var(--studio-muted); margin: 12px 0; }
+.refinement-panel label { display: block; margin: 12px 0; font-size: 13px; }
+.refinement-panel input, .refinement-panel textarea, .refinement-panel select { display: block; width: 100%; margin: 6px 0; padding: 10px; color: var(--studio-ink); background: var(--studio-surface); border: 1px solid var(--studio-line); border-radius: 8px; }
+@media(max-width:540px) { .creation-home { padding: 40px 20px; } .single-search-form .brand-search { padding-left: 14px; } .single-search-form .brand-search input { font-size: 14px; } .creation-home .example-row > span { text-align: center; } }
