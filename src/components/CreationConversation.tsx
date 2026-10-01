@@ -69,12 +69,13 @@ export function CreationConversation({ initialDraft, navigationKey, onGenerated,
   async function generate() {
     if (active.current) return;
     let context: string;
-    try { if (!normalizeCompanyWebsite(draft.website)) { setStep(0); throw new Error('Add your company website before creating the miniature.'); } context = makeCreationContext(draft); } catch (error) { setStatus((error as Error).message); return; }
+    const site = normalizeCompanyWebsite(draft.website); const noSite = !site && Boolean(initialDraft);
+    try { if (!site && !noSite) { setStep(0); throw new Error('Add your company website before creating the miniature.'); } context = makeCreationContext(draft); } catch (error) { setStatus((error as Error).message); return; }
     const controller = new AbortController(); active.current = controller; const attempt = ++latest.current;
     setBusy(true); setStatus('Turning your story into a miniature…');
     const timer = window.setTimeout(() => controller.abort(), 220000);
     try {
-      const data = await requestConcept({ brand: normalizeCompanyWebsite(draft.website), context, summaryOnly: draft.summaryOnly, edition: draft.interaction === 'Display only' ? 'icon' : 'inside', format: 'miniature' }, controller.signal);
+      const data = await requestConcept({ brand: site || 'no-website', context, summaryOnly: noSite || draft.summaryOnly, edition: draft.interaction === 'Display only' ? 'icon' : 'inside', format: 'miniature' }, controller.signal);
       if (attempt !== latest.current) return;
       if (controller.signal.aborted) throw new Error('Creation timed out.');
       if (data.concept) { onGenerated(data.concept, draft); return; }

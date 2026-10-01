@@ -48,7 +48,8 @@ Deno.serve(async req => {
   const context=typeof input.context==='string'?input.context.trim():'';
   if(brand.length<2||brand.length>120||context.length>600)return json({error:'Enter a brand (2–120 characters) and a short brief (up to 600 characters).'},400);
   let websiteUrl: string;
-  try { websiteUrl=validatePublicWebsiteUrl(brand).href; } catch(error) { return json({error:error instanceof Error?error.message:'Enter a public company website.'},400); }
+  if(brand==='no-website'&&input.summaryOnly===true&&!input.inspectWebsite) websiteUrl='';
+  else try { websiteUrl=validatePublicWebsiteUrl(brand).href; } catch(error) { return json({error:error instanceof Error?error.message:'Enter a public company website.'},400); }
   const key=Deno.env.get('LOVABLE_API_KEY');const enabled=Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
   if(!input.inspectWebsite&&(!key||!enabled))throw new Failure(503,'Live generation is not available yet. Please try again later.');
   const cacheKey=await hash(JSON.stringify([PROMPT_VERSION,websiteUrl,context,Boolean(input.summaryOnly),selection!.edition,selection!.format]));
