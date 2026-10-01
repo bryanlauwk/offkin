@@ -156,12 +156,11 @@
 .spin { animation: studio-spin 1s linear infinite; }
 @keyframes studio-spin { to { transform: rotate(360deg); } }
 @keyframes result-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-@media (min-width: 1600px) { .hero-layout { padding-top: 120px; padding-bottom: 120px; } }
+@media (min-width: 1600px) { .welcome-hero { padding-top: 110px; padding-bottom: 90px; } }
 @media (max-width: 1000px) {
-  .studio-header, .creation-home, .result-page { width: calc(100% - 56px); }
-  .hero-layout { gap: 30px; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
-  .material-study { padding-left: 20px; }
-  .prompt-block h1 { font-size: clamp(43px, 5.5vw, 60px); }
+  .studio-header, .creation-home, .result-page { width: calc(100% - 48px); }
+  .welcome-hero { gap: 38px; grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr); }
+  .prompt-block h1 { font-size: clamp(48px, 6vw, 64px); }
   .brand-search { gap: 10px; padding-left: 15px; }
   .brand-search input { font-size: 13px; }
   .studio-process { gap: 18px; }
@@ -173,12 +172,16 @@
   .creation-home { min-height: calc(100svh - 78px); }
   .brand-search input, .brand-context textarea, .refinement-panel input, .refinement-panel textarea, .refinement-panel select, #proposal input, #proposal select { font-size: 16px; }
   .header-caption { max-width: 140px; text-align: right; font-size: 10px; line-height: 1.5; }
-  .hero-layout { grid-template-columns: 1fr; padding: 58px 0 40px; gap: 26px; }
-  .prompt-block h1 { font-size: clamp(43px, 7.7vw, 60px); }
+  .welcome-hero { grid-template-columns: 1fr; padding: 42px 0 38px; gap: 38px; }
+  .prompt-block { text-align: center; }
+  .guide-greeting { justify-content: center; }
+  .prompt-block h1 { font-size: clamp(46px, 12vw, 64px); }
   .prompt-copy { margin: 23px 0 29px; max-width: 420px; font-size: 15px; }
-  .material-study { min-height: 0; padding: 0; border-left: 0; border-top: 1px solid var(--studio-line); }
-  .material-study > svg { max-height: 235px; margin: 12px auto 0; }
-  .material-study p { margin-top: 0; }
+  .prompt-copy, .single-search-form { margin-left: auto; margin-right: auto; }
+  .hero-reassure, .creation-status { justify-content: center; }
+  .hero-product { width: min(100% - 18px, 520px); margin: 0 auto; transform: rotate(1deg); }
+  .product-note-top { left: -12px; }
+  .product-note-side { right: -12px; }
   .studio-process { gap: 16px; padding: 22px 0; }
   .studio-process > div, .studio-process > article, .studio-process > li { display: block; padding-right: 10px; }
   .studio-process span { display: block; margin-bottom: 9px; }
@@ -195,13 +198,22 @@
   .studio-header, .creation-home, .result-page { width: calc(100% - 36px); }
   .studio-logo { font-size: 21px; }
   .header-caption { max-width: 115px; }
-  .hero-layout { padding-top: 44px; }
-  .welcome { font-size: 9px; letter-spacing: .12em; margin-bottom: 24px; }
-  .prompt-block h1 { font-size: 42px; }
-  .brand-search { padding: 7px; gap: 8px; min-height: 66px; }
+  .welcome-hero { padding-top: 28px; gap: 34px; }
+  .guide-greeting { margin-bottom: 18px; font-size: 13px; }
+  .prompt-block h1 { font-size: 45px; }
+  .brand-search { padding: 7px; gap: 8px; min-height: 66px; border-radius: 16px; }
   .brand-search > svg { display: none; }
   .brand-search input { padding-left: 6px; font-size: 16px; }
-  .brand-search button { width: 48px; height: 48px; min-height: 48px; flex-basis: 48px; }
+  .brand-search button { min-width: 52px; width: 52px; height: 52px; min-height: 52px; padding: 0; }
+  .brand-search button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .hero-reassure { gap: 4px; font-size: 11px; }
+  .hero-product { width: 100%; padding: 10px; border-radius: 19px; }
+  .product-image-wrap { border-radius: 13px; }
+  .hero-product figcaption { align-items: flex-start; gap: 10px; padding-top: 13px; }
+  .product-format { font-size: 10px; }
+  .product-note { font-size: 10px; }
+  .product-note-top { top: 18px; }
+  .product-note-side { bottom: 78px; }
   .studio-process { gap: 10px; }
   .studio-process > div, .studio-process > article, .studio-process > li { padding-right: 8px; }
   .studio-process h2, .studio-process strong { font-size: 11px; }
