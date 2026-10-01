@@ -89,12 +89,25 @@ export function CreationConversation({ initialDraft, navigationKey, onGenerated,
   const chips = <T extends string>(values: readonly T[], selected: T, choose: (value: T) => void) => <div className="choice-chips">{values.map(value => <Button type="button" variant="outline" key={value} aria-pressed={selected === value} className={selected === value ? 'is-selected' : ''} onClick={() => choose(value)} disabled={busy}>{value}</Button>)}</div>;
   return !started ? (
     <main id="main-content" className="creation-home">
-      <div className="hero-layout"><section className="prompt-block" aria-labelledby="creation-title"><p className="welcome">SMALL OBJECT. DISTINCTLY YOURS.</p><h1 id="creation-title">Your business DNA.<br /> Made collectible.</h1><p className="prompt-copy">Hi! I’m your studio guide. Share your website and I’ll ask a few friendly questions — together we’ll shape a little world around your business.</p>
-        <form onSubmit={start} className="creation-form single-search-form" aria-busy={busy}><div className="brand-search"><Search aria-hidden="true" /><label className="sr" htmlFor="brand">Company website</label><input id="brand" placeholder="Start with your company website…" value={draft.website} onChange={e => update('website', e.target.value)} required maxLength={120} autoComplete="url" inputMode="url" disabled={busy} /><Button type="submit" disabled={busy} aria-label={busy ? 'Reading your website' : 'Start the conversation'}>{busy ? <LoaderCircle className="spin" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}</Button></div></form>
-        <div className="creation-status" role="status">{status}{busy && <Button variant="ghost" type="button" onClick={stop}>Stop</Button>}</div>
-        <p className="hero-reassure">Takes about a minute · No account needed · You can change any answer</p>
-      </section><aside className="material-study" aria-hidden="true"><div className="study-caption"><span>FORM / STORY / IDENTITY</span><span>DIORAMINI</span></div><svg viewBox="0 0 440 430" fill="none"><path d="M70 295L218 369L370 294M70 226L218 300L370 225" stroke="#c8c1b5" /><path d="M93 222L224 155L353 221L220 289Z" fill="#e9e3d8" /><path d="M93 222L220 289V340L93 274Z" fill="#c7bfb0" /><path d="M220 289L353 221V272L220 340Z" fill="#aaa193" /><path d="M93 146L224 79L353 145L220 213Z" fill="#f9f6ed" /><path d="M93 146L220 213V251L93 184Z" fill="#d8d0c2" /><path d="M220 213L353 145V183L220 251Z" fill="#b6ad9d" /><path d="M157 78L226 43L292 77L222 112Z" fill="#f16a42" /><path d="M157 78L222 112V160L157 126Z" fill="#d94f29" /><path d="M222 112L292 77V125L222 160Z" fill="#ae3e20" /></svg><div className="study-caption"><span>AN IDEA TAKES SHAPE</span><span>↗</span></div></aside></div>
-      <footer className="studio-footer"><p>YOUR STORY, IN A SMALLER WORLD</p><p className="fine-print">From RM100 per piece. Design fees are separate.<br />Final pricing follows design review and a physical sample.</p></footer>
+      <section className="welcome-hero" aria-labelledby="creation-title">
+        <div className="prompt-block">
+          <p className="guide-greeting"><Avatar />Hi, I’m your miniature studio guide</p>
+          <h1 id="creation-title">What should we<br />bring to life?</h1>
+          <p className="prompt-copy">Share your company website. I’ll get to know your story, ask a few simple questions, and shape it into a collectible miniature.</p>
+          <form onSubmit={start} className="creation-form single-search-form" aria-busy={busy}>
+            <div className="brand-search"><Search aria-hidden="true" /><label className="sr" htmlFor="brand">Company website</label><input id="brand" placeholder="Enter your company website…" value={draft.website} onChange={e => update('website', e.target.value)} required maxLength={120} autoComplete="url" inputMode="url" disabled={busy} /><Button type="submit" disabled={busy}>{busy ? <><LoaderCircle className="spin" aria-hidden="true" /><span>Reading</span></> : <><span>Start creating</span><ArrowRight aria-hidden="true" /></>}</Button></div>
+          </form>
+          <div className="creation-status" role="status">{status}{busy && <Button variant="ghost" type="button" onClick={stop}>Stop</Button>}</div>
+          <p className="hero-reassure">About a minute <span aria-hidden="true">·</span> No account needed <span aria-hidden="true">·</span> Change anything later</p>
+        </div>
+        <figure className="hero-product">
+          <div className="product-image-wrap"><img src="/miniature-assets/stive-commerce-v1.webp" alt="A colorful STIVE Commerce shop recreated as a collectible miniature" /></div>
+          <figcaption><span><strong>STIVE Commerce</strong> Featured studio design</span><span className="product-format">Inside · Miniature</span></figcaption>
+          <span className="product-note product-note-top" aria-hidden="true">Made from a business story</span>
+          <span className="product-note product-note-side" aria-hidden="true">Desk-sized delight</span>
+        </figure>
+      </section>
+      <footer className="studio-footer"><p>Every business has a tiny world inside it.</p><p className="fine-print">From RM100 per piece · Design fees are separate</p></footer>
     </main>
   ) : (
     <main id="main-content" className="conversation-page">
