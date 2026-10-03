@@ -14,6 +14,26 @@ const questions = [
   'Last one: how should your miniature feel?',
   'That’s everything I need. Shall we bring your story to life?'
 ];
+const studioDesigns = [
+  {
+    name: 'STIVE Commerce',
+    detail: 'Shop counter · Miniature',
+    image: '/miniature-assets/stive-commerce-v1.webp',
+    alt: 'A colorful STIVE Commerce shop recreated as a collectible miniature'
+  },
+  {
+    name: 'KLDEX',
+    detail: 'Tasting flight · Interactive',
+    image: '/clicker-assets/kldex.webp',
+    alt: 'A KLDEX durian tasting flight recreated as an interactive collectible'
+  },
+  {
+    name: 'PETRONAS',
+    detail: 'Brand icon · Collectible',
+    image: '/clicker-assets/petronas.webp',
+    alt: 'A PETRONAS-inspired sculptural brand collectible'
+  }
+] as const;
 function Avatar() { return <span className="chat-avatar" aria-hidden="true"><Sparkles /></span>; }
 function Typing() { return <span className="typing-dots" aria-hidden="true"><i /><i /><i /></span>; }
 export function CreationConversation({ initialDraft, navigationKey, onGenerated, onExit, directionMissing = false }: { initialDraft?: CreationDraft; directionMissing?: boolean; navigationKey: string; onGenerated: (concept: CollectibleConcept, draft: CreationDraft) => void; onExit?: () => void }) {
@@ -24,6 +44,7 @@ export function CreationConversation({ initialDraft, navigationKey, onGenerated,
   const [busy, setBusy] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [status, setStatus] = useState('');
+  const [activeDesign, setActiveDesign] = useState(0);
   const active = useRef<AbortController | null>(null);
   const latest = useRef(0);
   const question = useRef<HTMLHeadingElement>(null);
@@ -101,10 +122,15 @@ export function CreationConversation({ initialDraft, navigationKey, onGenerated,
           <p className="hero-reassure">About a minute <span aria-hidden="true">·</span> No account needed <span aria-hidden="true">·</span> Change anything later</p>
         </div>
         <figure className="hero-product">
-          <div className="product-image-wrap"><img src="/miniature-assets/stive-commerce-v1.webp" alt="A colorful STIVE Commerce shop recreated as a collectible miniature" /></div>
-          <figcaption><span><strong>STIVE Commerce</strong> Featured studio design</span><span className="product-format">Inside · Miniature</span></figcaption>
+          <div className="product-image-wrap"><img key={studioDesigns[activeDesign].image} src={studioDesigns[activeDesign].image} alt={studioDesigns[activeDesign].alt} /></div>
+          <figcaption><span><strong>{studioDesigns[activeDesign].name}</strong>{studioDesigns[activeDesign].detail}</span><span className="product-format">Real design</span></figcaption>
           <span className="product-note product-note-top" aria-hidden="true">Made from a business story</span>
           <span className="product-note product-note-side" aria-hidden="true">Desk-sized delight</span>
+          <div className="product-browser" role="group" aria-label="Browse real product designs">
+            {studioDesigns.map((design, index) => <Button key={design.name} type="button" variant="ghost" className={activeDesign === index ? 'is-active' : ''} aria-pressed={activeDesign === index} onClick={() => setActiveDesign(index)}>
+              <img src={design.image} alt="" /><span>{design.name}</span>
+            </Button>)}
+          </div>
         </figure>
       </section>
       <footer className="studio-footer"><p>Every business has a tiny world inside it.</p><p className="fine-print">From RM100 per piece · Design fees are separate</p></footer>
