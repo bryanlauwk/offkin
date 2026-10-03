@@ -17,18 +17,21 @@ const questions = [
 const studioDesigns = [
   {
     name: 'STIVE Commerce',
+    shortName: 'STIVE',
     detail: 'Shop counter · Miniature',
     image: '/miniature-assets/stive-commerce-v1.webp',
     alt: 'A colorful STIVE Commerce shop recreated as a collectible miniature'
   },
   {
     name: 'KLDEX',
+    shortName: 'KLDEX',
     detail: 'Tasting flight · Interactive',
     image: '/clicker-assets/kldex.webp',
     alt: 'A KLDEX durian tasting flight recreated as an interactive collectible'
   },
   {
     name: 'PETRONAS',
+    shortName: 'PETRONAS',
     detail: 'Brand icon · Collectible',
     image: '/clicker-assets/petronas.webp',
     alt: 'A PETRONAS-inspired sculptural brand collectible'
@@ -128,7 +131,7 @@ export function CreationConversation({ initialDraft, navigationKey, onGenerated,
           <span className="product-note product-note-side" aria-hidden="true">Desk-sized delight</span>
           <div className="product-browser" role="group" aria-label="Browse real product designs">
             {studioDesigns.map((design, index) => <Button key={design.name} type="button" variant="ghost" className={activeDesign === index ? 'is-active' : ''} aria-pressed={activeDesign === index} onClick={() => setActiveDesign(index)}>
-              <img src={design.image} alt="" /><span>{design.name}</span>
+              <img src={design.image} alt="" /><span>{design.shortName}</span>
             </Button>)}
           </div>
         </figure>
