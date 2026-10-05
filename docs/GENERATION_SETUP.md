@@ -2,13 +2,13 @@
 
 The following notes supersede older product-flow, quota and prompt-version descriptions below. See [EDITORIAL_STUDIO_REDESIGN.md](./EDITORIAL_STUDIO_REDESIGN.md) for the full release checklist.
 
-- Draft source prompt version: `dioramini-story-led-miniatures-v5`. This is not a claim about the currently deployed function version. Deploy the function explicitly after approval to activate the revised creative guidance.
+- Draft source prompt version: `dioramini-story-led-miniatures-v6`. This is not a claim about the currently deployed function version. Deploy the function explicitly after approval to activate the revised creative guidance.
 - The public flow is website text inspection → three proposed editorial story lenses → owner-supplied hidden detail → object/style/audience/exact wording → explicit generation → rationale and prototype checks.
 - Website inspection uses the existing safe public-site reader without an AI call. The displayed lenses are transparent editorial suggestions, not automated business-verification findings.
 - Old KLDEX/STIVE/PETRONAS curated examples are retired from the public UI. New A24/Airbnb/Tesla demonstrations are unofficial code-native studies with unverified mechanics.
 - Daily quotas remain temporarily waived by the existing owner-requested default. `BRICK_ENFORCE_DAILY_LIMITS=true` restores limits; unknown non-false values fail closed. The generation kill switch, request bounds, private bucket and SSRF guards remain in place.
 - No live paid generation, deployment or production publish was performed for this rebuild. Offline passing tests do not verify live provider quality.
-- DIORAMINI is the temporary fallback identity; a new name requires approval before release. Existing custom admin title/logo settings remain authoritative.
+- OFFKIN｜异趣伙伴 is the approved identity. First-product hardware scope and release remain pending; the current UI does not offer or claim a tested connected-hardware product. Existing custom admin title/logo settings remain authoritative.
 
 ## Historical setup and earlier product directions
 

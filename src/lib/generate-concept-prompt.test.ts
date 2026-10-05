@@ -3,8 +3,15 @@ import { BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION } from '../../supabase/funct
 
 // These are offline prompt-contract checks, not claims about a live model's output.
 describe('story-led generation prompt contract', () => {
+  it('uses the approved studio identity without changing the technical cache namespace', () => {
+    expect(BRAND_PROMPT).toContain('creative director of OFFKIN, an independent creative studio');
+    expect(IMAGE_PROMPT).toContain('for OFFKIN.');
+    expect(BRAND_PROMPT).not.toContain('DIORAMINI');
+    expect(IMAGE_PROMPT).not.toContain('DIORAMINI');
+  });
+
   it('invalidates cached images when the creative direction changes', () => {
-    expect(PROMPT_VERSION).toBe('dioramini-story-led-miniatures-v5');
+    expect(PROMPT_VERSION).toBe('dioramini-story-led-miniatures-v6');
   });
 
   it('understands the backward-compatible context envelope and optional story fields', () => {

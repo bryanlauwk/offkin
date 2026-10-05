@@ -107,17 +107,18 @@ describe('Editorial creation entry', () => {
   it('opens with one website composer, the business-DNA headline, and honest price terms', async () => {
     mount();
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
+    expect(screen.getByText('异趣伙伴')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your business DNA. Made collectible.');
     expect(screen.getByText('Objects from RM100*')).toBeInTheDocument();
     expect(screen.getByText(/Design and prototyping priced separately/)).toBeInTheDocument();
     expect(screen.queryByText(/STIVE|Rimba|AI credits|internal brief|agency/i)).not.toBeInTheDocument();
-    await screen.findByRole('link', { name: 'DIORAMINI home' });
+    await screen.findByRole('link', { name: 'OFFKIN home' });
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it('offers three clearly unofficial studies without starting a provider request', async () => {
     mount();
-    await screen.findByRole('link', { name: 'DIORAMINI home' });
+    await screen.findByRole('link', { name: 'OFFKIN home' });
     const studies = screen.getByRole('group', { name: 'Explore observation studies' });
     expect(within(studies).getAllByRole('button')).toHaveLength(3);
     expect(screen.getByRole('img', { name: 'Off-screen: interactive concept study' })).toBeInTheDocument();
@@ -131,7 +132,7 @@ describe('Editorial creation entry', () => {
 
   it('explains the process on demand, including approval and physical prototyping', async () => {
     mount();
-    await screen.findByRole('link', { name: 'DIORAMINI home' });
+    await screen.findByRole('link', { name: 'OFFKIN home' });
     const toggle = screen.getByRole('button', { name: 'How it takes shape' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(toggle);
@@ -149,17 +150,19 @@ describe('Editorial creation entry', () => {
     await waitFor(() => expect(document.title).toBe('My Studio — Your business DNA. Made collectible.'));
   });
 
-  it.each(['BRIQ2.0', 'form.', 'STIVE'])('rebrands the legacy %s setting', async title => {
+  it.each(['DIORAMINI', 'BRIQ2.0', 'form.', 'STIVE'])('rebrands the legacy %s setting', async title => {
     settings.title = title;
-    mount();
-    await screen.findByRole('link', { name: 'DIORAMINI home' });
+    await act(async () => { mount(); });
+    expect(screen.getByRole('link', { name: 'OFFKIN home' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: `${title} home` })).not.toBeInTheDocument();
+    expect(document.title).toBe('OFFKIN｜异趣伙伴 — Your business DNA. Made collectible.');
   });
 
   it('retires old sample URL parameters instead of selecting or generating a client concept', async () => {
     mount('/?brand=stive');
     expect(screen.getByLabelText('START WITH YOUR WEBSITE')).toHaveValue('');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your business DNA.');
-    await screen.findByRole('link', { name: 'DIORAMINI home' });
+    await screen.findByRole('link', { name: 'OFFKIN home' });
     expect(fetch).not.toHaveBeenCalled();
   });
 });

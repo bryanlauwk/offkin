@@ -73,6 +73,17 @@
   font-weight:800;
   letter-spacing:-1.3px
 }
+.brand-wordmark {
+  display:flex;
+  align-items:baseline;
+  gap:11px;
+}
+.brand-chinese {
+  font-family:Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:11px;
+  font-weight:400;
+  letter-spacing:2px;
+}
 .studio-logo img {
   max-height:42px;
   max-width:200px;
@@ -1282,4 +1293,8 @@
     transition:none!important;
     animation:none!important
   }
+}
+
+@media (max-width: 400px) {
+  .header-coordinate { display:none; }
 }

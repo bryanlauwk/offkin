@@ -1,3 +1,7 @@
+# Historical rollout record
+
+The current approved identity is OFFKIN｜异趣伙伴. This file preserves earlier DIORAMINI rollout history; see EDITORIAL_STUDIO_REDESIGN.md for the current source and release gates.
+
 # DIORAMINI functional rollout
 
 The homepage starts with one website field. It performs a no-AI website inspection, shows a clearly attributed excerpt when available, and asks the customer to confirm their business story. Four short conversation steps collect the story, miniature or diorama and audience, exact wording and placement, then style and meaningful optional interaction. Only the final Create action requests a generated concept. Display-only requests use Icon / Miniature; requested meaningful interactions use Inside / Miniature: the business process becomes the product, with a click only when it imitates a real action. Printing is outsourced initially. The admin route is removed from the public app because its previous client-side password was not real authentication; no account or database permissions are changed by that UI removal.
@@ -57,3 +61,4 @@ The no-AI inspectWebsite call is supported by the existing deployed function. Or
 Deploying these Git changes is separately required to enable summaryOnly on previously rejected sites, new DIORAMINI generation prompts, and passing the original customer wording directly into the image prompt. Until deployed, the existing generator receives the complete customer direction as its supported context string, but the stronger new prompt rules must not be claimed live. No AI generation was used for local verification.
 
 Original direction is kept per concept in this browser after successful creation, including verbatim lettering, for refresh and refinement. A shared concept opened on another device still restores the server-saved concept, but asks for the original design details again before a new version; it does not invent or claim to retain missing wording. Description-only and website-grounded generation have separate cache keys.
+

@@ -2,7 +2,7 @@
 
 ## Scope
 
-This draft replaces the public creation interface with an independent, editorial creative-studio direction. The existing admin-configured logo, link and title remain authoritative. `src/lib/studio-brand.ts` isolates the fallback name; DIORAMINI remains temporary until a new identity is approved.
+This draft replaces the public creation interface with an independent, editorial creative-studio direction. The existing admin-configured logo, link and title remain authoritative. `src/lib/studio-brand.ts` isolates the fallback name; the approved identity is OFFKIN｜异趣伙伴. Legacy DIORAMINI default title settings migrate in the UI while genuinely custom studio titles are preserved.
 
 The three code-native A24, Airbnb and Tesla demonstrations are hypothetical, unofficial design studies. They are not customer commissions, completed prototypes or engineering validation. Each has one linear scene action, a pressable cap and a return state. Geometry and dimensions are design targets, not manufacturing specifications.
 
@@ -27,7 +27,9 @@ No price is a firm quote. RM100 is an indicative unit entry point. Design, proto
 
 ## Release requirements
 
-This is a draft branch. Do not merge or publish until the identity and design are approved.
+This is a draft branch. The name is approved. Do not merge or publish until the first-product scope and design are approved.
+
+The first connected-hardware product is still being researched. This source does not claim electronics, AI hardware, or a finished physical product is available or tested. The existing miniature concept flow remains until that scope is approved.
 
 The frontend uses the existing deployed API. The improved editorial generation instructions in `supabase/functions/generate-concept/prompt.ts` require an explicit function deployment before they affect generated output. The new prompt version separates new cached results from older directions. No new migration, key or paid connector is needed.
 
