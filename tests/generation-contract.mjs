@@ -27,7 +27,14 @@ try {
  const generate=body=>send(JSON.stringify(body));
  assert.equal((await send('', 'OPTIONS')).status,200);
  assert.equal((await send('', 'GET')).status,200);
- assert.equal((await (await send('', 'GET')).json()).daily_limits_enforced,false);
+ const ready=await (await send('', 'GET')).json();
+ assert.equal(ready.ready,true);assert.equal(ready.daily_limits_enforced,false);
+ assert.equal(ready.capabilities.electronic_story_scene,true);assert.equal(ready.capabilities.summary_only,true);
+ assert.equal(ready.prompt_version,'dioramini-story-led-miniatures-v7');
+ delete env.SUPABASE_SERVICE_ROLE_KEY;
+ const unconfigured=await send('', 'GET');assert.equal(unconfigured.status,503);
+ const unconfiguredData=await unconfigured.json();assert.equal(unconfiguredData.ready,false);assert.equal(unconfiguredData.prompt_version,ready.prompt_version);
+ env.SUPABASE_SERVICE_ROLE_KEY='test';
  assert.equal(providerCalls,0);
  assert.equal((await send('x'.repeat(12001))).status,413);
  for(const raw of ['{','null','[]','{"brand":"X"}'])assert.equal((await send(raw)).status,400);
@@ -35,6 +42,8 @@ try {
  assert.equal(providerCalls,0);
  assert.equal((await generate({brand:'not-a-website'})).status,400);assert.equal(reservations,0);
  env.BRICK_GENERATION_ENABLED='false'; assert.equal((await generate({brand:'rimba.com'})).status,503);
+ const disabledReadiness=await send('', 'GET');assert.equal(disabledReadiness.status,503);
+ const disabledReadinessData=await disabledReadiness.json();assert.equal(disabledReadinessData.ready,false);assert.equal(disabledReadinessData.capabilities.electronic_story_scene,true);
  env.BRICK_GENERATION_ENABLED='true'; env.BRICK_ENFORCE_DAILY_LIMITS='true'; limit=false; assert.equal((await generate({brand:'rimba.com'})).status,429); assert.equal(providerCalls,0);
  limit=true; assert.equal((await (await generate({brand:'unknown.com'})).json()).needsContext,true); assert.equal(providerCalls,1);
  globalThis.websiteBlocked=true;
@@ -96,5 +105,42 @@ try {
   assert.notEqual(a.concept.id,b.concept.id);
   assert.equal(Boolean(a.concept.sourceUrl),!summaryFirst);assert.equal(Boolean(b.concept.sourceUrl),summaryFirst);
  }
- console.log('Backend contract passed: validation, disabled service, temporary waiver, restored rate limits, context, successful generation, edition/format cache separation, saved links, and legacy defaults.');
+ // The explicit electronic mode is bounded to its own study direction; legacy requests stay mechanical.
+ const storyRequest={brand:'no-website',edition:'inside',format:'miniature',summaryOnly:true};
+ const electronicContext=JSON.stringify({mode:'electronic',business:'A coffee roaster.',exactWording,interaction:'One button, display and light'});
+ const mechanicalContext=JSON.stringify({...JSON.parse(electronicContext),mode:'mechanical'});
+ const beforeModeValidation=providerCalls;const reservationsBeforeModeValidation=reservations;
+ for(const mode of ['Electronic','unknown',null,false,{}]) {
+  assert.equal((await generate({...storyRequest,context:JSON.stringify({mode})})).status,400);
+ }
+ for(const choice of [{edition:'inside',format:'bricks'},{edition:'hero',format:'miniature'},{edition:'everyday',format:'clicker'},{edition:undefined,format:undefined}]) {
+  assert.equal((await generate({...storyRequest,...choice,context:electronicContext})).status,400);
+ }
+ assert.equal((await generate({...storyRequest,context:'x'.repeat(601)})).status,400);
+ assert.equal(providerCalls,beforeModeValidation);assert.equal(reservations,reservationsBeforeModeValidation);
+ const electronicResult=await (await generate({...storyRequest,context:electronicContext})).json();
+ assert.ok(electronicResult.concept);assert.equal(electronicResult.concept.edition,'inside');assert.equal(electronicResult.concept.format,'miniature');
+ const electronicTextPrompt=prompts.at(-2).messages[0].content;const electronicImagePrompt=prompts.at(-1).prompt;
+ for(const prompt of [electronicTextPrompt,electronicImagePrompt]) {
+  assert.match(prompt,/Concept mode: electronic\./);assert.match(prompt,/Edition: Inside\./);assert.match(prompt,/Object format: Miniature\./);
+  assert.match(prompt,/off-the-shelf ESP32-class controller/);assert.match(prompt,/unvalidated proposal requiring physical, electrical, firmware, privacy\/content and cost validation/);
+  assert.match(prompt,/No promised Muse integration/);assert.match(prompt,/Electronics, firmware and cloud services are scoped and quoted separately/);
+  assert.match(prompt,/art, technology and commercial usefulness/);assert.match(prompt,/at most one or two mechanical actions/);
+  assert.match(prompt,/RM100–500 is an exploratory budget range/);assert.doesNotMatch(prompt,/minimum RM100/);
+  assert.doesNotMatch(prompt,/Concept mode: mechanical\./);
+ }
+ assert.equal(JSON.parse(prompts.at(-2).messages[1].content).context,electronicContext);
+ assert.ok(electronicImagePrompt.includes(JSON.stringify({context:electronicContext})));
+ await generate({...storyRequest,context:electronicContext});assert.equal(providerCalls,beforeModeValidation+2);
+ const electronicRestored=await (await generate({id:electronicResult.concept.id})).json();
+ assert.equal(electronicRestored.concept.id,electronicResult.concept.id);assert.equal(providerCalls,beforeModeValidation+2);
+ const mechanicalResult=await (await generate({...storyRequest,context:mechanicalContext})).json();
+ assert.notEqual(mechanicalResult.concept.id,electronicResult.concept.id);assert.equal(providerCalls,beforeModeValidation+4);
+ assert.match(prompts.at(-2).messages[0].content,/Concept mode: mechanical\..*No powered electronics/);
+ assert.doesNotMatch(prompts.at(-2).messages[0].content,/Concept mode: electronic\./);
+ assert.equal(rows.find(row=>row.id===electronicResult.concept.id).prompt_version,ready.prompt_version);
+ const legacyContext=JSON.stringify({business:'A coffee roaster.'});
+ await generate({...storyRequest,context:legacyContext});
+ assert.match(prompts.at(-2).messages[0].content,/Concept mode: mechanical\./);
+ console.log('Backend contract passed: validation, capability/version readiness, bounded electronic studies, mechanical compatibility, disabled service, temporary waiver, restored rate limits, context, successful generation, cache separation, saved links, and legacy defaults.');
 } finally { await rm(temp,{recursive:true,force:true}); }

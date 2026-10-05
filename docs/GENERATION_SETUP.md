@@ -1,3 +1,19 @@
+# Current editorial rebuild (draft source, October 5, 2026)
+
+The following notes supersede older product-flow, quota and prompt-version descriptions below. See [EDITORIAL_STUDIO_REDESIGN.md](./EDITORIAL_STUDIO_REDESIGN.md) for the full release checklist.
+
+- Draft source prompt version: `dioramini-story-led-miniatures-v7`. This is not a claim about the currently deployed function version. Deploy the function explicitly after approval to activate the revised creative guidance.
+- The public flow is website text inspection → three proposed editorial story lenses → owner-supplied hidden detail → object/style/audience/exact wording → explicit generation → rationale and prototype checks.
+- Website inspection uses the existing safe public-site reader without an AI call. The displayed lenses are transparent editorial suggestions, not automated business-verification findings.
+- Old KLDEX/STIVE/PETRONAS curated examples are retired from the public UI. New A24/Airbnb/Tesla demonstrations are unofficial code-native studies with unverified mechanics.
+- Daily quotas remain temporarily waived by the existing owner-requested default. `BRICK_ENFORCE_DAILY_LIMITS=true` restores limits; unknown non-false values fail closed. The generation kill switch, request bounds, private bucket and SSRF guards remain in place.
+- No live paid generation, deployment or production publish was performed for this rebuild. Offline passing tests do not verify live provider quality.
+- OFFKIN｜异趣伙伴 is the approved identity. The website scope is approved for merge; public publishing and backend deployment remain separate. Customer copy explicitly labels buttons/screens/light/AI scenes as exploration requiring hardware/software prototype validation. The wizard distinguishes mechanical and exploratory electronic briefs. Electronic image generation requires ready:true, capabilities.electronic_story_scene:true and exact prompt_version dioramini-story-led-miniatures-v7 from GET; otherwise it offers a local brief only. Backend source enforces the electronic Inside/miniature selection. No tested hardware or Muse integration is offered. The current RM100–500 figure is an exploratory budget range pending outsourced sample/printing quotes, not a product price, rigid floor or universal cap. The first edition stays palm-sized with one main scene and at most one or two useful mechanical actions, reusing bases/connectors/mechanisms where possible. Existing custom admin title/logo settings remain authoritative.
+
+## Historical setup and earlier product directions
+
+The rest of this file contains older rollout notes. Read their dated descriptions as historical, not as the current frontend or live-deployment status.
+
 # Brand concept generation — activation
 
 Status: frontend and backend implementation complete; backend not deployed or provider-tested in this change. The connected Lovable workspace rejected the build/deployment request because it was out of credits. GitHub sync alone does not deploy an Edge Function or run a migration.
@@ -47,3 +63,4 @@ Current prompt version: `brandkin-collectibles-v2`. Apply `20260930090000_collec
 - The Rimba Coffee board is a generated fictional reference image, not a real customer or manufacturing validation.
 
 Local verification: `npm ci --legacy-peer-deps` (the existing lockfile omits testing-library peer dependencies), `npm run build`, `npx tsc --noEmit -p tsconfig.app.json`, `npm test`, `node tests/generation-contract.mjs`. Backend contract tests use fake services and do not spend model credits. A live provider smoke test is still required after deployment.
+
