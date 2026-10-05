@@ -1,18 +1,14 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight, Check, Download, Globe2, LoaderCircle, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ConceptStudy } from '@/components/ConceptStudy';
+import { ConceptPresentation } from '@/components/ConceptPresentation';
+import { homepageStudies as studies } from '@/lib/homepage-studies';
 import { normalizeCompanyWebsite } from '@/lib/company-website';
 import { requestConcept, supportsElectronicStoryScenes, supportsSummaryOnly, WebsiteAddressError, type WebsiteEvidence } from '@/lib/concept-api';
 import { emptyDraft, makeCreationContext, makeElectronicBrief, type CreationDraft } from '@/lib/creation-journey';
 import { angleEvidence, getStoryAngle, storyAngles } from '@/lib/story-angles';
 import type { CollectibleConcept } from '@/lib/collectible-brief';
 
-const studies = [
-  { kind: 'a24', brand: 'A24', title: 'OFF-SCREEN', line: 'The frame hides its making.', detail: 'A small cinematic scene. Press to reveal the work outside the frame.' },
-  { kind: 'airbnb', brand: 'Airbnb', title: 'A PLACE IS MADE', line: 'A place becomes yours when someone makes room.', detail: 'A table, an empty place, a spare chair. One small gesture of welcome.' },
-  { kind: 'tesla', brand: 'Tesla', title: 'STORED AFTERNOON', line: 'What if you could keep a little of the afternoon?', detail: 'A quiet architectural study of sunlight, storage and the hours after.' },
-] as const;
 const steps = ['Find a story', 'Go one layer deeper', 'Shape the object', 'Review & create'];
 
 export function CreationConversation({ initialDraft, navigationKey, onGenerated, onExit, directionMissing = false }: { initialDraft?: CreationDraft; directionMissing?: boolean; navigationKey: string; onGenerated: (concept: CollectibleConcept, draft: CreationDraft) => void; onExit?: () => void }) {
@@ -117,7 +113,7 @@ export function CreationConversation({ initialDraft, navigationKey, onGenerated,
           {statusBlock}<p className="composer-note">Three story lenses. One detail only you know. Then we create.</p>
         </div>
       </div>
-      <div className="hero-study"><div className="study-topline"><span>OBSERVATION STUDY / 0{activeDesign + 1}</span><span>TRY THE OBJECT <span aria-hidden="true">↙</span></span></div><ConceptStudy key={study.kind} kind={study.kind} /><div className="study-caption"><div><span className="eyebrow">{study.brand} / UNOFFICIAL CONCEPT</span><h2>{study.title}</h2><p>{study.line}</p></div><span className="study-index">0{activeDesign + 1}<span>/03</span></span></div><div className="study-tabs" role="group" aria-label="Explore observation studies">{studies.map((entry, index) => <button key={entry.kind} type="button" aria-pressed={index === activeDesign} onClick={() => setActiveDesign(index)}><span>0{index + 1}</span>{entry.brand}<ArrowUpRight size={15} aria-hidden="true" /></button>)}</div><p className="concept-note">Independent design explorations. No affiliation, commission or endorsement.</p></div>
+      <div className="hero-study"><div className="study-topline"><span>OBSERVATION STUDY / 0{activeDesign + 1}</span><span>LOOK / EXPLORE <span aria-hidden="true">↙</span></span></div><ConceptPresentation key={study.kind} study={study} /><div className="study-caption"><div><span className="eyebrow">{study.brand} / UNOFFICIAL CONCEPT</span><h2>{study.title}</h2><p>{study.line}</p></div><span className="study-index">0{activeDesign + 1}<span>/03</span></span></div><div className="study-tabs" role="group" aria-label="Explore observation studies">{studies.map((entry, index) => <button key={entry.kind} type="button" aria-pressed={index === activeDesign} onClick={() => setActiveDesign(index)}><span>0{index + 1}</span>{entry.brand}<ArrowUpRight size={15} aria-hidden="true" /></button>)}</div><p className="concept-note">Independent design explorations. No affiliation, commission or endorsement.</p></div>
     </section>
     <section className="studio-footnote"><div className="footnote-statement"><span className="asterisk" aria-hidden="true">✳</span><p>Less logo.<br /><strong>More story.</strong></p></div><p>Palm-sized. One main scene.<br />Up to two mechanical actions, only when meaningful.</p><div className="price-note"><strong>Exploring RM100–500 budgets*</strong><span>*An exploratory range, not a quote. Samples and print quotes will show which specifications fit. Design and electronics scoped separately.</span></div><button type="button" className="process-toggle" aria-expanded={showProcess} aria-controls="studio-process" onClick={() => setShowProcess(value => !value)}>How it takes shape{showProcess ? <Minus size={17} /> : <Plus size={17} />}</button></section>
     {showProcess && <section id="studio-process" className="process-details"><div><span>01 / OBSERVE</span><h2>Find your story</h2><p>Read a public website, choose an editorial lens, then add the detail only you know.</p></div><div><span>02 / EXPLORE</span><h2>Make the first look</h2><p>You approve the direction before AI creates a visual concept. Refine it until the idea feels right.</p></div><div><span>03 / PROTOTYPE</span><h2>Make it real</h2><p>We reuse bases, connectors and selected mechanisms, then outsource a few printed samples to test the experience and cost before production.</p></div></section>}

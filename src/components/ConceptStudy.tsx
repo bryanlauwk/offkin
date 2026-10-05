@@ -99,38 +99,68 @@ function Home({ active }: { active: boolean }) {
 }
 
 function Energy({ active }: { active: boolean }) {
-  return <g>
-    <Box x={20} y={17} w={178} d={111} h={3} top="#d4d8c9" front="#b8c0ab" side="#959f8a" />
-    <Box x={30} y={23} w={144} d={68} h={90} top="#e1e3d9" front="#cbd1c0" side="#a6b09c" />
-    <polygon points={points([74, 92, 21], [167, 92, 21], [167, 92, 93], [74, 92, 93])} fill="#343e32" stroke="#20291f" strokeWidth="1" />
-    <g stroke="#63745b" strokeWidth="1">
-      <polyline points={points([86, 93, 23], [86, 93, 86], [164, 93, 86])} fill="none" />
-      <polyline points={points([91, 93, 23], [91, 93, 81], [164, 93, 81])} fill="none" />
+  return <g stroke="#77786c" strokeWidth="0.8" strokeLinejoin="round">
+    {/* Fixed cutaway home and enclosed USB controller, matching the visual concept. */}
+    <path d="M96 262 L134 283 L442 263 L443 313 Q443 323 429 325 L148 345 Q131 345 124 336 L96 312 Z" fill="#414640" />
+    <path d="M96 242 L134 266 L425 246 L443 261 L134 284 L96 263 Z" fill="#eeeade" />
+    <path d="M96 260 L134 282 L134 335 Q124 335 118 330 L96 313 Z" fill="#c2c0b2" />
+    <path d="M134 282 L443 261 L443 306 Q443 316 429 317 L150 337 Q134 337 134 326 Z" fill="#e4e1d5" />
+    <path d="M96 293 L108 299 L108 287 L96 281 Z" fill="#343b32" />
+    <path d="M106 291 C91 288 82 289 61 299" fill="none" stroke="#d1cdbf" strokeWidth="9" strokeLinecap="round" />
+    <path d="M106 289 C91 287 82 288 61 297" fill="none" stroke="#ece9df" strokeWidth="5" strokeLinecap="round" />
+    <path d="M103 148 L145 172 L145 272 L103 245 Z" fill="#53584f" />
+    <path d="M145 173 L342 74 L423 115 L423 258 L145 276 Z" fill="#eeebde" />
+    <path d="M158 177 L342 87 L411 121 L411 246 L158 263 Z" fill="#c9c8b6" />
+    <path d="M158 177 L342 87 L342 251 L158 263 Z" fill="#d8d5c5" />
+    <path d="M342 87 L411 121 L411 246 L342 251 Z" fill="#c1c0ad" />
+    <path d="M155 265 L411 246 L419 253 L153 273 Z" fill="#f2eee1" />
+    <path d="M153 210 L411 191 L419 200 L153 220 Z" fill="#f0ecdf" />
+    <path d="M153 220 L419 200 L419 207 L153 227 Z" fill="#bcbda9" />
+    <path d="M260 219 L269 218 L269 256 L260 257 Z" fill="#ede9dc" />
+    <path d="M349 140 L366 139 L366 158 L349 159 Z" fill="#d7d3c3" />
+    <path d="M354 159 L354 193 M362 158 L362 192" fill="none" stroke="#a9aa98" strokeWidth="1.4" />
+    <path d="M383 176 L400 175 L408 180 L390 182 Z" fill="#eeeadd" />
+    <path d="M390 182 L408 180 L408 191 L390 193 Z" fill="#d6d4c3" />
+    <path d="M383 176 L390 182 L390 193 L383 188 Z" fill="#b9bbaa" />
+    {/* The amber route and exposed storage are static illustration, not a circuit animation. */}
+    <path d="M254 126 L254 178 L328 173 L328 213 L342 220" fill="none" stroke="#b88a3b" strokeWidth="2.6" strokeLinecap="round" />
+    <path d="M302 215 L380 209 L398 219 L320 226 Z" fill="#cf9d43" />
+    <path d="M302 215 L320 226 L320 260 L302 249 Z" fill="#ae762e" />
+    <path d="M320 226 L398 219 L398 253 L320 260 Z" fill="#c59439" />
+    <path d="M325 229 L393 223 L393 249 L325 255 Z" fill="#d0a452" stroke="#88672f" />
+    <path d="M333 231 L345 230 L345 252 L333 253 Z" fill="#ddbb78" stroke="none" opacity="0.65" />
+    <path d="M300 250 L320 261 L399 254 L402 260 L320 267 L300 256 Z" fill="#dfdac9" />
+    <path d="M102 147 L299 41 L346 66 L145 173 Z" fill="#454a43" />
+    <path d="M102 147 L145 173 L145 183 L102 157 Z" fill="#303830" />
+    <path d="M145 173 L346 66 L346 75 L145 183 Z" fill="#696d60" />
+    <g fill="#3a413c" stroke="#8b9182" strokeWidth="0.7">
+      <path d="M110 147 L153 124 L190 144 L146 166 Z" />
+      <path d="M158 121 L201 98 L239 119 L195 141 Z" />
+      <path d="M206 95 L249 72 L287 93 L244 116 Z" />
+      <path d="M254 69 L298 46 L337 67 L292 90 Z" />
     </g>
-    <Box x={125} y={84} z={33} w={34} d={8} h={43} top="#edc374" front="#d4a14d" side="#a47935" />
-    <polyline points={points([130, 93, 62], [153, 93, 62])} fill="none" stroke="#6b4c20" strokeWidth="1.2" />
-    <polyline points={points([130, 93, 48], [153, 93, 48])} fill="none" stroke="#6b4c20" strokeWidth="1.2" />
-    <g className="concept-study__moving" style={{ transform: active ? "translate(-21px, -8.82px)" : "translate(0, 0)" }}>
-      <Box x={74} y={96} z={22} w={98} d={4} h={72} top="#e6e8dc" front="#d3d8c8" side="#aab4a0" />
-      <g stroke="#aab49f" strokeWidth="0.65">
-        {[86, 98, 110, 122, 134, 146, 158].map(x => <polyline key={x} points={points([x, 101, 25], [x, 101, 90])} />)}
+    <g fill="none" stroke="#9ba08e" strokeWidth="0.45" opacity="0.7">
+      <path d="M118 150 L304 51 M127 155 L313 56 M136 160 L322 61" />
+    </g>
+    {/* One fixed button; only the sample display and one LED change state. */}
+    <ellipse cx="182" cy="306" rx="13" ry="13.5" fill="#a6a99a" />
+    <ellipse cx="182" cy="304" rx="12" ry="12.5" fill="#4c5349" stroke="#30382d" strokeWidth="1.2" />
+    <g className="concept-study__electronic-response" data-simulation-state={active ? "active" : "idle"}>
+      <g transform="matrix(1 -0.07 0 1 226 287)">
+        <rect width="126" height="28" rx="3" fill="#454c45" stroke="#343b35" strokeWidth="1.2" />
+        <rect x="4" y="4" width="118" height="20" rx="1" className="concept-study__display" fill={active ? "#f4edce" : "#d8e0d9"} stroke="#a8b3a5" />
+        <text x="63" y="18" textAnchor="middle" className="concept-study__display-message" opacity={active ? 1 : 0}>STORED</text>
       </g>
+      <circle cx="396" cy="289" r="4.5" fill="#b99457" stroke="#8a734b" />
+      <circle cx="396" cy="289" r="2.9" className="concept-study__led" fill={active ? "#ffcb68" : "#8f773e"} stroke="none" />
     </g>
-    <Box x={24} y={18} z={108} w={157} d={80} h={5} top="#e4e7dc" front="#bfc8b4" side="#939f88" />
-    <Box x={39} y={28} z={113} w={91} d={54} h={2} top="#485746" front="#33442e" side="#263921" />
-    <g stroke="#829075" strokeWidth="0.65">
-      {[57, 75, 93, 111].map(x => <polyline key={x} points={points([x, 29, 115.5], [x, 81, 115.5])} />)}
-      {[46, 64].map(y => <polyline key={y} points={points([40, y, 115.5], [129, y, 115.5])} />)}
-    </g>
-    <polyline points={points([130, 57, 115], [151, 57, 115], [151, 90, 115], [151, 92, 95])} fill="none" stroke="#b29452" strokeWidth="2" />
-    <Box x={42} y={107} z={21} w={16} d={11} h={25} top="#c1c9b4" front="#a3ae94" side="#75846a" />
   </g>;
 }
 
 const studies = {
-  a24: { index: "01", title: "Off-screen", action: "Look behind the scene", rest: "The frame hides its making", reveal: "A director’s viewpoint, revealed", motion: "SCENIC FLAT / SLIDE", description: "A miniature film set. Pressing moves one scenic flat aside to reveal a stationary director’s chair and camera." },
-  airbnb: { index: "02", title: "A place is made", action: "Make a place", rest: "Someone is already expected", reveal: "One more place at the table", motion: "SPARE CHAIR / SLIDE", description: "A miniature dining corner with two cups. Pressing moves one spare chair toward the table." },
-  tesla: { index: "03", title: "Stored afternoon", action: "See what stays", rest: "The useful part of a sunny day", reveal: "The storage behind the wall", motion: "WALL PANEL / SLIDE", description: "A miniature solar-roof home. A static engraved path leads toward storage. Pressing moves one wall panel to reveal an amber storage block." },
+  a24: { mode: "mechanical", index: "01", title: "Off-screen", action: "Look behind the scene", rest: "The frame hides its making", reveal: "A director’s viewpoint, revealed", motion: "SCENIC FLAT / SLIDE", description: "A miniature film set. Pressing moves one scenic flat aside to reveal a stationary director’s chair and camera." },
+  airbnb: { mode: "mechanical", index: "02", title: "A place is made", action: "Make a place", rest: "Someone is already expected", reveal: "One more place at the table", motion: "SPARE CHAIR / SLIDE", description: "A miniature dining corner with two cups. Pressing moves one spare chair toward the table." },
+  tesla: { mode: "electronic", index: "03", title: "Stored afternoon", action: "Try the simulated response", rest: "The useful part of a sunny day", reveal: "A stored afternoon, simulated", motion: "BUTTON / SIMULATED RESPONSE", description: "An illustrated electronic concept: a fixed, two-level solar-roof home with exposed amber storage and a proposed enclosed USB-powered controller. One round button sits beside a small blank display and one amber LED. Pressing shows a sample STORED display message and lights the indicator together; releasing resets them. The house, energy route and storage stay still. This is a local visual simulation, with no connected hardware, network request or AI response." },
 };
 
 export function ConceptStudy({ kind, className = "" }: ConceptStudyProps) {
@@ -138,47 +168,56 @@ export function ConceptStudy({ kind, className = "" }: ConceptStudyProps) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const id = useId().replace(/:/g, "");
   const study = studies[kind];
+  const electronic = study.mode === "electronic";
   const clearTimer = () => { if (timer.current) clearTimeout(timer.current); timer.current = null; };
   const reset = () => { clearTimer(); setActive(false); };
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  useEffect(() => { setActive(false); if (timer.current) clearTimeout(timer.current); }, [kind]);
+  useEffect(() => {
+    setActive(false);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  }, [kind]);
 
   return <figure className={`concept-study concept-study--${kind} ${active ? "is-pressed" : ""} ${className}`}>
-    <div className="concept-study__meta" aria-hidden="true"><span>STUDY {study.index} / {kind.toUpperCase()}</span><span>ONE PRESS. ONE REVEAL.</span></div>
+    <div className="concept-study__meta" aria-hidden="true"><span>STUDY {study.index} / {kind.toUpperCase()}</span><span>{electronic ? "ILLUSTRATED SIMULATION" : "ONE PRESS. ONE REVEAL."}</span></div>
     <div className="concept-study__canvas">
       <svg viewBox="0 0 520 370" role="img" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}>
-        <title id={`${id}-title`}>{study.title}: interactive concept study</title>
+        <title id={`${id}-title`}>{`${study.title}: interactive concept study`}</title>
         <desc id={`${id}-description`}>{study.description} This is an illustrated design proposal, not a tested physical prototype.</desc>
         <defs>
           <filter id={`${id}-shadow`} x="-30%" y="-50%" width="160%" height="200%"><feGaussianBlur stdDeviation="9" /></filter>
           <linearGradient id={`${id}-base`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#e2e2d5" /><stop offset="100%" stopColor="#b9c2aa" /></linearGradient>
         </defs>
-        <ellipse cx="282" cy="306" rx="172" ry="31" fill="#596343" opacity="0.18" filter={`url(#${id}-shadow)`} />
-        <g className="concept-study__guides" fill="none" stroke="#7e8970" strokeWidth="0.55" opacity="0.5">
+        <ellipse cx="282" cy={electronic ? 331 : 306} rx="172" ry={electronic ? 20 : 31} fill="#596343" opacity="0.18" filter={`url(#${id}-shadow)`} />
+        {!electronic && <g className="concept-study__guides" fill="none" stroke="#7e8970" strokeWidth="0.55" opacity="0.5">
           <polyline points="86,248 307,341 480,268" />
           <path d="M82 253l8-10m213 103l8-10m165-63l8-10" />
-        </g>
-        <Box x={0} y={0} z={0} w={220} d={160} h={18} top={`url(#${id}-base)`} front="#bdc6ad" side="#8e9b80" />
-        <g opacity="0.6" stroke="#59664d" strokeWidth="0.7"><polyline points={points([0, 160, 6], [220, 160, 6], [220, 0, 6])} fill="none" /></g>
+        </g>}
+        {!electronic && <>
+          <Box x={0} y={0} z={0} w={220} d={160} h={18} top={`url(#${id}-base)`} front="#bdc6ad" side="#8e9b80" />
+          <g opacity="0.6" stroke="#59664d" strokeWidth="0.7"><polyline points={points([0, 160, 6], [220, 160, 6], [220, 0, 6])} fill="none" /></g>
+        </>}
         {kind === "a24" ? <Cinema active={active} /> : kind === "airbnb" ? <Home active={active} /> : <Energy active={active} />}
-        <Box x={174} y={121} z={18} w={31} d={26} h={2} top="#596747" front="#354428" side="#27371e" />
-        <g className="concept-study__cap" style={{ transform: active ? "translateY(5px)" : "translateY(0)" } as CSSProperties}>
-          <Box x={176} y={123} z={20} w={27} d={22} h={7} top="#e4f2a3" front="#bbc97d" side="#8f9f59" />
-          <polyline points={points([184, 129, 27.5], [194, 129, 27.5], [194, 138, 27.5])} stroke="#596840" strokeWidth="1.1" fill="none" />
-        </g>
-        <text x="321" y="347" transform="rotate(-23 321 347)" className="concept-study__dimension">84 MM · PROPOSED</text>
+        {!electronic && <>
+          <Box x={174} y={121} z={18} w={31} d={26} h={2} top="#596747" front="#354428" side="#27371e" />
+          <g className="concept-study__cap" style={{ transform: active ? "translateY(5px)" : "translateY(0)" } as CSSProperties}>
+            <Box x={176} y={123} z={20} w={27} d={22} h={7} top="#e4f2a3" front="#bbc97d" side="#8f9f59" />
+            <polyline points={points([184, 129, 27.5], [194, 129, 27.5], [194, 138, 27.5])} stroke="#596840" strokeWidth="1.1" fill="none" />
+          </g>
+        </>}
+        <text x={electronic ? 274 : 321} y={electronic ? 362 : 347} transform={electronic ? undefined : "rotate(-23 321 347)"} className="concept-study__dimension">{electronic ? "USB-POWERED · PROPOSED" : "84 MM · PROPOSED"}</text>
       </svg>
     </div>
     <figcaption className="concept-study__controls">
       <div className="concept-study__caption">
         <span className="concept-study__motion">{study.motion}</span>
         <span className="concept-study__state" aria-live="polite" aria-atomic="true">{active ? study.reveal : study.rest}</span>
-        <span className="concept-study__hint">Hold to explore · release to reset</span>
+        <span className="concept-study__hint">{electronic ? "Hold for sample response · release to reset" : "Hold to explore · release to reset"}</span>
       </div>
       <button
         type="button"
         className="concept-study__push"
-        aria-label={`${study.action}. Hold to reveal; release to reset. Keyboard activation plays one cycle.`}
+        aria-label={`${study.action}. ${electronic ? "Hold for a simulated display and LED response" : "Hold to reveal"}; release to reset. Keyboard activation plays one cycle.`}
         aria-pressed={active}
         onPointerDown={event => {
           if (event.button > 0) return;
@@ -193,14 +232,14 @@ export function ConceptStudy({ kind, className = "" }: ConceptStudyProps) {
           // Native keyboard and assistive-technology clicks have detail zero.
           if (event.detail !== 0) return;
           clearTimer(); setActive(true);
-          timer.current = setTimeout(() => setActive(false), 1300);
+          timer.current = setTimeout(() => { timer.current = null; setActive(false); }, 1300);
         }}
       >
         <span aria-hidden="true" className="concept-study__push-face">↓</span>
         <span className="concept-study__push-label">PRESS</span>
       </button>
     </figcaption>
-    <p className="concept-study__disclaimer">Independent concept · mechanism unverified</p>
+    <p className="concept-study__disclaimer">{electronic ? "Illustrated simulation · no live hardware or AI" : "Independent concept · mechanism unverified"}</p>
   </figure>;
 }
 

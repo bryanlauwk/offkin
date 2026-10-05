@@ -11,7 +11,7 @@
 }
 .concept-study--a24 { background: #dfe5d4; }
 .concept-study--airbnb { background: #e9e9da; }
-.concept-study--tesla { background: #e0e6db; }
+.concept-study--tesla { background: #e9e6dc; }
 .concept-study__meta {
   position: relative;
   z-index: 1;
@@ -28,6 +28,8 @@
 .concept-study__dimension { fill: #647154; font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
 .concept-study__moving { transition: transform 450ms cubic-bezier(.22, .65, .3, 1); }
 .concept-study__cap { transition: transform 160ms ease; }
+.concept-study__display-message { fill: #796139; stroke: none; font: 500 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .18em; }
+.concept-study__display, .concept-study__display-message, .concept-study__led { transition: fill 160ms ease, opacity 160ms ease; }
 .concept-study__controls {
   display: flex;
   align-items: center;
@@ -88,5 +90,6 @@
   .concept-study__disclaimer { margin-right: 18px; margin-left: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .concept-study__moving, .concept-study__cap, .concept-study__push-face { transition: none; }
+  .concept-study__moving, .concept-study__cap, .concept-study__push-face,
+  .concept-study__display, .concept-study__display-message, .concept-study__led { transition: none; }
 }

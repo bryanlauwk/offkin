@@ -139,11 +139,14 @@ describe('Editorial creation entry', () => {
     await screen.findByRole('link', { name: 'OFFKIN home' });
     const studies = screen.getByRole('group', { name: 'Explore observation studies' });
     expect(within(studies).getAllByRole('button')).toHaveLength(3);
+    expect(screen.getByRole('img', { name: /A24 Off-screen visual concept/ })).toHaveAttribute('src', '/concept-studies/offkin-a24-concept.webp');
+    fireEvent.click(screen.getByRole('button', { name: 'Interaction sketch' }));
     expect(screen.getByRole('img', { name: 'Off-screen: interactive concept study' })).toBeInTheDocument();
     fireEvent.click(within(studies).getByRole('button', { name: /Airbnb/ }));
-    expect(screen.getByRole('img', { name: 'A place is made: interactive concept study' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Airbnb A place is made visual concept/ })).toHaveAttribute('src', '/concept-studies/offkin-airbnb-concept.webp');
     fireEvent.click(within(studies).getByRole('button', { name: /Tesla/ }));
-    expect(screen.getByRole('img', { name: 'Stored afternoon: interactive concept study' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Tesla Stored afternoon electronic visual concept/ })).toHaveAttribute('src', '/concept-studies/offkin-tesla-concept.webp');
+    expect(screen.getByRole('button', { name: 'Response sketch' })).toBeInTheDocument();
     expect(screen.getByText(/No affiliation, commission or endorsement/)).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
