@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseSelection, designDirection, type Edition, type GiftFormat } from './options.ts';
 import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
-import { BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION } from './prompt.ts';
+import { BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION, parseConceptMode, modeDesignDirection } from './prompt.ts';
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Cache-Control':'no-store'}});
 const hash = async (s:string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');
 // Temporary owner-requested test waiver. Set BRICK_ENFORCE_DAILY_LIMITS=true to restore caps.
@@ -11,12 +11,13 @@ class Failure extends Error { constructor(public status:number, message:string){
 Deno.serve(async req => {
  if(req.method==='OPTIONS')return json({});
  if(req.method==='GET'){
+  const sourceCapabilities={prompt_version:PROMPT_VERSION,capabilities:{summary_only:true,electronic_story_scene:true}};
   const url=Deno.env.get('SUPABASE_URL'); const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if(!url||!service)return json({ready:false,reason:'Backend configuration is missing.'},503);
+  if(!url||!service)return json({ready:false,...sourceCapabilities,reason:'Backend configuration is missing.'},503);
   const db=createClient(url,service);
   const {error}=await db.from('brick_concepts').select('id,edition,format,interaction,source_url,source_title').limit(0);
   const enabled=Boolean(Deno.env.get('LOVABLE_API_KEY'))&&Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
-  return json({ready:!error&&enabled,daily_limits_enforced:dailyLimitsEnforced(),capabilities:{summary_only:true},verification:'Configuration and schema only; website transport and AI providers need a live test.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
+  return json({ready:!error&&enabled,daily_limits_enforced:dailyLimitsEnforced(),...sourceCapabilities,verification:'Configuration and schema only; website transport and AI providers need a live test. Electronic story scenes are unvalidated concept studies requiring physical, electrical, firmware, privacy/content and cost validation.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
  }
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try {
@@ -47,6 +48,10 @@ Deno.serve(async req => {
   const brand=typeof input.brand==='string'?input.brand.trim():'';
   const context=typeof input.context==='string'?input.context.trim():'';
   if(brand.length<2||brand.length>120||context.length>600)return json({error:'Enter a brand (2–120 characters) and a short brief (up to 600 characters).'},400);
+  const mode=parseConceptMode(context);
+  if(!mode)return json({error:'Choose mechanical or electronic concept mode.'},400);
+  if(mode==='electronic'&&(selection!.edition!=='inside'||selection!.format!=='miniature'))return json({error:'Electronic story-scene studies require the Inside edition and Miniature format.'},400);
+  const direction=modeDesignDirection(mode,designDirection(selection!));
   let websiteUrl: string;
   if(brand==='no-website'&&input.summaryOnly===true&&!input.inspectWebsite) websiteUrl='';
   else try { websiteUrl=validatePublicWebsiteUrl(brand).href; } catch(error) { return json({error:error instanceof Error?error.message:'Enter a public company website.'},400); }
@@ -77,11 +82,11 @@ Deno.serve(async req => {
    if(!response.ok)throw new Failure(response.status===429?429:503,response.status===429?'The generator is busy. Please try again shortly.':'The generator is unavailable right now. Please try again later.');
    return await response.json();
   }
-  const text=await ai('chat/completions',{model:Deno.env.get('BRICK_TEXT_MODEL')||'google/gemini-3-flash-preview',messages:[{role:'system',content:BRAND_PROMPT+'\n'+designDirection(selection!)},{role:'user',content:JSON.stringify({brand,context,websiteEvidence:website,...selection})}],response_format:{type:'json_object'},max_tokens:1100});
+  const text=await ai('chat/completions',{model:Deno.env.get('BRICK_TEXT_MODEL')||'google/gemini-3-flash-preview',messages:[{role:'system',content:BRAND_PROMPT+'\n'+direction},{role:'user',content:JSON.stringify({brand,context,websiteEvidence:website,...selection})}],response_format:{type:'json_object'},max_tokens:1100});
   let design;try{design=JSON.parse(text.choices?.[0]?.message?.content||'');}catch{throw new Failure(502,'We could not resolve this brand. Add a short description and retry.');}
   if(design.needsContext===true)return json({needsContext:true,message:'Tell us what your brand does and its main colours so the concept feels like you.'});
   if(design.needsContext!==false||!['brand','title','story','interaction','design'].every(k=>typeof design[k]==='string'&&design[k].length>0&&design[k].length<=1500))throw new Failure(502,'Please add a short brand description and retry.');
-  const result=await ai('images/generations',{model:Deno.env.get('BRICK_IMAGE_MODEL')||'openai/gpt-image-2',prompt:IMAGE_PROMPT+'\n'+designDirection(selection!)+'\nDesign brief JSON:\n'+JSON.stringify(design)+'\nOriginal customer direction JSON (preserve exactWording verbatim, no added wording):\n'+JSON.stringify({context}),n:1,size:'1024x1024'});
+  const result=await ai('images/generations',{model:Deno.env.get('BRICK_IMAGE_MODEL')||'openai/gpt-image-2',prompt:IMAGE_PROMPT+'\n'+direction+'\nDesign brief JSON:\n'+JSON.stringify(design)+'\nOriginal customer direction JSON (preserve exactWording verbatim, no added wording):\n'+JSON.stringify({context}),n:1,size:'1024x1024'});
   const b64=result.data?.[0]?.b64_json;
   if(typeof b64!=='string'||b64.length>14000000)throw new Failure(502,'The image could not be completed. Please retry.');
   const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));

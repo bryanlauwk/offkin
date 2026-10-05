@@ -33,3 +33,15 @@ export async function requestConcept(body: Record<string, unknown>, signal: Abor
   }
   return data;
 }
+
+
+export async function supportsElectronicStoryScenes(signal: AbortSignal): Promise<boolean> {
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !key) return false;
+  try {
+    const response = await fetch(`${url}/functions/v1/generate-concept`, { headers: { apikey: key }, signal });
+    const data = await response.json();
+    return !signal.aborted && response.ok && data.ready === true && data.capabilities?.electronic_story_scene === true && data.prompt_version === 'dioramini-story-led-miniatures-v7';
+  } catch { return false; }
+}

@@ -14,7 +14,12 @@ describe('agency briefs', () => {
     expect(brief).toContain('does not place an order');
   });
   it('labels internal budget as a target rather than a quote', () => {
-    expect(makeBrief(concept, { ...details, clientReady: false })).toContain('Target unit budget: RM100 (not a quote; design and sample fees excluded)');
+    expect(makeBrief(concept, { ...details, clientReady: false })).toContain('Target unit budget: RM87 (not a quote; design and sample fees excluded)');
+  });
+  it('does not clamp budgets into an unvalidated price range', () => {
+    expect(makeBrief(concept, { ...details, budget: '700', clientReady: false })).toContain('Target unit budget: RM700');
+    expect(makeBrief(concept, { ...details, budget: 'bad', clientReady: false })).toContain('Target unit budget: To be scoped');
+    expect(makeBrief(concept, details)).toContain('RM100–500 is an exploratory budget range');
   });
   it('does not invent an agency identity or delivery commitment', () => {
     const brief = makeBrief(concept, { ...details, agency: ' ' });
@@ -37,3 +42,4 @@ describe('collectible choices', () => {
     expect(parseSelection({ edition: null })).toBeNull();
   });
 });
+

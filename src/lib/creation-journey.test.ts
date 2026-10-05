@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { emptyDraft, loadCreationDraft, makeCreationContext, saveCreationDraft, type CreationDraft } from './creation-journey';
+import { emptyDraft, loadCreationDraft, makeCreationContext, makeElectronicBrief, saveCreationDraft, type CreationDraft } from './creation-journey';
 import { angleEvidence, getStoryAngle, storyAngles } from './story-angles';
 
 const draft: CreationDraft = {
@@ -29,6 +29,14 @@ describe('Customer creation context', () => {
     expect(JSON.parse(makeCreationContext({ ...draft, hiddenDetail })).hiddenDetail).toBe(hiddenDetail);
   });
 
+  it('explicitly marks electronic contexts without changing any customer-supplied wording', () => {
+    const mechanical = JSON.parse(makeCreationContext(draft));
+    const electronic = JSON.parse(makeCreationContext({ ...draft, mode: 'electronic' }));
+    expect(mechanical).not.toHaveProperty('mode');
+    expect(electronic).toEqual({ ...mechanical, mode: 'electronic', interaction: 'One button, display and LED' });
+    expect(electronic.exactWording).toBe(draft.wording);
+  });
+
   it('keeps optional new fields absent for a legacy direction', () => {
     const result = JSON.parse(makeCreationContext({ ...draft, angle: '', hiddenDetail: '' }));
     expect(result).not.toHaveProperty('angle');
@@ -55,7 +63,44 @@ describe('Customer creation context', () => {
   });
 });
 
+describe('Exploratory electronic brief', () => {
+  it('preserves all customer answers, including exact whitespace, punctuation and line breaks', () => {
+    const electronic = { ...draft, mode: 'electronic' as const };
+    const brief = makeElectronicBrief(electronic);
+    expect(brief).toContain(`Business: ${electronic.business}`);
+    expect(brief).toContain(`Website: ${electronic.website}`);
+    expect(brief).toContain('Story lens: The unseen ritual');
+    expect(brief).toContain(`Hidden detail: ${electronic.hiddenDetail}`);
+    expect(brief).toContain(`Object: ${electronic.item}`);
+    expect(brief).toContain(`Audience: ${electronic.audience}`);
+    expect(brief).toContain(`Style: ${electronic.style}`);
+    expect(brief).toContain(`Wording placement: ${electronic.placement}`);
+    const wording = brief.split('\n\n').find(line => line.startsWith('Exact wording: '))!;
+    expect(JSON.parse(wording.slice('Exact wording: '.length))).toBe(electronic.wording);
+  });
+
+  it('bounds the proposed hardware, optional AI and validation without making availability or price promises', () => {
+    const brief = makeElectronicBrief({ ...draft, mode: 'electronic' });
+    expect(brief).toContain('Not a tested product, quotation or order');
+    expect(brief).toMatch(/USB power.*ESP32-class controller.*one button.*small display.*LED/);
+    expect(brief).toContain('not a validated specification');
+    expect(brief).toMatch(/Optional AI: a short response grounded in approved brand material/);
+    expect(brief).toContain('No Muse integration is assumed');
+    expect(brief).toContain('No camera, microphone or motor is required');
+    expect(brief).toMatch(/Prototype review:.*electrical safety.*firmware.*network failure.*content boundaries.*data privacy/);
+    expect(brief).toContain('Confirm provider terms and running costs');
+    expect(brief).toContain('separate scoping and quotations');
+    expect(brief).toContain('RM100–500 as a range to investigate');
+    expect(brief).toContain('not a promised unit price');
+    expect(brief).toContain('Outsourced samples and supplier quotes');
+  });
+});
+
 describe('Device-local direction storage', () => {
+  it('defaults new directions to the existing mechanical flow', () => {
+    expect(emptyDraft.mode).toBe('mechanical');
+  });
+
   it('round-trips every answer without trimming exact wording or hidden detail', () => {
     saveCreationDraft('saved', draft);
     expect(loadCreationDraft('saved')).toEqual(draft);
@@ -70,9 +115,21 @@ describe('Device-local direction storage', () => {
   });
 
   it('loads older saved directions with empty new fields while retaining all existing answers', () => {
-    const { angle: _angle, hiddenDetail: _hiddenDetail, ...legacy } = draft;
+    const { angle: _angle, hiddenDetail: _hiddenDetail, mode: _mode, ...legacy } = draft;
     localStorage.setItem('dioramini:direction:old', JSON.stringify(legacy));
-    expect(loadCreationDraft('old')).toEqual({ ...legacy, angle: '', hiddenDetail: '' });
+    expect(loadCreationDraft('old')).toEqual({ ...legacy, angle: '', hiddenDetail: '', mode: 'mechanical' });
+  });
+
+  it('loads a saved story direction without mode as mechanical without losing any answers', () => {
+    const { mode: _mode, ...legacy } = draft;
+    localStorage.setItem('dioramini:direction:old-story', JSON.stringify(legacy));
+    expect(loadCreationDraft('old-story')).toEqual({ ...legacy, mode: 'mechanical' });
+  });
+
+  it('round-trips an electronic concept-study direction with exact wording intact', () => {
+    const electronic: CreationDraft = { ...draft, mode: 'electronic' };
+    saveCreationDraft('electronic', electronic);
+    expect(loadCreationDraft('electronic')).toEqual(electronic);
   });
 
   it('does not persist a generated context as if it were the complete source draft', () => {
@@ -95,6 +152,7 @@ describe('Device-local direction storage', () => {
     ['angle', 'invented-angle'], ['angle', null], ['item', 'Full-size statue'],
     ['placement', 'Somewhere'], ['style', 'Invented style'], ['interaction', 'Unknown mechanism'],
     ['summaryOnly', 'false'], ['business', null],
+    ['mode', 'unknown'], ['mode', null], ['mode', true],
   ])('rejects an invalid saved %s field', (key, value) => {
     localStorage.setItem('dioramini:direction:bad', JSON.stringify({ ...draft, [key]: value }));
     expect(loadCreationDraft('bad')).toBeUndefined();

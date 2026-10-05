@@ -4,6 +4,6 @@ export const studioBrand = {
   chineseName: '异趣伙伴',
   displayName: 'OFFKIN｜异趣伙伴',
   headline: 'Your business DNA. Made collectible.',
-  description: 'An independent creative studio for stories you can hold. AI-assisted ideas. Thoughtful physical objects.',
+  description: 'An independent creative studio connecting art, technology and commercial purpose through physical stories. Start small; keep the format open.',
 };
 export const displayStudioName = (name: string) => name === studioBrand.name ? studioBrand.displayName : name;

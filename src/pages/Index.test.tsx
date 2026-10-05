@@ -23,6 +23,10 @@ const evidence = {
   verified: true,
   website: { url: 'https://company.com/', title: 'Company home', excerpt: sourceDetails.join(' ') },
 };
+const electronicCapability = {
+  ready: true, capabilities: { electronic_story_scene: true },
+  prompt_version: 'dioramini-story-led-miniatures-v7',
+};
 const business = 'We personalise online gift orders, then pack and ship them.';
 const hiddenDetail = 'We turn every ribbon twice so the recipient sees the knot first.';
 const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status });
@@ -94,6 +98,17 @@ function answerToReview(wording = '') {
   fireEvent.click(screen.getByRole('button', { name: 'On the base' }));
   fireEvent.click(screen.getByRole('button', { name: 'Review my direction' }));
 }
+function answerElectronicToReview(wording = '') {
+  chooseStory();
+  addHiddenDetail();
+  fireEvent.click(screen.getByRole('button', { name: 'Electronic story scene (concept study)' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Small diorama' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Playful & sculptural' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Customers & fans' }));
+  fireEvent.change(screen.getByLabelText(/Exact wording/), { target: { value: wording } });
+  fireEvent.click(screen.getByRole('button', { name: 'On the base' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Review my direction' }));
+}
 function generate() { fireEvent.click(screen.getByRole('button', { name: 'Generate my concept' })); }
 function storedDirection(overrides: Partial<CreationDraft> = {}): CreationDraft {
   return {
@@ -109,8 +124,11 @@ describe('Editorial creation entry', () => {
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
     expect(screen.getByText('异趣伙伴')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your business DNA. Made collectible.');
-    expect(screen.getByText('Objects from RM100*')).toBeInTheDocument();
-    expect(screen.getByText(/Design and prototyping priced separately/)).toBeInTheDocument();
+    expect(screen.getByText('Exploring RM100–500 budgets*')).toBeInTheDocument();
+    expect(screen.getByText('IN EXPLORATION')).toBeInTheDocument();
+    expect(screen.getByText(/Hardware and software need prototype validation/)).toBeInTheDocument();
+    expect(screen.queryByText(/Muse integration|hardware available|order your AI/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Samples and print quotes will show which specifications fit/)).toBeInTheDocument();
     expect(screen.queryByText(/STIVE|Rimba|AI credits|internal brief|agency/i)).not.toBeInTheDocument();
     await screen.findByRole('link', { name: 'OFFKIN home' });
     expect(fetch).not.toHaveBeenCalled();
@@ -138,7 +156,8 @@ describe('Editorial creation entry', () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText(/You approve the direction before AI creates/)).toBeInTheDocument();
-    expect(screen.getByText(/a physical sample before production/)).toBeInTheDocument();
+    expect(screen.getByText(/reuse bases, connectors and selected mechanisms/)).toHaveTextContent('outsource a few printed samples');
+    expect(screen.getByText(/reuse bases, connectors and selected mechanisms/)).toHaveTextContent('test the experience and cost before production');
     fireEvent.click(toggle);
     expect(screen.queryByRole('heading', { name: 'Make it real' })).not.toBeInTheDocument();
   });
@@ -313,6 +332,322 @@ describe('Four-step customer direction', () => {
   });
 });
 
+describe('Electronic concept-study capability gating', () => {
+  it('offers an explicit exploratory electronic choice without checking or generating before review', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence));
+    vi.stubGlobal('fetch', fetchMock);
+    mount();
+    await start();
+    chooseStory();
+    addHiddenDetail();
+    expect(screen.getByRole('button', { name: 'Mechanical miniature' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Electronic story scene (concept study)' }));
+    expect(screen.getByRole('button', { name: 'Electronic story scene (concept study)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/USB-powered scene with one button, a small display and an LED/)).toHaveTextContent('ESP32-class controller');
+    expect(screen.getByText(/A short, bounded AI story response is optional/)).toBeInTheDocument();
+    expect(screen.getByText(/Hardware, software, content and safety need prototype validation/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Display only' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['an older deployment', { ready: true }, 200],
+    ['a missing electronic capability', { ...electronicCapability, capabilities: {} }, 200],
+    ['a mismatched prompt version', { ...electronicCapability, prompt_version: 'dioramini-story-led-miniatures-v6' }, 200],
+    ['an unready backend', { ...electronicCapability, ready: false }, 200],
+    ['a failed readiness response', electronicCapability, 503],
+  ])('keeps %s in brief-only mode with no paid generation request', async (_description, capability, status) => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockResolvedValueOnce(reply(capability, status));
+    vi.stubGlobal('fetch', fetchMock);
+    mount();
+    await start();
+    answerElectronicToReview('KEEP exactly!');
+    expect(await screen.findByRole('button', { name: 'Save electronic brief' })).toBeEnabled();
+    expect(screen.getByText(/no image will be generated/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate my concept' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toBe('https://test.invalid/functions/v1/generate-concept');
+    expect(fetchMock.mock.calls[1][1].method || 'GET').toBe('GET');
+    expect(fetchMock.mock.calls[1][1].body).toBeUndefined();
+  });
+
+  it('fails closed to a savable brief when the capability network request rejects', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchMock);
+    mount();
+    await start();
+    answerElectronicToReview();
+    expect(await screen.findByRole('button', { name: 'Save electronic brief' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Generate my concept' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('downloads a complete exploratory brief with exact wording and no paid POST', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockResolvedValueOnce(reply({ ready: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    const createObjectURL = vi.fn().mockReturnValue('blob:electronic-brief');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', class extends URL {
+      static createObjectURL = createObjectURL;
+      static revokeObjectURL = revokeObjectURL;
+    });
+    const clicks: HTMLAnchorElement[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { clicks.push(this); });
+    mount();
+    await start();
+    const wording = '  KEEP this™!\nExactly.  ';
+    answerElectronicToReview(wording);
+    fireEvent.click(await screen.findByRole('button', { name: 'Save electronic brief' }));
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const blob: Blob = createObjectURL.mock.calls[0][0];
+    const text = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsText(blob);
+    });
+    expect(blob.type).toBe('text/plain;charset=utf-8');
+    expect(text).toContain(`Business: ${business}`);
+    expect(text).toContain(`Hidden detail: ${hiddenDetail}`);
+    expect(text).toContain('Story lens: The unseen ritual');
+    expect(text).toContain(`Exact wording: ${JSON.stringify(wording)}`);
+    expect(text).toContain('Wording placement: On the base');
+    expect(text).toContain('Not a tested product, quotation or order');
+    expect(text).toContain('ESP32-class controller');
+    expect(text).toContain('No Muse integration is assumed');
+    expect(clicks).toHaveLength(1);
+    expect(clicks[0].download).toBe('offkin-electronic-story-brief.txt');
+    expect(clicks[0].href).toBe('blob:electronic-brief');
+    expect(screen.getByText(/Your electronic story brief is saved/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(localStorage.getItem('dioramini:direction:saved')).toBeNull();
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:electronic-brief'), { timeout: 1500 });
+  });
+
+  it('times out a hanging capability check to brief-only and ignores a late compatible response', async () => {
+    const pending = deferredResponse();
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockReturnValueOnce(pending.promise);
+    vi.stubGlobal('fetch', fetchMock);
+    mount();
+    await start();
+    vi.useFakeTimers();
+    answerElectronicToReview('  Keep after timeout  ');
+    expect(screen.getByRole('button', { name: 'Save electronic brief' })).toBeEnabled();
+    expect(screen.getByText('Checking whether electronic image concepts are available…')).toBeInTheDocument();
+    await act(async () => { vi.advanceTimersByTime(10001); });
+    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(true);
+    expect(screen.getByText(/no image will be generated/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save electronic brief' })).toBeEnabled();
+    await act(async () => { pending.resolve(reply(electronicCapability)); });
+    expect(screen.queryByRole('button', { name: 'Generate my concept' })).not.toBeInTheDocument();
+    expect(screen.getByText(/no image will be generated/)).toBeInTheDocument();
+    const letteringRow = screen.getByRole('button', { name: 'Edit Exact wording' }).parentElement!;
+    expect(letteringRow.querySelector('dd')?.textContent).toBe('  Keep after timeout  ');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('exports a complete max-length electronic brief even when its direction is too long for paid generation', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockResolvedValueOnce(reply(electronicCapability));
+    vi.stubGlobal('fetch', fetchMock);
+    const createObjectURL = vi.fn().mockReturnValue('blob:long-electronic-brief');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', class extends URL {
+      static createObjectURL = createObjectURL;
+      static revokeObjectURL = revokeObjectURL;
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    mount();
+    await start();
+    const longBusiness = 'B'.repeat(100);
+    const longDetail = 'D'.repeat(120);
+    const wording = `  ${'X'.repeat(94)}\n!  `;
+    fireEvent.change(screen.getByLabelText('In one line, what does the business do?'), { target: { value: longBusiness } });
+    fireEvent.click(screen.getByRole('radio', { name: /The unseen ritual/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.change(screen.getByLabelText('The detail only you know'), { target: { value: longDetail } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Electronic story scene (concept study)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Miniature workstation' }));
+    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'A'.repeat(40) } });
+    fireEvent.change(screen.getByLabelText(/Exact wording/), { target: { value: wording } });
+    fireEvent.click(screen.getByRole('button', { name: 'Review my direction' }));
+    expect(await screen.findByRole('button', { name: 'Generate my concept' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save electronic brief' })).toBeEnabled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    generate();
+    expect(screen.getByText(/Please shorten the business description or hidden detail/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Save electronic brief' }));
+    expect(click).toHaveBeenCalledTimes(1);
+    const blob: Blob = createObjectURL.mock.calls[0][0];
+    const text = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsText(blob);
+    });
+    expect(text).toContain(`Business: ${longBusiness}`);
+    expect(text).toContain(`Hidden detail: ${longDetail}`);
+    expect(text).toContain(`Exact wording: ${JSON.stringify(wording)}`);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:long-electronic-brief'), { timeout: 1500 });
+  });
+
+  it('waits for compatibility and an explicit click before one electronic inside/miniature generation', async () => {
+    const pending = deferredResponse();
+    const electronicConcept = { ...concept, edition: 'inside' };
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce(reply({ concept: electronicConcept }));
+    vi.stubGlobal('fetch', fetchMock);
+    mount();
+    await start();
+    const wording = '  This stays!\nEXACT  ';
+    answerElectronicToReview(wording);
+    expect(screen.getByText('Checking whether electronic image concepts are available…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save electronic brief' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Generate my concept' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await act(async () => { pending.resolve(reply(electronicCapability)); });
+    const generateButton = screen.getByRole('button', { name: 'Generate my concept' });
+    expect(generateButton).toBeEnabled();
+    expect(screen.getByText(/unvalidated visual proposal, not working hardware/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fireEvent.click(generateButton);
+    fireEvent.click(generateButton);
+    await screen.findByRole('heading', { name: concept.title });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const payload = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(payload).toMatchObject({ brand: 'https://company.com', edition: 'inside', format: 'miniature', summaryOnly: false });
+    expect(JSON.parse(payload.context)).toMatchObject({ mode: 'electronic', exactWording: wording, hiddenDetail, business });
+    expect(JSON.parse(localStorage.getItem('dioramini:direction:saved')!)).toMatchObject({ mode: 'electronic', wording, hiddenDetail });
+    fireEvent.click(screen.getByRole('button', { name: 'Refine this direction' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByRole('button', { name: 'Electronic story scene (concept study)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText(/Exact wording/)).toHaveValue(wording);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('aborts a pending check on Back, preserves answers and cannot apply its result to a newer check', async () => {
+    const stale = deferredResponse();
+    const current = deferredResponse();
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockReturnValueOnce(stale.promise).mockReturnValueOnce(current.promise);
+    vi.stubGlobal('fetch', fetchMock);
+    mount();
+    await start();
+    answerElectronicToReview('  Still here!  ');
+    fireEvent.click(screen.getByRole('button', { name: '← Back' }));
+    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(true);
+    expect(screen.getByLabelText(/Exact wording/)).toHaveValue('  Still here!  ');
+    expect(screen.getByRole('button', { name: 'Electronic story scene (concept study)' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Review my direction' }));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    await act(async () => { stale.resolve(reply(electronicCapability)); });
+    expect(screen.getByText('Checking whether electronic image concepts are available…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save electronic brief' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Generate my concept' })).not.toBeInTheDocument();
+    await act(async () => { current.resolve(reply({ ready: true })); });
+    expect(screen.getByRole('button', { name: 'Save electronic brief' })).toBeEnabled();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps the mechanical flow unchanged after switching modes and ignores a late capability result', async () => {
+    const stale = deferredResponse();
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockReturnValueOnce(stale.promise).mockResolvedValueOnce(reply({ concept }));
+    vi.stubGlobal('fetch', fetchMock);
+    mount();
+    await start();
+    answerElectronicToReview('Retain my words');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Direction' }));
+    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Mechanical miniature' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Display only' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review my direction' }));
+    await act(async () => { stale.resolve(reply(electronicCapability)); });
+    expect(screen.getByRole('button', { name: 'Generate my concept' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Save electronic brief' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    generate();
+    await screen.findByRole('heading', { name: concept.title });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const payload = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(payload).toMatchObject({ edition: 'icon', format: 'miniature' });
+    expect(JSON.parse(payload.context)).not.toHaveProperty('mode');
+    expect(JSON.parse(payload.context).exactWording).toBe('Retain my words');
+  });
+
+  it('cancels and retries supported electronic generation without rechecking or losing its exact direction', async () => {
+    const stale = deferredResponse();
+    const electronicConcept = { ...concept, edition: 'inside' };
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockResolvedValueOnce(reply(electronicCapability))
+      .mockReturnValueOnce(stale.promise).mockResolvedValueOnce(reply({ concept: electronicConcept }));
+    vi.stubGlobal('fetch', fetchMock);
+    mountBrowser();
+    await start();
+    answerElectronicToReview('  Retry EXACT!  ');
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate my concept' }));
+    expect(screen.getByRole('button', { name: 'Creating your concept' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Stop waiting' }));
+    expect(fetchMock.mock.calls[2][1].signal.aborted).toBe(true);
+    expect(screen.getByText(/Your answers are still here/)).toBeInTheDocument();
+    expect(screen.getByText(hiddenDetail)).toBeInTheDocument();
+    generate();
+    await screen.findByRole('heading', { name: concept.title });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock.mock.calls[3][1].body).toBe(fetchMock.mock.calls[2][1].body);
+    expect(JSON.parse(JSON.parse(fetchMock.mock.calls[3][1].body).context)).toMatchObject({
+      mode: 'electronic', exactWording: '  Retry EXACT!  ', interaction: 'One button, display and LED',
+    });
+    await act(async () => { stale.resolve(reply({ concept: { ...electronicConcept, id: 'late', title: 'Late electronic result' } })); });
+    expect(screen.queryByRole('heading', { name: 'Late electronic result' })).not.toBeInTheDocument();
+    expect(window.location.search).toBe('?concept=saved');
+    expect(localStorage.getItem('dioramini:direction:late')).toBeNull();
+  });
+
+  it('restores electronic answers after reload but checks current capability again before any new generation', async () => {
+    const direction = storedDirection({ mode: 'electronic' });
+    localStorage.setItem('dioramini:direction:saved', JSON.stringify(direction));
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply({ concept: { ...concept, edition: 'inside' } }))
+      .mockResolvedValueOnce(reply({ ready: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    mount('/?concept=saved');
+    await screen.findByRole('heading', { name: concept.title });
+    fireEvent.click(screen.getByRole('button', { name: 'Refine this direction' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByLabelText('The detail only you know')).toHaveValue(direction.hiddenDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(screen.getByRole('button', { name: 'Electronic story scene (concept study)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText(/Exact wording/)).toHaveValue(direction.wording);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Review my direction' }));
+    await screen.findByText(/no image will be generated/);
+    expect(screen.getByRole('button', { name: 'Save electronic brief' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Generate my concept' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].method || 'GET').toBe('GET');
+  });
+
+  it('aborts a pending capability check on browser navigation and ignores its late success', async () => {
+    const stale = deferredResponse();
+    const otherConcept = { ...concept, id: 'newer', title: 'The Newer Direction' };
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(evidence)).mockReturnValueOnce(stale.promise)
+      .mockResolvedValueOnce(reply({ concept: otherConcept }));
+    vi.stubGlobal('fetch', fetchMock);
+    mountBrowser();
+    await start();
+    answerElectronicToReview();
+    fireEvent.click(screen.getByRole('link', { name: 'Another concept' }));
+    await screen.findByRole('heading', { name: otherConcept.title });
+    expect(fetchMock.mock.calls[1][1].signal.aborted).toBe(true);
+    await act(async () => { stale.resolve(reply(electronicCapability)); });
+    expect(screen.getByRole('heading', { name: otherConcept.title })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate my concept' })).not.toBeInTheDocument();
+    expect(window.location.search).toBe('?concept=newer');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ id: 'newer' });
+  });
+});
+
 describe('Interrupted requests and browser navigation', () => {
   it('blocks duplicate generation, cancels the active request and keeps the complete direction for retry', async () => {
     const pending = deferredResponse();
@@ -476,7 +811,7 @@ describe('Reloading and refining saved concepts', () => {
   });
 
   it('loads a legacy saved direction without losing its wording and asks for the new story details', async () => {
-    const { angle: _angle, hiddenDetail: _hiddenDetail, ...legacy } = storedDirection();
+    const { angle: _angle, hiddenDetail: _hiddenDetail, mode: _mode, ...legacy } = storedDirection();
     localStorage.setItem('dioramini:direction:saved', JSON.stringify(legacy));
     const fetchMock = vi.fn().mockResolvedValue(reply({ concept }));
     vi.stubGlobal('fetch', fetchMock);
@@ -490,6 +825,7 @@ describe('Reloading and refining saved concepts', () => {
     expect(screen.getByLabelText('The detail only you know')).toHaveValue('');
     addHiddenDetail();
     expect(screen.getByLabelText(/Exact wording/)).toHaveValue(legacy.wording);
+    expect(screen.getByRole('button', { name: 'Mechanical miniature' })).toHaveAttribute('aria-pressed', 'true');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
