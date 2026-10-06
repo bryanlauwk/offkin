@@ -67,10 +67,12 @@ describe('Canvas privacy defaults and authored references', () => {
   it('shows actual source art, real selected elements and only a bodyless readiness read', async () => {
     const { posts, readiness, fetchMock } = installFetch(); mount();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Generate my brand world' })).toBeEnabled());
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your business DNA.Made collectible.');
-    expect(screen.getByRole('img', { name: 'Airbnb original rich illustrated brand world' })).toHaveAttribute('src', worldReferences[0].worldImage);
-    expect(screen.getByText(`${worldReferences[0].elements.length} selected`)).toBeInTheDocument();
-    expect(screen.getByText('Private until you share')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Your business DNA. Made collectible.');
+    const examples=screen.getByRole('region',{name:'Example concept boards'});
+    expect(examples.querySelector('img')).toHaveAttribute('src',worldReferences[0].boardImage);
+    expect(screen.getByText('Private on this device until you choose to generate or share')).toBeInTheDocument();
+    expect(document.querySelector('.oc-edit-details')).not.toHaveAttribute('open');
+    expect(screen.queryByRole('region',{name:'Brand world canvas'})).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Generate physical concept' })).toBeDisabled();
     expect(localStorage.getItem(CANVAS_SESSION_KEY)).toBeNull(); expect(posts).not.toHaveBeenCalled(); expect(readiness).toHaveBeenCalledOnce();
     expect(fetchMock.mock.calls[0][1]).not.toHaveProperty('body'); expect(fetchMock.mock.calls[0][1].method).not.toBe('POST');
@@ -84,19 +86,20 @@ describe('Canvas privacy defaults and authored references', () => {
     expect(document.title).toContain('Studio by OFFKIN');
   });
 
-  it('keeps reference selection, hero changes, replacements and notes local', async () => {
+  it('opens examples without changing the draft, and keeps advanced element edits local', async () => {
     const { posts } = installFetch(); mount();
     fireEvent.click(screen.getByRole('button', { name: /Tesla/ }));
-    const reference = worldReferences.find(world => world.id === 'tesla')!;
+    expect(screen.getByRole('img', { name:'Tesla, complete original concept board' })).toHaveAttribute('src',worldReferences[2].boardImage);
+    expect(localStorage.getItem(CANVAS_SESSION_KEY)).toBeNull();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Close'}));
+    const reference=worldReferences[0];
     fireEvent.click(element(reference.elements[1].label));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Make main character' }));
     fireEvent.change(screen.getByLabelText('OR REPLACE WITH ANOTHER IDEA'), { target: { value: 'Neighbourhood observatory' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply element replacement' }));
-    fireEvent.change(screen.getByLabelText('Tell the next image where to go.'), { target: { value: 'Keep the bright path' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save direction note' }));
+    fireEvent.change(screen.getByLabelText('DIRECTION NOTES'), { target: { value: 'Keep the bright path' } });
     const saved = JSON.parse(localStorage.getItem(CANVAS_SESSION_KEY)!);
-    expect(saved.referenceId).toBe('tesla'); expect(saved.hero).toBe(reference.elements[1].id);
+    expect(saved.referenceId).toBe('airbnb'); expect(saved.hero).toBe(reference.elements[1].id);
     expect(saved.replacements[0].label).toBe('Neighbourhood observatory'); expect(saved.brief.notes).toBe('Keep the bright path');
     expect(posts).not.toHaveBeenCalled();
   });
@@ -146,7 +149,7 @@ describe('Explicit two-stage generation and linked element decisions', () => {
     expect(screen.getByText(/Tell us a little about the business/)).toBeInTheDocument(); expect(posts).not.toHaveBeenCalled();
     await generateWorld();
     for (const item of sourceElements) { fireEvent.click(element(item.label)); fireEvent.click(screen.getByRole('button', { name: 'Included · remove' })); }
-    expect(screen.getByText('0 selected')).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Generate physical concept' })).toBeDisabled(); expect(posts).toHaveBeenCalledOnce();
+    expect(screen.getByText(/^0 selected/)).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Generate physical concept' })).toBeDisabled(); expect(posts).toHaveBeenCalledOnce();
   });
 
   it('allows physical interaction and direction edits while correctly marking an existing preview stale', async () => {
@@ -159,7 +162,7 @@ describe('Explicit two-stage generation and linked element decisions', () => {
     fireEvent.change(screen.getByLabelText('Tell the next image where to go.'), { target: { value: 'Make the garden stranger' } }); fireEvent.click(screen.getByRole('button', { name: 'Save direction note' }));
     expect(screen.getByRole('button', { name: 'Regenerate physical concept' })).toBeEnabled(); expect(posts).toHaveBeenCalledTimes(2);
     fireEvent.change(screen.getByLabelText('WHAT SHOULD WE KNOW?'), { target: { value: 'Now we make wooden toys.' } });
-    expect(screen.getByText(/Your story has changed/)).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Regenerate physical concept' })).toBeDisabled(); expect(posts).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/Your story has changed/)).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Regenerate physical concept' })).not.toBeInTheDocument(); expect(screen.getByRole('button', {name:'Regenerate brand world'})).toBeEnabled(); expect(posts).toHaveBeenCalledTimes(2);
   });
 
   it('rechecks readiness at the explicit generation boundary without leaking a brief to a stale backend', async () => {
@@ -274,7 +277,7 @@ describe('Local resume, reviewed sharing and separate imported versions', () => 
     const { posts } = installFetch(); mountBrowser('/' + encodeCanvasShare(incoming, { sharedWorld }));
     fireEvent.click(screen.getByRole('button', { name: 'Create my own version' }));
     expect(screen.getByRole('heading', { name: 'Detached paper town' })).toBeInTheDocument(); expect(element('Paper fold')).toBeEnabled();
-    expect(screen.queryByRole('img', { name: /Airbnb/ })).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Generate physical concept' })).toBeDisabled(); expect(posts).not.toHaveBeenCalled();
+    expect(screen.queryByRole('img', { name: /Airbnb/ })).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Generate physical concept' })).not.toBeInTheDocument(); expect(posts).not.toHaveBeenCalled();
     expect(JSON.parse(localStorage.getItem(CANVAS_SESSION_KEY)!).sharedWorld).toEqual(sharedWorld);
   });
 
@@ -425,37 +428,134 @@ describe('Restore lifecycle regressions', () => {
     const { posts } = installFetch(vi.fn(async () => reply({ concept: worldFor({ context: canvasContext(incoming.brief) }, { sourceUrl: 'https://original-company.example' }) })));
     mountBrowser('/' + encodeCanvasShare(incoming, { includeGenerated: true })); fireEvent.click(screen.getByRole('button', { name: 'Create my own version' }));
     await screen.findByRole('heading', { name: 'A town made of paper' });
-    expect(screen.getByText(/Your story has changed/)).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Generate physical concept' })).toBeDisabled(); expect(posted(posts)).toEqual({ id: worldId });
+    expect(screen.getByText(/Your story has changed/)).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Generate physical concept' })).not.toBeInTheDocument(); expect(screen.getByRole('button', {name:'Regenerate brand world'})).toBeEnabled(); expect(posted(posts)).toEqual({ id: worldId });
   });
 });
 
-describe('Responsive sheet accessibility', () => {
-  it('mounts one uniquely labelled story form on a narrow viewport and keeps its answers after closing', async () => {
+describe('Responsive conversation accessibility', () => {
+  it('has one composer and one optional details form on a narrow viewport, retaining answers after closing', async () => {
     vi.stubGlobal('innerWidth',390); const {posts}=installFetch(); mount();
-    expect(screen.queryByLabelText('WHAT SHOULD WE KNOW?')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:'Your story'}));
-    let dialog=screen.getByRole('dialog',{name:'Your business story'});
-    const field=within(dialog).getByLabelText('WHAT SHOULD WE KNOW?');
+    expect(document.querySelectorAll('#conversation-entry')).toHaveLength(1);
+    const details=document.querySelector('.oc-edit-details') as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    fireEvent.click(screen.getByText('Edit details'));
+    const field=screen.getByLabelText('WHAT SHOULD WE KNOW?');
     expect(document.querySelectorAll('#canvas-business')).toHaveLength(1);
     fireEvent.change(field,{target:{value:business}});
-    fireEvent.click(within(dialog).getByRole('button',{name:'Close'}));
-    expect(screen.queryByLabelText('WHAT SHOULD WE KNOW?')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button',{name:'Your story'}));
-    dialog=screen.getByRole('dialog',{name:'Your business story'});
-    expect(within(dialog).getByLabelText('WHAT SHOULD WE KNOW?')).toHaveValue(business);
+    fireEvent.click(screen.getByText('Edit details'));
+    fireEvent.click(screen.getByText('Edit details'));
+    expect(screen.getByLabelText('WHAT SHOULD WE KNOW?')).toHaveValue(business);
     expect(document.querySelectorAll('#canvas-business')).toHaveLength(1);
     expect(posts).not.toHaveBeenCalled();
   });
-  it('mounts one element editor on narrow screens and closes the sheet cleanly on desktop resize', async () => {
+  it('keeps one element editor and preserved fields across a narrow-to-wide resize', async () => {
     vi.stubGlobal('innerWidth',390); installFetch(); mount();
+    fireEvent.click(screen.getByText('Edit details'));
     fireEvent.click(element('Bélo landmark'));
-    const dialog=screen.getByRole('dialog',{name:'Shape the story elements'});
-    expect(within(dialog).getByLabelText('OR REPLACE WITH ANOTHER IDEA')).toBeInTheDocument();
+    expect(screen.getByLabelText('OR REPLACE WITH ANOTHER IDEA')).toBeInTheDocument();
     expect(document.querySelectorAll('#replace-element')).toHaveLength(1);
     vi.stubGlobal('innerWidth',1280); fireEvent(window,new Event('resize'));
-    await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(document.querySelectorAll('#replace-element')).toHaveLength(1);
     expect(document.querySelectorAll('#canvas-business')).toHaveLength(1);
-    expect(screen.getByLabelText('WHAT SHOULD WE KNOW?')).toBeInTheDocument();
+  });
+});
+
+describe('Simple guided conversation', () => {
+  async function introduce(value=business){
+    fireEvent.change(screen.getByLabelText('Your brand, website or story'),{target:{value}});
+    fireEvent.click(screen.getByRole('button',{name:'Continue conversation'}));
+  }
+  it('reaches both real output stages through the composer without opening details', async () => {
+    const {posts}=installFetch(); mount();
+    await introduce();
+    expect(screen.getByText('Who would you like to make this for?')).toBeInTheDocument();
+    expect(posts).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button',{name:'Our team'}));
+    expect(screen.queryByLabelText('Your audience')).not.toBeInTheDocument();
+    await clickWorld(); await screen.findByRole('heading',{name:'A town made of paper'});
+    expect(posted(posts).context).toMatchObject({business,audience:'Our team'});
+    expect(document.querySelector('.oc-edit-details')).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByRole('button',{name:'Generate physical concept'}));
+    await screen.findByRole('heading',{name:'Paper town, made tangible'});
+    expect(posts).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('region',{name:'Refine your concept'})).toBeInTheDocument();
+    expect(screen.queryByRole('img',{name:/Airbnb/})).not.toBeInTheDocument();
+  });
+  it('accepts a URL locally, asks one business question and never reads it while typing or continuing', async () => {
+    const {posts}=installFetch(); mount(); await introduce('paper.example');
+    expect(screen.getByText('What makes this brand special?')).toBeInTheDocument();
+    expect(screen.getByLabelText(/YOUR WEBSITE/)).toHaveValue('https://paper.example');
+    expect(posts).not.toHaveBeenCalled();
+    await introduce('我们为社区做纸艺礼物 🪁');
+    fireEvent.click(screen.getByRole('button',{name:'You choose'}));
+    await clickWorld(); await screen.findByRole('heading',{name:'A town made of paper'});
+    expect(posted(posts)).toMatchObject({brand:'https://paper.example',context:{business:'我们为社区做纸艺礼物 🪁'}});
+    expect(posts).toHaveBeenCalledOnce();
+  });
+  it('preserves free-form audience text and ignores Enter during IME composition', async () => {
+    const {posts}=installFetch(); mount();
+    const entry=screen.getByLabelText('Your brand, website or story');
+    fireEvent.change(entry,{target:{value:'礼物'}}); fireEvent.keyDown(entry,{key:'Enter',isComposing:true});
+    expect(screen.queryByText('Who would you like to make this for?')).not.toBeInTheDocument();
+    fireEvent.keyDown(entry,{key:'Enter'});
+    const audience='  合作伙伴 / Kuala Lumpur ☀️  ';
+    fireEvent.change(screen.getByLabelText('Your audience'),{target:{value:audience}});
+    fireEvent.click(screen.getByRole('button',{name:'Continue conversation'}));
+    expect(JSON.parse(localStorage.getItem(CANVAS_SESSION_KEY)!).brief.audience).toBe(audience);
+    expect(posts).not.toHaveBeenCalled();
+  });
+  it('includes an unsent refinement when the user explicitly generates and keeps earlier turns', async () => {
+    const {posts}=installFetch(); mount(); await generateWorld();
+    fireEvent.change(screen.getByLabelText('Tell the next image where to go.'),{target:{value:'Keep the yellow road'}});
+    fireEvent.click(screen.getByRole('button',{name:'Save direction note'}));
+    fireEvent.change(screen.getByLabelText('Tell the next image where to go.'),{target:{value:'  加一间咖啡馆 ☀️  '}});
+    expect(posts).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button',{name:'Generate physical concept'}));
+    await screen.findByRole('heading',{name:'Paper town, made tangible'});
+    expect(posted(posts,1).context.revisionNotes).toBe('Keep the yellow road\n  加一间咖啡馆 ☀️  ');
+    expect(screen.getByLabelText('Tell the next image where to go.')).toHaveValue('');
+    expect(JSON.parse(localStorage.getItem(CANVAS_SESSION_KEY)!).brief.notes).toBe('Keep the yellow road\n  加一间咖啡馆 ☀️  ');
+  });
+  it('does not silently truncate a full direction or start a generation', async () => {
+    const {posts}=installFetch(); mount(); await generateWorld();
+    fireEvent.change(screen.getByLabelText('DIRECTION NOTES'),{target:{value:'x'.repeat(999)}});
+    fireEvent.change(screen.getByLabelText('Tell the next image where to go.'),{target:{value:'More gardens'}});
+    fireEvent.click(screen.getByRole('button',{name:'Generate physical concept'}));
+    expect(screen.getByRole('status')).toHaveTextContent('This direction is full');
+    expect(screen.getByLabelText('Tell the next image where to go.')).toHaveValue('More gardens');
+    expect(posts).toHaveBeenCalledOnce();
+  });
+});
+
+
+describe('Conversation draft boundaries', () => {
+  it('preserves the pending refinement during same-version image refresh', async () => {
+    const {posts}=installFetch(); mount(); await generateWorld();
+    fireEvent.change(screen.getByLabelText('Tell the next image where to go.'),{target:{value:'Keep this unsent direction'}});
+    fireEvent.error(screen.getByRole('img',{name:/illustrated brand world/}));
+    fireEvent.click(screen.getByRole('button',{name:'Restore images again'}));
+    await waitFor(()=>expect(posts).toHaveBeenCalledTimes(2));
+    await waitFor(()=>expect(screen.getByRole('button',{name:'Generate physical concept'})).toBeEnabled());
+    expect(screen.getByLabelText('Tell the next image where to go.')).toHaveValue('Keep this unsent direction');
+    expect(posted(posts,1)).toEqual({id:worldId});
+  });
+  it('opens and focuses element controls directly from the board', async () => {
+    vi.stubGlobal('innerWidth',390); installFetch(); mount(); await generateWorld();
+    fireEvent.click(screen.getByRole('button',{name:'Refine elements'}));
+    await waitFor(()=>expect(screen.getByRole('region',{name:'Concept details'})).toHaveFocus());
+    expect(document.querySelector('.oc-edit-details')).toHaveAttribute('open');
+    expect(document.querySelectorAll('#canvas-business')).toHaveLength(1);
+  });
+  it('does not carry an unsent refinement into an imported branch', async () => {
+    const incoming=savedDirection(); incoming.brief.business='A different business';
+    const {posts}=installFetch(); mountBrowser(); await generateWorld();
+    fireEvent.change(screen.getByLabelText('Tell the next image where to go.'),{target:{value:'Private idea from the first draft'}});
+    await act(async()=>{window.history.pushState({},'', '/'+encodeCanvasShare(incoming));window.dispatchEvent(new PopStateEvent('popstate'));});
+    fireEvent.click(screen.getByRole('button',{name:'Create my own version'}));
+    await waitFor(()=>expect(screen.getByLabelText('WHAT SHOULD WE KNOW?')).toHaveValue('A different business'));
+    await clickWorld(); await waitFor(()=>expect(posts).toHaveBeenCalledTimes(2));
+    expect(posted(posts,1).context.business).toBe('A different business');
+    expect(posted(posts,1).context.revisionNotes).not.toContain('Private idea from the first draft');
   });
 });
