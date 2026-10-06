@@ -88,6 +88,14 @@ async function pair() {
 const supplement = (stage: 'details' | 'packaging', world: ProposalConcept, physical: ProposalConcept): ProposalRequest => ({ ...worldRequest, stage, sourceWorldId: world.id, sourcePhysicalId: physical.id });
 const planRequest = (world: ProposalConcept, physical: ProposalConcept): RevisionPlanRequest => ({ contractVersion: PROPOSAL_CONTRACT_VERSION, action: 'plan-revision', instruction: 'Make the packaging dark blue. Keep the object.', brand: 'no-website', context: worldRequest.context, sourceWorldId: world.id, sourcePhysicalId: physical.id });
 const imageCalls = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/images/'));
+function multipartBody(value: unknown): FormData {
+  expect(value).toBeInstanceOf(FormData);
+  return value as FormData;
+}
+function modelPayloadText(value: unknown): string {
+  return value instanceof FormData ? JSON.stringify(Array.from(value.entries()).map(([key, part]) =>
+    [key, typeof part === 'string' ? part : { name: part.name, type: part.type, size: part.size }])) : String(value);
+}
 
 describe('complete proposal backend with mocked providers only', () => {
   it('advertises the separate capability only with explicit enablement, keeping v9 intact', async () => {
@@ -111,12 +119,21 @@ describe('complete proposal backend with mocked providers only', () => {
     const calls = imageCalls();
     expect(calls.map(([url]) => String(url).split('/').at(-1))).toEqual(['generations', 'edits', 'edits', 'edits']);
     expect(JSON.parse(String(calls[0][1]?.body))).not.toHaveProperty('images');
+    expect(new Headers(calls[0][1]?.headers).get('content-type')).toBe('application/json');
     for (const [i, count] of [[1, 1], [2, 1], [3, 2]]) {
-      const body = JSON.parse(String(calls[i][1]?.body));
-      expect(body).toMatchObject({ model: 'openai/gpt-image-2', n: 1, size: '1536x1024', quality: 'medium' });
-      expect(body.images).toEqual(Array.from({ length: count }, () => ({ image_url: `data:image/png;base64,${png}` })));
-      expect(body).not.toHaveProperty('input_fidelity');
-      expect(body.prompt).toContain(JSON.stringify(worldRequest.context.exactWording).slice(1, -1));
+      const body = multipartBody(calls[i][1]?.body);
+      expect(body.get('model')).toBe('openai/gpt-image-2'); expect(body.get('n')).toBe('1');
+      expect(body.get('size')).toBe('1536x1024'); expect(body.get('quality')).toBe('medium');
+      expect(body.has('input_fidelity')).toBe(false); expect(body.has('images')).toBe(false);
+      expect(new Headers(calls[i][1]?.headers).has('content-type')).toBe(false);
+      const parts = body.getAll('image[]'); expect(parts).toHaveLength(count);
+      for (const [index, part] of parts.entries()) {
+        expect(part).toBeInstanceOf(Blob);
+        const file = part as File;
+        expect(file.name).toBe(`reference-${index + 1}.png`); expect(file.type).toBe('image/png');
+        expect(Buffer.from(await file.arrayBuffer()).toString('base64')).toBe(png);
+      }
+      expect(body.get('prompt')).toContain(JSON.stringify(worldRequest.context.exactWording).slice(1, -1));
     }
     expect(state.download).toHaveBeenCalledWith('brick-concepts', expect.stringMatching(/\.png$/));
     for (const row of state.rows) expect(parseProposalManifest(String(row.story))?.stageVersion).toBe(PROPOSAL_STAGE_VERSION);
@@ -131,7 +148,7 @@ describe('complete proposal backend with mocked providers only', () => {
     expect(privateManifest.previousAssetId).toBe(packaging.id);
     expect(privateManifest.sourceImageIds).toEqual([packaging.id, physical.id, world.id]);
     expect(updated.sourcePhysicalId).toBe(physical.id); expect(updated.sourceWorldId).toBe(world.id);
-    expect(JSON.parse(String(imageCalls().at(-1)![1]?.body)).images).toHaveLength(3);
+    expect(multipartBody(imageCalls().at(-1)![1]?.body).getAll('image[]')).toHaveLength(3);
     const revisedWorld = await generate({ ...worldRequest, previousAssetId: world.id, context: { ...worldRequest.context, style: 'Bold expressive ink' } });
     expect(revisedWorld.sourceImageIds).toEqual([]);
     expect(revisedWorld).not.toHaveProperty('previousAssetId');
@@ -173,7 +190,7 @@ describe('complete proposal backend with mocked providers only', () => {
     const planned = await post({ ...planRequest(world, physical), context: third.context, packagingId: third.id });
     expect(planned.status).toBe(200);
     for (const [, init] of vi.mocked(fetch).mock.calls) {
-      const body = String(init?.body);
+      const body = modelPayloadText(init?.body);
       expect(body).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
       expect(body).not.toContain('previousAssetId'); expect(body).not.toContain('sourceImageIds');
     }
@@ -219,7 +236,29 @@ describe('complete proposal backend with mocked providers only', () => {
     state.blobs.set(String(row.image_path), Uint8Array.from([...Buffer.from(png, 'base64'), 10]));
     const second = await generate(supplement('details', world, physical));
     expect(second.id).not.toBe(first.id);
-    expect(JSON.parse(String(imageCalls().at(-1)![1]?.body)).images[0].image_url).not.toBe(`data:image/png;base64,${png}`);
+    const part = multipartBody(imageCalls().at(-1)![1]?.body).get('image[]') as File;
+    expect(Buffer.from(await part.arrayBuffer()).toString('base64')).not.toBe(png);
+  });
+  it('serializes repeated image[] parts in actual reference order with runtime-owned boundaries', async () => {
+    const { world, physical } = await pair();
+    const packaging = await generate(supplement('packaging', world, physical));
+    const order = [packaging.id, physical.id, world.id];
+    const expected = order.map((id, index) => {
+      const bytes = Uint8Array.from([...Buffer.from(png, 'base64'), index + 1]);
+      state.blobs.set(String(state.rows.find(row => row.id === id)!.image_path), bytes);
+      return Buffer.from(bytes).toString('base64');
+    });
+    await generate({ ...supplement('packaging', world, physical), previousAssetId: packaging.id, context: { ...worldRequest.context, revisionNotes: 'Blue packaging only' } });
+    const [, init] = imageCalls().at(-1)!;
+    expect(new Headers(init?.headers).has('content-type')).toBe(false);
+    const wire = new Request('https://gateway.invalid/images/edits', { method: 'POST', headers: init?.headers, body: multipartBody(init?.body) });
+    expect(wire.headers.get('content-type')).toMatch(/^multipart\/form-data; boundary=.+/);
+    const parsed = await wire.formData();
+    expect(parsed.get('model')).toBe('openai/gpt-image-2');
+    const files = parsed.getAll('image[]') as File[];
+    expect(await Promise.all(files.map(async file => Buffer.from(await file.arrayBuffer()).toString('base64')))).toEqual(expected);
+    expect(files.map(file => file.name)).toEqual(['reference-1.png', 'reference-2.png', 'reference-3.png']);
+    expect(modelPayloadText(parsed)).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   });
   it('restores all roles with generation disabled and no paid calls', async () => {
     const { world, physical } = await pair(); const details = await generate(supplement('details', world, physical));

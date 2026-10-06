@@ -35,9 +35,9 @@ The existing private bucket, RLS, admin/auth controls, pinned URL reader and own
 
 ## Gateway verification gate
 
-World generation uses `images/generations`. Reference-conditioned assets use `images/edits` with an ordered JSON `images` list containing data URLs built from validated saved private storage bytes. The server never accepts arbitrary image URLs or falls back to text-only generation after an edit failure.
+World generation uses JSON `images/generations`. Reference-conditioned assets use `images/edits` with multipart `FormData`: string fields `model`, `prompt`, `n`, `size` and `quality`, plus ordered, repeated `image[]` file parts built from validated saved private storage bytes. Fetch supplies the multipart boundary; the application never sets a multipart `Content-Type` header manually. File names contain only reference positions, not capability UUIDs. The server never accepts arbitrary image URLs or falls back to text-only generation after an edit failure. Edit cache identity uses `openai-multipart-edits-v2`.
 
-Upstream OpenAI documents this JSON edit request. Lovable documents GPT Image 2 image editing but does not publicly document the exact gateway edit wire format. Consequently, the route remains an explicit live integration gate. `BRICK_PROPOSAL_ENABLED` must only be enabled as part of the authorized deployment and bounded verification after the configured gateway route is established. A readiness GET is not visual or end-to-end acceptance.
+The authorized gateway probe rejected JSON edits with HTTP 400 requiring multipart form data and a model field; it produced no image. The multipart file-field name follows the [official OpenAI Images Edit HTTP example](https://developers.openai.com/api/reference/resources/images/methods/edit). Multipart success and visual fidelity still require the next authorized live integration check. `BRICK_PROPOSAL_ENABLED` stays off until the configured gateway route is established. A readiness GET is not visual or end-to-end acceptance.
 
 ## Release checks
 

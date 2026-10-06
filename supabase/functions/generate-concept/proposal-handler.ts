@@ -180,7 +180,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   const sources = new Map([world, physical, previous].filter((s): s is Source => Boolean(s)).map(s => [s.row.id, s]));
   const boundary = modelBoundary([world, physical, previous], { brand: generation.brand, context: generation.context });
   // Download only paths held in validated rows from the project-managed private bucket.
-  const images: { image_url: string }[] = [];
+  const images: Blob[] = [];
   const imageIdentities: { id: string; contentHash: string; path: string }[] = [];
   for (const id of sourceImageIds) {
     active();
@@ -188,11 +188,12 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     const { data: blob, error } = await db.storage.from('brick-concepts').download(source.row.image_path);
     if (error || !blob) throw new CanvasFailure(503, 'The saved reference image is temporarily unavailable. No image generation was started.');
     if (blob.size > MAX_IMAGE_BYTES || blob.size < 12) throw new CanvasFailure(400, 'The saved reference image is unsupported or too large.');
-    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const buffer = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
     const mime = imageMime(bytes);
     if (!mime || bytes.length > MAX_IMAGE_BYTES) throw new CanvasFailure(400, 'The saved reference image is unsupported or too large.');
     const encoded = base64(bytes);
-    images.push({ image_url: `data:${mime};base64,${encoded}` });
+    images.push(new Blob([buffer], { type: mime }));
     imageIdentities.push({ id, path: source.row.image_path, contentHash: await runtime.hash(encoded) });
   }
   let websiteUrl = world?.row.source_url || '';
@@ -203,7 +204,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   if (generation.stage === 'world' && !websiteUrl && !generation.context.business?.trim()) return respond({ needsContext: true, message: 'Tell us what the business does so this proposal starts with real facts.' });
   const cacheKey = await runtime.hash(canonicalProposal({ contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION,
     request: generation, websiteUrl, sourceManifests: Array.from(sources.values()).map(s => ({ id: s.row.id, manifest: s.manifest })),
-    imageIdentities, model: runtime.imageModel, textModel: runtime.textModel, size: '1536x1024', quality: 'medium', transport: images.length ? 'openai-json-edits-v1' : 'openai-generations-v1' }));
+    imageIdentities, model: runtime.imageModel, textModel: runtime.textModel, size: '1536x1024', quality: 'medium', transport: images.length ? 'openai-multipart-edits-v2' : 'openai-generations-v1' }));
   const { data: cached, error: cacheError } = await db.from('brick_concepts').select(columns).eq('cache_key', cacheKey).maybeSingle();
   if (cacheError) throw new CanvasFailure(503, 'Proposal storage is temporarily unavailable.');
   active();
@@ -247,8 +248,17 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   const imageDirection = { context: generation.context, heroElementId: direction.heroElementId, references: direction.references };
   const prompt = proposalImagePrompt(generation.stage, generation.context.mode || 'mechanical') + '\nApproved design JSON:\n' + JSON.stringify(design) + '\nAuthoritative current direction and ordered image references:\n' + JSON.stringify(imageDirection);
   if (prompt.length > 32000) throw new CanvasFailure(400, 'This proposal direction is too long for the image model. Please shorten it; no wording was truncated.');
-  const body = { model: runtime.imageModel, prompt, n: 1, size: '1536x1024', quality: 'medium', ...(images.length ? { images } : {}) };
-  // Upstream-supported route. BRICK_PROPOSAL_ENABLED remains off until the gateway is verified.
+  let body: Record<string, string | number> | FormData = { model: runtime.imageModel, prompt, n: 1, size: '1536x1024', quality: 'medium' };
+  if (images.length) {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(body)) form.append(key, String(value));
+    // Official Images Edit multipart shape uses repeated image[] file parts.
+    // https://developers.openai.com/api/reference/resources/images/methods/edit
+    // Filenames describe position only; capability UUIDs never reach the model provider.
+    images.forEach((image, index) => form.append('image[]', image, `reference-${index + 1}.${image.type.split('/')[1]}`));
+    body = form;
+  }
+  // The gateway rejected JSON edits. Keep enablement off until this multipart route is verified.
   const result = await runtime.ai(images.length ? 'images/edits' : 'images/generations', body);
   active();
   const { bytes, mime } = imageResult(result);
