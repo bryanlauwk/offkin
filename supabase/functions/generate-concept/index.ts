@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseSelection, designDirection, type Edition, type GiftFormat } from './options.ts';
 import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
+import { websiteReadMessage } from './website-contract.ts';
 import { CANVAS_WORLD_PROMPT, CANVAS_PHYSICAL_PROMPT, canvasImagePrompt, BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION, parseConceptMode, modeDesignDirection, CO_CREATION_CONTRACT_VERSION, MAX_CONTEXT_CHARS, LEGACY_MAX_CONTEXT_CHARS, MAX_REQUEST_BYTES, isCoCreationContext } from './prompt.ts';
 import { CANVAS_CONTRACT_VERSION, CANVAS_CAPABILITIES, CanvasFailure, validateCanvasRequest, canvasCacheInput, parseCanvasManifest, serializeCanvasManifest, restoreCanvasRow, selectWorldElements, parseCanvasDesign, isCanvasContext, type CanvasManifest, type CanvasStoredRow } from './canvas.ts';
 import { PROPOSAL_CONTRACT_VERSION, PROPOSAL_CAPABILITIES, restoreProposalRow } from './proposal.ts';
@@ -197,6 +198,12 @@ export async function handleRequest(req: Request) {
   if(input.summaryOnly===true && !context.trim())return json({needsContext:true,message:'Tell us what your business does so we can start with your story.'});
   try { if(input.summaryOnly!==true)website=await readCompanyWebsite(websiteUrl); }
   catch(error) {
+   // Inspection reports the real, bounded failure reason and never fabricates
+   // evidence or invokes generation. Client copy comes from stable safe codes.
+   if(input.inspectWebsite===true) {
+    const code=error instanceof WebsiteReadError?error.code:'unreadable';
+    return json({website:null,verified:false,code,message:websiteReadMessage(code)},error instanceof WebsiteReadError?error.status:422);
+   }
    if(error instanceof WebsiteReadError && error.status===400)return json({error:error.message},400);
    if(!context.trim())return json({needsContext:true,message:'We could not read that public website. Add a short business summary so we can create an accurate concept without guessing.'});
   }

@@ -1,3 +1,4 @@
+import { WEBSITE_MAX_BYTES, WEBSITE_TIMEOUT_MS, WEBSITE_READ_MESSAGES, WebsiteReadError } from './website-contract.ts';
 import { Agent, request } from 'npm:undici@7.30.0';
 import { Duplex } from 'node:stream';
 import { Buffer } from 'node:buffer';
@@ -54,7 +55,7 @@ export async function fetchNativePinnedWebsite(url: URL, address: string, signal
   const abort = () => close();
   signal.addEventListener('abort', abort, { once: true });
   const agent = new Agent({
-    connections: 1, pipelining: 0, maxHeaderSize: 16_384, maxResponseSize: 300_000,
+    connections: 1, pipelining: 0, maxHeaderSize: 16_384, maxResponseSize: WEBSITE_MAX_BYTES,
     connect: async (options, callback) => {
       try {
         signal.throwIfAborted();
@@ -80,7 +81,7 @@ export async function fetchNativePinnedWebsite(url: URL, address: string, signal
     signal.throwIfAborted();
     const result = await request(url.href, {
       dispatcher: agent, method: 'GET', signal,
-      headersTimeout: 6000, bodyTimeout: 6000,
+      headersTimeout: WEBSITE_TIMEOUT_MS, bodyTimeout: WEBSITE_TIMEOUT_MS,
       headers: { Accept: 'text/html, text/plain;q=0.8', 'Accept-Encoding': 'identity', 'User-Agent': 'BRIQ-CompanyReader/1.0' },
     });
     const headers = new Headers();
@@ -93,14 +94,14 @@ export async function fetchNativePinnedWebsite(url: URL, address: string, signal
     // The caller validates every redirect separately; do not read irrelevant bodies.
     if (status >= 300 || status === 204 || status === 205) return new Response(null, { status, headers });
     const encoding = headers.get('content-encoding')?.trim().toLowerCase();
-    if (encoding && encoding !== 'identity') throw new Error('Compressed website response refused');
-    if (Number(headers.get('content-length') || 0) > 300_000) throw new Error('Website response too large');
+    if (encoding && encoding !== 'identity') throw new WebsiteReadError(422, WEBSITE_READ_MESSAGES.encoding, 'encoding');
+    if (Number(headers.get('content-length') || 0) > WEBSITE_MAX_BYTES) throw new WebsiteReadError(422, WEBSITE_READ_MESSAGES.too_large, 'too_large');
     let size = 0;
     const chunks: Uint8Array[] = [];
     for await (const chunk of result.body) {
       signal.throwIfAborted();
       size += chunk.byteLength;
-      if (size > 300_000) throw new Error('Website response too large');
+      if (size > WEBSITE_MAX_BYTES) throw new WebsiteReadError(422, WEBSITE_READ_MESSAGES.too_large, 'too_large');
       chunks.push(new Uint8Array(chunk));
     }
     const bytes = new Uint8Array(size);
@@ -109,6 +110,9 @@ export async function fetchNativePinnedWebsite(url: URL, address: string, signal
     headers.delete('transfer-encoding');
     headers.set('content-length', String(size));
     return new Response(bytes, { status, headers });
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'UND_ERR_RES_EXCEEDED') throw new WebsiteReadError(422, WEBSITE_READ_MESSAGES.too_large, 'too_large');
+    throw error;
   } finally {
     close();
     await agent.destroy();

@@ -163,3 +163,25 @@ describe('generation request boundary', () => {
     expect(fetchMock.mock.calls[0][1].method).toBe('POST');
   });
 });
+
+
+describe('public website inspection failures', () => {
+  const inspection = { brand: 'https://company.com/', edition: 'icon', format: 'miniature', inspectWebsite: true };
+  it.each([
+    ['too_large', 422, 'too large'], ['timeout', 504, 'too long'],
+    ['blocked', 422, 'does not allow automated'], ['unavailable', 503, 'unavailable right now'],
+    ['unsafe_url', 400, 'without login details'],
+  ])('shows the safe reason for %s without a generation call', async (code, status, expected) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({ code, message: 'Untrusted server detail' }, status)));
+    await expect(requestConcept(inspection, new AbortController().signal)).rejects.toThrow(expected);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it.each(['unknown_code', '__proto__', 'constructor', null])('never displays arbitrary server details for unknown code %s', async code => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({ code, message: 'Internal secret or page HTML' }, 422)));
+    await expect(requestConcept(inspection, new AbortController().signal)).rejects.toThrow('Try another public company page');
+  });
+  it('provides useful fixed guidance for the old needsContext response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({ needsContext: true, message: 'Old opaque failure' })));
+    expect(await requestConcept(inspection, new AbortController().signal)).toMatchObject({ message: expect.stringContaining('such as About') });
+  });
+});

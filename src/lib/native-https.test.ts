@@ -32,3 +32,37 @@ describe('native transport cancellation and socket lifecycle',()=>{
   expect(data).not.toHaveBeenCalled();expect(conn.close).toHaveBeenCalledOnce();
  });
 });
+
+describe('native pinned HTTP response budgets', () => {
+ function httpRuntime(body: string, declaredLength = Buffer.byteLength(body)) {
+  const bytes = Buffer.from(`HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ${declaredLength}\r\nConnection: close\r\n\r\n${body}`);
+  let offset = 0;
+  const tcp = connection(), tls = connection();
+  tls.read = vi.fn(async buffer => {
+   if (offset === bytes.length) return null;
+   const size = Math.min(buffer.length, bytes.length - offset);
+   buffer.set(bytes.subarray(offset, offset + size));offset += size;return size;
+  });
+  const runtime: NativeTlsRuntime = { connect: vi.fn(async () => tcp), startTls: vi.fn(async () => tls) };
+  return { runtime, tcp, tls };
+ }
+ it('accepts a 1.25 MB public homepage over the same pinned, verified TLS socket', async () => {
+  const body = `<html><head><title>Public site</title><style>${' '.repeat(1_250_000)}</style></head><body>Electric vehicles and home energy storage.</body></html>`;
+  const {runtime,tls,tcp} = httpRuntime(body);
+  const response = await fetchNativePinnedWebsite(new URL('https://company.com/'),'93.184.216.34',new AbortController().signal,runtime);
+  expect(response.status).toBe(200);expect(await response.text()).toBe(body);
+  expect(runtime.connect).toHaveBeenCalledWith(expect.objectContaining({hostname:'93.184.216.34',port:443}));
+  expect(runtime.startTls).toHaveBeenCalledWith(tcp,{hostname:'company.com',alpnProtocols:['http/1.1']});
+  expect(tls.handshake).toHaveBeenCalledOnce();expect(tls.close).toHaveBeenCalled();
+ });
+ it('rejects larger bodies and destroys the pinned connection with a useful size error', async () => {
+  const {runtime,tls} = httpRuntime('x'.repeat(2_000_001));
+  await expect(fetchNativePinnedWebsite(new URL('https://company.com/'),'93.184.216.34',new AbortController().signal,runtime)).rejects.toMatchObject({code:'too_large'});
+  expect(tls.close).toHaveBeenCalled();
+ });
+ it('rejects incomplete responses instead of returning truncated source evidence', async () => {
+  const {runtime,tls} = httpRuntime('<p>Incomplete company facts.</p>',1000);
+  await expect(fetchNativePinnedWebsite(new URL('https://company.com/'),'93.184.216.34',new AbortController().signal,runtime)).rejects.toBeInstanceOf(Error);
+  expect(tls.close).toHaveBeenCalled();
+ });
+});

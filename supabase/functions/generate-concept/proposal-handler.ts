@@ -8,7 +8,7 @@ import {
   serializeProposalManifest, validateProposalRequest, validateRevisionPlanRequest,
   type ProposalManifest, type ProposalRequest, type ProposalStage,
 } from './proposal.ts';
-import { proposalDesignPrompt, proposalImagePrompt, PROPOSAL_REVISION_PROMPT } from './proposal-prompt.ts';
+import { proposalDesignPrompt, proposalImagePrompt, PROPOSAL_REVISION_PROMPT, PROPOSAL_PROMPT_REVISION } from './proposal-prompt.ts';
 import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
 
 type StoredRow = CanvasStoredRow & { cache_key?: string; edition?: 'inside'; format?: 'miniature' };
@@ -202,7 +202,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     catch (error) { throw new CanvasFailure(400, error instanceof Error ? error.message : 'Enter a public company website.'); }
   }
   if (generation.stage === 'world' && !websiteUrl && !generation.context.business?.trim()) return respond({ needsContext: true, message: 'Tell us what the business does so this proposal starts with real facts.' });
-  const cacheKey = await runtime.hash(canonicalProposal({ contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION,
+  const cacheKey = await runtime.hash(canonicalProposal({ contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION, promptRevision: PROPOSAL_PROMPT_REVISION,
     request: generation, websiteUrl, sourceManifests: Array.from(sources.values()).map(s => ({ id: s.row.id, manifest: s.manifest })),
     imageIdentities, model: runtime.imageModel, textModel: runtime.textModel, size: '1536x1024', quality: 'medium', transport: images.length ? 'openai-multipart-edits-v2' : 'openai-generations-v1' }));
   const { data: cached, error: cacheError } = await db.from('brick_concepts').select(columns).eq('cache_key', cacheKey).maybeSingle();

@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   env: {} as Record<string, string | undefined>, rows: [] as Record<string, unknown>[],
   blobs: new Map<string, Uint8Array>(), allowed: true, dbError: false, uploadError: false, saveError: false,
   downloadError: false, fakeDownloadSize: 0, output: null as unknown, imageOutput: null as unknown,
+  promptRevision: 'test-prompt-v1',
   textCalls: 0, imageCalls: 0, rpc: vi.fn(), upload: vi.fn(), download: vi.fn(), remove: vi.fn(), sign: vi.fn(), readWebsite: vi.fn(),
 }));
 vi.mock('https://esm.sh/@supabase/supabase-js@2', () => ({ createClient: () => ({
@@ -44,6 +45,10 @@ vi.mock('../../supabase/functions/generate-concept/website', async importOrigina
   const original = await importOriginal<typeof import('../../supabase/functions/generate-concept/website')>();
   return { ...original, readCompanyWebsite: (...args: unknown[]) => state.readWebsite(...args) };
 });
+vi.mock('../../supabase/functions/generate-concept/proposal-prompt', async importOriginal => {
+  const original = await importOriginal<typeof import('../../supabase/functions/generate-concept/proposal-prompt')>();
+  return { ...original, get PROPOSAL_PROMPT_REVISION() { return state.promptRevision; } };
+});
 
 const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS1sAAAAASUVORK5CYII=';
 const elements = Array.from({ length: 6 }, (_, i) => ({ id: `element-${i}`, label: `Paper place ${i}`, description: `Connected paper form ${i}`, kind: 'proposal' as const }));
@@ -64,6 +69,7 @@ beforeEach(() => {
   state.env = { SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'test-server-only', LOVABLE_API_KEY: 'test-not-real', BRICK_GENERATION_ENABLED: 'true', BRICK_PROPOSAL_ENABLED: 'true' };
   state.rows = []; state.blobs.clear(); state.allowed = true; state.dbError = false; state.uploadError = false; state.saveError = false;
   state.downloadError = false; state.fakeDownloadSize = 0; state.output = null; state.imageOutput = null; state.textCalls = 0; state.imageCalls = 0;
+  state.promptRevision = 'test-prompt-v1';
   for (const fn of [state.rpc, state.upload, state.download, state.remove, state.sign, state.readWebsite]) fn.mockReset();
   state.readWebsite.mockResolvedValue({ url: 'https://studio.example/', title: 'Paper Studio', excerpt: 'We make stationery.' });
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
@@ -228,6 +234,15 @@ describe('complete proposal backend with mocked providers only', () => {
     await generate({ ...supplement('packaging', world, physical), context: { ...worldRequest.context, revisionNotes: 'Blue box' } });
     await generate(supplement('details', world, physical));
     expect(state.imageCalls).toBe(5);
+  });
+  it('separates revised prompts in cache without invalidating previously saved manifests', async () => {
+    const original = await generate(worldRequest);
+    expect((await generate(worldRequest)).id).toBe(original.id);
+    state.promptRevision = 'test-prompt-v2';
+    const updated = await generate(worldRequest);
+    expect(updated.id).not.toBe(original.id); expect(state.imageCalls).toBe(2);
+    expect(updated.stageVersion).toBe(original.stageVersion);
+    expect((await (await post({ id: original.id })).json()).concept).toEqual(original);
   });
   it('includes actual reference bytes in cache identity rather than signed URLs', async () => {
     const { world, physical } = await pair();
