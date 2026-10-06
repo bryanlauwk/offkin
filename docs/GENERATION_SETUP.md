@@ -1,14 +1,53 @@
-# Current editorial rebuild (draft source, October 5, 2026)
+# OFFKIN co-creation v8 (draft source, October 6, 2026)
 
-The following notes supersede older product-flow, quota and prompt-version descriptions below. See [EDITORIAL_STUDIO_REDESIGN.md](./EDITORIAL_STUDIO_REDESIGN.md) for the full release checklist.
+These notes supersede the historical flow and prompt descriptions below. This change is source-only: it does not deploy a function, run a migration, publish the site, change credentials or invoke paid generation. Passing offline tests does not establish live provider quality or typography accuracy.
 
-- Draft source prompt version: `dioramini-story-led-miniatures-v7`. This is not a claim about the currently deployed function version. Deploy the function explicitly after approval to activate the revised creative guidance.
-- The public flow is website text inspection → three proposed editorial story lenses → owner-supplied hidden detail → object/style/audience/exact wording → explicit generation → rationale and prototype checks.
-- Website inspection uses the existing safe public-site reader without an AI call. The displayed lenses are transparent editorial suggestions, not automated business-verification findings.
-- Old KLDEX/STIVE/PETRONAS curated examples are retired from the public UI. New A24/Airbnb/Tesla demonstrations are unofficial code-native studies with unverified mechanics.
-- Daily quotas remain temporarily waived by the existing owner-requested default. `BRICK_ENFORCE_DAILY_LIMITS=true` restores limits; unknown non-false values fail closed. The generation kill switch, request bounds, private bucket and SSRF guards remain in place.
-- No live paid generation, deployment or production publish was performed for this rebuild. Offline passing tests do not verify live provider quality.
-- OFFKIN｜异趣伙伴 is the approved identity. The website scope is approved for merge; public publishing and backend deployment remain separate. Customer copy explicitly labels buttons/screens/light/AI scenes as exploration requiring hardware/software prototype validation. The wizard distinguishes mechanical and exploratory electronic briefs. Electronic image generation requires ready:true, capabilities.electronic_story_scene:true and exact prompt_version dioramini-story-led-miniatures-v7 from GET; otherwise it offers a local brief only. Backend source enforces the electronic Inside/miniature selection. No tested hardware or Muse integration is offered. The current RM100–500 figure is an exploratory budget range pending outsourced sample/printing quotes, not a product price, rigid floor or universal cap. The first edition stays palm-sized with one main scene and at most one or two useful mechanical actions, reusing bases/connectors/mechanisms where possible. Existing custom admin title/logo settings remain authoritative.
+## Frontend/backend negotiation
+
+- Source prompt and request contract version: `offkin-cocreation-v8`. Every new co-creation generation POST must contain `contractVersion: "offkin-cocreation-v8"`.
+- A read-only GET must return HTTP 200, `ready: true`, `prompt_version: "offkin-cocreation-v8"`, `capabilities.cocreation: true`, and `capabilities.context_max_chars: 6000`. Electronic exploration also requires `capabilities.electronic_story_scene: true`.
+- `supportsCoCreation(signal)` drives frontend availability. `requestConcept` repeats this check immediately before a v8 POST, even if the screen checked earlier. Missing, malformed, disabled, v7, future-version or aborted responses fail closed. No new generation POST is sent, and the brief can be kept/downloaded for design review.
+- Never silently truncate a brief or downgrade a new direction to the live v7 contract. A source commit or GitHub sync does not activate the new backend. Deploy only after explicit approval, then confirm the GET response before enabling new image generation.
+- Readiness verifies configuration and the existing storage schema only. It is not a successful provider test, proof of a working electronic object or a production-readiness claim.
+
+## Bounded co-creation input
+
+The `brand` website/identifier input is bounded to 2–300 characters, matching the frontend website field; existing public-URL validation still applies. The `context` remains a JSON-encoded string, now with a maximum of 6,000 JavaScript UTF-16 code units including its JSON envelope. Frontend and backend use the same limit. The whole request is streamed with a 48,000-byte cap, allowing bounded Unicode and JSON escaping without the old 3,000-character body restriction. Oversize requests are rejected, never shortened.
+
+The v8 context is a flat JSON object with known string-valued fields:
+
+- `business`, `hiddenDetail`, `angle`, `item`, `audience`
+- `exactWording`, `placement`, `style`, `interaction`
+- `mode` (`mechanical` or `electronic`; absent means mechanical)
+- `scale`, `brandIdentifiers`
+- Optional design-review extensions: `materials`, `avoid`, `revisionNotes`
+
+Unknown fields, nested values, arrays, non-string fields and unknown modes are rejected. Whitespace, line breaks, case, punctuation and Unicode in the original context and exact wording pass through unchanged to both provider prompts. This is an input-preservation guarantee, not a claim that an image model renders perfect lettering. Artwork proofing remains necessary. The website reader has a separate 6,000-character evidence-excerpt cap; it does not truncate customer context. Generated response summaries keep their existing display/storage bounds, while the original customer direction is included independently in the image prompt.
+
+The new UI sends its expanded choices through `item`, `style`, `interaction`, and `scale`; for example Scene in a frame, Illustrated & surreal, Slide to discover, and Let the story decide. `brandIdentifiers` describes supplied product shapes, materials, colours, gestures or rituals. This is a text-only contract: it does not accept logo/image uploads or imply that an asset is available. Website text is evidence, not print-ready logo artwork.
+
+Legacy requests without `contractVersion` retain the existing 600-character context limit and default mechanical mode. Existing website-inspection and saved-concept requests stay available. The persisted `edition` and `format` enums remain unchanged (`icon|hero|inside|everyday`, `bricks|miniature|clicker`); expanded forms refine the miniature direction within context, avoiding a schema migration. Icon/clicker remains invalid. Explicit electronic studies still require Inside/miniature.
+
+## Creative and prototype boundaries
+
+- One coherent story and hero object, with at most one or two meaningful actions. Actions are optional; display-only remains static.
+- Use supplied business details and brand identifiers to shape the object. A proposed story lens is not proof of a founding story or customer habit. Do not invent facts, logo assets, a verified palette or unrequested lettering.
+- Story-specific silhouette, composition, material finish, lighting and framing replace the fixed warm-ivory catalogue template. A separate pedestal is optional, never the universal format. Expanded art directions should materially change the object and image.
+- Dimensions follow story, intended placement, construction and exploratory cost. There is no universal palm-size ceiling. Reuse hidden internals, connectors or mechanism patterns when suitable while keeping outer forms story-specific.
+- Mechanical mode has no powered electronics. Electronic mode is an explicitly selected exploration: respect a chosen click, turn, slide or display-only preference rather than replacing it with a button/screen/LED package. Any requested USB-powered response and sensing/control need separate validation; static display can omit electronics. No motors, cameras, microphones, heating, food use or actual working industrial machinery.
+- A short cloud reply is optional only when requested and bounded to 160 characters per deliberate activation, with content scope, request limits and a scripted fallback to validate. No promised Muse integration, existing API access, autonomous operation or unrestricted conversation.
+- Start with a few outsourced printed samples to validate appearance, physical performance, assembly and cost. No render establishes dimensions, tolerances, stability, firmware, electrical safety, hardware availability or manufacturability.
+- RM100–500 remains an exploratory budget range pending actual sample and print quotes, not a fixed floor, ceiling, product price or promise every design fits. Design, electronics, firmware and cloud services are scoped separately.
+
+## Data, safety and deployment
+
+- The safe public-site reader, SSRF guards, RLS and private image bucket are unchanged. Summary-only requests skip website fetching without allowing malformed addresses. Website content remains untrusted source material.
+- Daily quotas retain the existing temporary owner-requested waiver. `BRICK_ENFORCE_DAILY_LIMITS=true` restores limits; unknown non-false values fail closed. This change does not alter the kill switch, quota database or provider credentials.
+- Cache keys include v8 prompt version, explicit contract/legacy mode, full unchanged context, source mode, website and persisted selection. New directions cannot reuse v7 imagery. Raw customer context and exact wording are not added to persisted rows.
+- Saved concept UUID links retain their existing behavior: anyone with the link can view that result through a fresh one-hour image URL; there is no public listing endpoint or automatic gallery inclusion.
+- Existing admin title/logo controls remain authoritative. No migration, production configuration change or external publication is part of this source change.
+
+Offline checks: `npx vitest run src/lib/generate-concept-prompt.test.ts src/lib/concept-api.test.ts`, `node tests/generation-contract.mjs`, and `npx tsc --noEmit -p tsconfig.app.json`. The contract script runs the real handler against fake provider/database/storage services and makes no paid calls. A separately authorized live test after backend deployment is still necessary.
 
 ## Historical setup and earlier product directions
 
@@ -63,4 +102,5 @@ Current prompt version: `brandkin-collectibles-v2`. Apply `20260930090000_collec
 - The Rimba Coffee board is a generated fictional reference image, not a real customer or manufacturing validation.
 
 Local verification: `npm ci --legacy-peer-deps` (the existing lockfile omits testing-library peer dependencies), `npm run build`, `npx tsc --noEmit -p tsconfig.app.json`, `npm test`, `node tests/generation-contract.mjs`. Backend contract tests use fake services and do not spend model credits. A live provider smoke test is still required after deployment.
+
 
