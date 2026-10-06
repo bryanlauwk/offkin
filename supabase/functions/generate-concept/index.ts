@@ -3,16 +3,21 @@ import { parseSelection, designDirection, type Edition, type GiftFormat } from '
 import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
 import { CANVAS_WORLD_PROMPT, CANVAS_PHYSICAL_PROMPT, canvasImagePrompt, BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION, parseConceptMode, modeDesignDirection, CO_CREATION_CONTRACT_VERSION, MAX_CONTEXT_CHARS, LEGACY_MAX_CONTEXT_CHARS, MAX_REQUEST_BYTES, isCoCreationContext } from './prompt.ts';
 import { CANVAS_CONTRACT_VERSION, CANVAS_CAPABILITIES, CanvasFailure, validateCanvasRequest, canvasCacheInput, parseCanvasManifest, serializeCanvasManifest, restoreCanvasRow, selectWorldElements, parseCanvasDesign, isCanvasContext, type CanvasManifest, type CanvasStoredRow } from './canvas.ts';
+import { PROPOSAL_CONTRACT_VERSION, PROPOSAL_CAPABILITIES, restoreProposalRow } from './proposal.ts';
+import { handleProposal, supportsProposalModel } from './proposal-handler.ts';
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Cache-Control':'no-store'}});
 const hash = async (s:string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');
 // Temporary owner-requested test waiver. Set BRICK_ENFORCE_DAILY_LIMITS=true to restore caps.
 // Only an absent setting or explicit false bypasses quotas; unknown values fail closed.
 const dailyLimitsEnforced = () => (Deno.env.get('BRICK_ENFORCE_DAILY_LIMITS') ?? 'false') !== 'false';
+const proposalImageModel = () => Deno.env.get('BRICK_PROPOSAL_IMAGE_MODEL') || Deno.env.get('BRICK_IMAGE_MODEL') || 'openai/gpt-image-2';
+// The new reference-conditioned route needs its own explicit, verified enablement.
+const proposalEnabled = () => Deno.env.get('BRICK_PROPOSAL_ENABLED') === 'true' && supportsProposalModel(proposalImageModel());
 class Failure extends Error { constructor(public status:number, message:string){super(message);} }
 export async function handleRequest(req: Request) {
  if(req.method==='OPTIONS')return json({});
  if(req.method==='GET'){
-  const sourceCapabilities={prompt_version:PROMPT_VERSION,capabilities:{...CANVAS_CAPABILITIES,summary_only:true,electronic_story_scene:true,cocreation:true,context_max_chars:MAX_CONTEXT_CHARS}};
+  const sourceCapabilities={prompt_version:PROMPT_VERSION,capabilities:{...CANVAS_CAPABILITIES,...PROPOSAL_CAPABILITIES,proposal:proposalEnabled(),summary_only:true,electronic_story_scene:true,cocreation:true,context_max_chars:MAX_CONTEXT_CHARS}};
   const url=Deno.env.get('SUPABASE_URL'); const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if(!url||!service)return json({ready:false,...sourceCapabilities,reason:'Backend configuration is missing.'},503);
   const db=createClient(url,service);
@@ -30,20 +35,26 @@ export async function handleRequest(req: Request) {
   if(!input || typeof input!=='object' || Array.isArray(input))return json({error:'Invalid request.'},400);
   if(input.summaryOnly!==undefined && typeof input.summaryOnly!=='boolean')return json({error:'Invalid story request.'},400);
   if(input.inspectWebsite!==undefined && typeof input.inspectWebsite!=='boolean')return json({error:'Invalid inspection request.'},400);
-  if(input.contractVersion!==undefined && input.contractVersion!==CO_CREATION_CONTRACT_VERSION && input.contractVersion!==CANVAS_CONTRACT_VERSION)return json({error:'This co-creation contract is not supported.'},400);
+  if(input.contractVersion!==undefined && input.contractVersion!==CO_CREATION_CONTRACT_VERSION && input.contractVersion!==CANVAS_CONTRACT_VERSION && input.contractVersion!==PROPOSAL_CONTRACT_VERSION)return json({error:'This co-creation contract is not supported.'},400);
   const canvas=input.contractVersion===CANVAS_CONTRACT_VERSION;
+  const proposal=input.contractVersion===PROPOSAL_CONTRACT_VERSION;
   // Never silently reinterpret an unversioned canvas request as a legacy product request.
-  if(!canvas && input.stage!==undefined)return json({error:'This canvas contract is not supported.'},400);
+  if(!canvas && !proposal && input.stage!==undefined)return json({error:'This canvas contract is not supported.'},400);
   if(canvas && !input.id)validateCanvasRequest(input);
   const coCreation=input.contractVersion===CO_CREATION_CONTRACT_VERSION;
   const selection=parseSelection(input);
-  if(!input.id && !canvas && !selection)return json({error:'Choose a valid edition and format. Icon is available as a brick build or miniature.'},400);
+  if(!input.id && !canvas && !proposal && !selection)return json({error:'Choose a valid edition and format. Icon is available as a brick build or miniature.'},400);
   const url=Deno.env.get('SUPABASE_URL');const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if(!url||!service)throw new Failure(503,'Concept generation is being connected. Please try again later.');
   const db=createClient(url,service);
   const deliver=async(row:CanvasStoredRow & {edition?:Edition;format?:GiftFormat})=>{
    const {data,error}=await db.storage.from('brick-concepts').createSignedUrl(row.image_path,3600);
    if(error||!data)throw new Failure(503,'The concept image is temporarily unavailable. Please retry.');
+   if(row.prompt_version===PROPOSAL_CONTRACT_VERSION){
+    const concept=restoreProposalRow(row,data.signedUrl);
+    if(!concept)throw new Failure(503,'The saved proposal could not be opened safely. Please retry.');
+    return json({concept});
+   }
    if(row.prompt_version===CANVAS_CONTRACT_VERSION){
     const concept=restoreCanvasRow(row,data.signedUrl);
     if(!concept)throw new Failure(503,'The saved world could not be opened safely. Please retry.');
@@ -63,6 +74,17 @@ export async function handleRequest(req: Request) {
    const response=await fetch('https://ai.gateway.lovable.dev/v1/'+path,{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Lovable-API-Key':key!,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([req.signal,AbortSignal.timeout(100000)])});
    if(!response.ok)throw new Failure(response.status===429?429:503,response.status===429?'The generator is busy. Please try again shortly.':'The generator is unavailable right now. Please try again later.');
    return await response.json();
+  }
+  if(proposal){
+   return await handleProposal(input,req,{db,enabled:Boolean(key)&&enabled&&proposalEnabled(),textModel:Deno.env.get('BRICK_TEXT_MODEL')||'google/gemini-3-flash-preview',imageModel:proposalImageModel(),ai,hash,respond:json,deliver,
+    reserve:async()=>{
+     if(!dailyLimitsEnforced())return;
+     const client=await hash(service+':'+(req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'unknown'));
+     const {data:allowed,error:limitError}=await db.rpc('reserve_brick_generation',{client_key:client});
+     if(limitError)throw new Failure(503,'Proposal generation is temporarily unavailable.');
+     if(!allowed)throw new Failure(429,'Today’s generation limit has been reached. Completed proposal sections are saved.');
+    }
+   });
   }
   if(canvas){
    const request=validateCanvasRequest(input);
@@ -200,4 +222,3 @@ export async function handleRequest(req: Request) {
  }catch(e){if(req.signal.aborted)return json({error:'The request was cancelled.'},499);return json({error:e instanceof Failure||e instanceof CanvasFailure?e.message:'The concept could not be completed. Please try again.'},e instanceof Failure||e instanceof CanvasFailure?e.status:503);}
 }
 Deno.serve(handleRequest);
-
