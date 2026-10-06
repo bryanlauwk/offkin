@@ -14,6 +14,9 @@
  * must delimit it as data and forbid obeying any instructions it contains.
  */
 
+import { WEBSITE_MAX_BYTES, WEBSITE_TIMEOUT_MS, WebsiteReadError } from './website-contract.ts';
+export { WebsiteReadError } from './website-contract.ts';
+
 export interface WebsiteSource {
   url: string;
   title: string;
@@ -35,21 +38,13 @@ export interface WebsiteReaderDependencies {
   maxRedirects?: number;
 }
 
-export class WebsiteReadError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-    this.name = 'WebsiteReadError';
-  }
-}
-
-const MAX_BYTES = 300_000;
 const MAX_EXCERPT_CHARS = 6_000;
-const TIMEOUT_MS = 6_000;
+
 const MAX_REDIRECTS = 3;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const LOCAL_SUFFIXES = ['localhost', 'local', 'internal', 'intranet', 'lan', 'home', 'corp', 'test', 'invalid', 'example', 'onion', 'arpa'];
 
-const unsafeUrl = () => new WebsiteReadError(400, 'Use a public company website with a domain name, without login details or a custom port.');
+const unsafeUrl = () => new WebsiteReadError(400, 'Use a public company website with a domain name, without login details or a custom port.', 'unsafe_url');
 
 /** Pure URL validation; it does not replace DNS and transport-level validation. */
 export function validatePublicWebsiteUrl(input: string): URL {
@@ -116,7 +111,7 @@ async function defaultResolveDns(hostname: string, type: RecordType): Promise<st
     Deno?: { resolveDns?: WebsiteDnsResolver };
   };
   if (!runtime.Deno?.resolveDns) {
-    throw new WebsiteReadError(503, 'Website reading is unavailable right now. Please try again shortly.');
+    throw new WebsiteReadError(503, 'Website reading is unavailable right now. Please try again shortly.', 'unavailable');
   }
   return runtime.Deno.resolveDns(hostname, type);
 }
@@ -128,13 +123,13 @@ async function validateDns(url: URL, resolveDns: WebsiteDnsResolver): Promise<st
       // An absent A or AAAA record is normal; timeouts/permission failures are not.
       if (error instanceof Error && error.name === 'NotFound') return [];
       if (error instanceof WebsiteReadError) throw error;
-      throw new WebsiteReadError(422, 'We could not verify that website address. Check the company URL and try again.');
+      throw new WebsiteReadError(422, 'We could not verify that website address. Check the company URL and try again.', 'dns');
     }
   };
   const records = await Promise.all([lookup('A'), lookup('AAAA')]);
   const addresses = records.flat();
   if (!addresses.length || addresses.some(address => typeof address !== 'string' || !isPublicWebsiteAddress(address))) {
-    throw new WebsiteReadError(400, 'That address is not a public website. Please use the company’s public HTTPS homepage.');
+    throw new WebsiteReadError(400, 'That address is not a public website. Please use the company’s public HTTPS homepage.', 'unsafe_url');
   }
   return addresses;
 }
@@ -164,8 +159,24 @@ export function extractWebsiteContent(content: string, contentType: string): { t
   const titleStart = stripped.search(/<title\b[^<>]*>/i);
   const titleText = titleStart < 0 ? '' : stripped.slice(titleStart).match(/^<title\b[^<>]*>([\s\S]*?)(?:<\/title\s*>|$)/i)?.[1] ?? '';
   const title = cleanText(titleText.replace(/<[^<>]*>/g, ' ')).slice(0, 160);
+  // Descriptive metadata is source text too. It helps JS-heavy pages and keeps
+  // the site's own business description ahead of long navigation menus.
+  const head = stripped.match(/<head\b[^<>]*>([\s\S]*?)(?:<\/head\s*>|$)/i)?.[1] ?? '';
+  const descriptions = new Map<string, string>();
+  for (const tag of head.match(/<meta\b[^<>]*>/gi) ?? []) {
+    const attributes = new Map<string, string>();
+    for (const attribute of tag.matchAll(/([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi)) {
+      attributes.set(attribute[1].toLowerCase(), attribute[2] ?? attribute[3] ?? attribute[4]);
+    }
+    const name = (attributes.get('name') ?? attributes.get('property') ?? '').toLowerCase();
+    if (name === 'description' || name === 'og:description') {
+      const content = cleanText((attributes.get('content') ?? '').replace(/<[^<>]*>/g, ' ')).slice(0, 1_000);
+      if (content && !descriptions.has(name)) descriptions.set(name, content);
+    }
+  }
+  const description = descriptions.get('description') ?? descriptions.get('og:description') ?? '';
   const body = stripped.replace(/<head\b[^<>]*>[\s\S]*?(?:<\/head\s*>|$)/gi, ' ').replace(/<[^<>]*>/g, ' ');
-  return { title, excerpt: cleanText(body).slice(0, MAX_EXCERPT_CHARS) };
+  return { title, excerpt: cleanText([description, body].filter(Boolean).join(' ')).slice(0, MAX_EXCERPT_CHARS) };
 }
 
 function throwIfAborted(signal: AbortSignal): void {
@@ -197,9 +208,9 @@ export const fetchPinnedWebsite: WebsiteTransport = async (input, init, addresse
   const options = pinnedWebsiteRequestOptions(url, addresses);
   const runtime = (globalThis as unknown as { Deno?: import('./native-https.ts').NativeTlsRuntime }).Deno;
   if (runtime) {
-    if (typeof runtime.connect !== 'function' || typeof runtime.startTls !== 'function') throw new WebsiteReadError(503, 'Secure website reading is unavailable. Add a short company description to continue.');
+    if (typeof runtime.connect !== 'function' || typeof runtime.startTls !== 'function') throw new WebsiteReadError(503, 'Secure website reading is unavailable. Add a short company description to continue.', 'unavailable');
     const { fetchNativePinnedWebsite } = await import('./native-https.ts');
-    return fetchNativePinnedWebsite(url, String(options.hostname), init.signal ?? AbortSignal.timeout(6000), runtime);
+    return fetchNativePinnedWebsite(url, String(options.hostname), init.signal ?? AbortSignal.timeout(WEBSITE_TIMEOUT_MS), runtime);
   }
   let request: typeof import('node:https').request;
   let checkServerIdentity: typeof import('node:tls').checkServerIdentity;
@@ -208,7 +219,7 @@ export const fetchPinnedWebsite: WebsiteTransport = async (input, init, addresse
     ({ checkServerIdentity } = await import('node:tls'));
     if (typeof request !== 'function' || typeof checkServerIdentity !== 'function') throw new Error('Unsupported transport');
   } catch {
-    throw new WebsiteReadError(503, 'Secure website reading is unavailable. Add a short company description to continue.');
+    throw new WebsiteReadError(503, 'Secure website reading is unavailable. Add a short company description to continue.', 'unavailable');
   }
   const signal = init.signal;
   if (signal) throwIfAborted(signal);
@@ -224,7 +235,7 @@ export const fetchPinnedWebsite: WebsiteTransport = async (input, init, addresse
       maxHeaderSize: 16_384,
     }, incoming => {
       try {
-      if (!identityVerified) throw new WebsiteReadError(503, 'Secure website reading is unavailable. Add a short company description to continue.');
+      if (!identityVerified) throw new WebsiteReadError(503, 'Secure website reading is unavailable. Add a short company description to continue.', 'unavailable');
       const headers = new Headers();
       for (const [name, value] of Object.entries(incoming.headers)) {
         if (Array.isArray(value)) value.forEach(item => headers.append(name, item));
@@ -233,11 +244,11 @@ export const fetchPinnedWebsite: WebsiteTransport = async (input, init, addresse
       const encoding = headers.get('content-encoding')?.trim().toLowerCase();
       if (encoding && encoding !== 'identity') {
         incoming.destroy();
-        reject(new WebsiteReadError(422, 'That page could not be read as plain website content. Try another public company page or add a short description.'));
+        reject(new WebsiteReadError(422, 'That page could not be read as plain website content. Try another public company page or add a short description.', 'encoding'));
         return;
       }
       const status = incoming.statusCode ?? 502;
-      if (status < 200 || status > 599) { incoming.destroy(); reject(new WebsiteReadError(422, 'That website returned an unsupported response. Try another public company page.')); return; }
+      if (status < 200 || status > 599) { incoming.destroy(); reject(new WebsiteReadError(422, 'That website returned an unsupported response. Try another public company page.', 'unreadable')); return; }
       // Redirect bodies, failures and empty responses are never read.
       if (REDIRECT_STATUSES.has(status) || status < 200 || status >= 300 || status === 204 || status === 205) {
         incoming.destroy();
@@ -288,7 +299,7 @@ async function readBoundedBody(response: Response, maxBytes: number, signal: Abo
   const declaredLength = response.headers.get('content-length');
   if (declaredLength && /^\d+$/.test(declaredLength) && Number(declaredLength) > maxBytes) {
     discardBody(response);
-    throw new WebsiteReadError(422, 'That page is too large to read. Try the company’s homepage or a shorter About page.');
+    throw new WebsiteReadError(422, 'That page is too large to read. Try the company’s homepage or a shorter About page.', 'too_large');
   }
   if (!response.body) return '';
   const reader = response.body.getReader();
@@ -306,7 +317,7 @@ async function readBoundedBody(response: Response, maxBytes: number, signal: Abo
       bytes += value.byteLength;
       if (bytes > maxBytes) {
         cancel();
-        throw new WebsiteReadError(422, 'That page is too large to read. Try the company’s homepage or a shorter About page.');
+        throw new WebsiteReadError(422, 'That page is too large to read. Try the company’s homepage or a shorter About page.', 'too_large');
       }
       text += decoder.decode(value, { stream: true });
     }
@@ -321,19 +332,19 @@ export async function readCompanyWebsite(input: string, dependencies: WebsiteRea
   let url = validatePublicWebsiteUrl(input);
   const fetchPage = dependencies.fetch ?? fetchPinnedWebsite;
   const resolveDns = dependencies.resolveDns ?? defaultResolveDns;
-  const maxBytes = lowerLimit(dependencies.maxBytes, MAX_BYTES);
+  const maxBytes = lowerLimit(dependencies.maxBytes, WEBSITE_MAX_BYTES);
   const maxRedirects = dependencies.maxRedirects === 0 ? 0 : lowerLimit(dependencies.maxRedirects, MAX_REDIRECTS);
   const controller = new AbortController();
-  const timeoutError = new WebsiteReadError(504, 'That website took too long to respond. Try again or use a faster company page.');
+  const timeoutError = new WebsiteReadError(504, 'That website took too long to respond. Try again or use a faster company page.', 'timeout');
   let timer: ReturnType<typeof setTimeout>;
   const deadline = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => { controller.abort(timeoutError); reject(timeoutError); }, lowerLimit(dependencies.timeoutMs, TIMEOUT_MS));
+    timer = setTimeout(() => { controller.abort(timeoutError); reject(timeoutError); }, lowerLimit(dependencies.timeoutMs, WEBSITE_TIMEOUT_MS));
   });
   const read = async (): Promise<WebsiteSource> => {
     const visited = new Set<string>();
     for (let redirectCount = 0; ; redirectCount++) {
       throwIfAborted(controller.signal);
-      if (visited.has(url.href)) throw new WebsiteReadError(422, 'That website has a redirect loop. Try its final public HTTPS address.');
+      if (visited.has(url.href)) throw new WebsiteReadError(422, 'That website has a redirect loop. Try its final public HTTPS address.', 'redirect');
       visited.add(url.href);
       const addresses = await validateDns(url, resolveDns);
       throwIfAborted(controller.signal);
@@ -346,16 +357,16 @@ export async function readCompanyWebsite(input: string, dependencies: WebsiteRea
       // The transport must honor manual redirects; never trust a silently followed response.
       if (response.redirected || (response.url && response.url !== url.href)) {
         discardBody(response);
-        throw new WebsiteReadError(422, 'We could not safely follow that website. Try its final public HTTPS address.');
+        throw new WebsiteReadError(422, 'We could not safely follow that website. Try its final public HTTPS address.', 'redirect');
       }
       if (REDIRECT_STATUSES.has(response.status)) {
         const location = response.headers.get('location');
         discardBody(response);
-        if (!location || redirectCount >= maxRedirects) throw new WebsiteReadError(422, 'That website redirects too many times. Try its final public HTTPS address.');
+        if (!location || redirectCount >= maxRedirects) throw new WebsiteReadError(422, 'That website redirects too many times. Try its final public HTTPS address.', 'redirect');
         let redirect: URL;
         try { redirect = new URL(location, url); }
         catch { throw unsafeUrl(); }
-        if (redirect.protocol !== 'https:') throw new WebsiteReadError(400, 'That website redirects to an insecure address. Use its public HTTPS homepage.');
+        if (redirect.protocol !== 'https:') throw new WebsiteReadError(400, 'That website redirects to an insecure address. Use its public HTTPS homepage.', 'unsafe_url');
         // Validate original Location as well: URL() normalizes explicit default ports.
         if (/^https?:\/\//i.test(location) || location.startsWith('//')) {
           validatePublicWebsiteUrl(location.startsWith('//') ? `https:${location}` : location);
@@ -365,16 +376,17 @@ export async function readCompanyWebsite(input: string, dependencies: WebsiteRea
       }
       if (!response.ok) {
         discardBody(response);
-        throw new WebsiteReadError(422, 'That website could not be read. Try a public page that does not require login or block automated visitors.');
+        throw new WebsiteReadError(422, 'That website could not be read. Try a public page that does not require login or block automated visitors.', [401, 403, 429, 451].includes(response.status) ? 'blocked' : 'unreadable');
       }
       const contentType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
       if (contentType !== 'text/html' && contentType !== 'text/plain') {
         discardBody(response);
-        throw new WebsiteReadError(422, 'Use a company web page rather than a download, image, or document.');
+        throw new WebsiteReadError(422, 'Use a company web page rather than a download, image, or document.', 'unsupported');
       }
       const content = await readBoundedBody(response, maxBytes, controller.signal);
       const extracted = extractWebsiteContent(content, contentType);
-      if (extracted.excerpt.length < 20) throw new WebsiteReadError(422, 'That page has too little readable text. Try the company’s About page or another public page.');
+      if (/^(?:access denied|just a moment(?:\.\.\.)?|attention required!?|verify (?:you are|you're) human)$/i.test(extracted.title.trim())) throw new WebsiteReadError(422, 'That page requires access verification and cannot be read automatically.', 'blocked');
+      if (extracted.excerpt.length < 20) throw new WebsiteReadError(422, 'That page has too little readable text. Try the company’s About page or another public page.', 'empty');
       return { url: url.href, title: extracted.title || url.hostname, excerpt: extracted.excerpt };
     }
   };
@@ -382,6 +394,6 @@ export async function readCompanyWebsite(input: string, dependencies: WebsiteRea
   catch (error) {
     if (error instanceof WebsiteReadError) throw error;
     if (controller.signal.aborted) throw timeoutError;
-    throw new WebsiteReadError(422, 'That website could not be read securely. Check its HTTPS address or try a different public company page.');
+    throw new WebsiteReadError(422, 'That website could not be read securely. Check its HTTPS address or try a different public company page.', 'secure');
   } finally { clearTimeout(timer!); }
 }

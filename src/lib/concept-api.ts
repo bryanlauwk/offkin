@@ -1,3 +1,4 @@
+import { websiteReadMessage } from '../../supabase/functions/generate-concept/website-contract';
 import { parseSelection } from '../../supabase/functions/generate-concept/options';
 import { CO_CREATION_CONTRACT_VERSION, MAX_CONTEXT_CHARS, LEGACY_MAX_CONTEXT_CHARS, isCoCreationContext } from '../../supabase/functions/generate-concept/prompt';
 import type { CollectibleConcept } from './collectible-brief';
@@ -66,11 +67,12 @@ export async function requestConcept(body: Record<string, unknown>, signal: Abor
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 429) throw new Error('We’re busy right now. Please try again a little later.');
-    if (body.inspectWebsite && response.status === 400) throw new WebsiteAddressError('We couldn’t use that address. Try your public HTTPS homepage.');
-    if (body.inspectWebsite) throw new Error('We couldn’t read this website. You can tell us about the business instead.');
+    if (body.inspectWebsite && response.status === 400) throw new WebsiteAddressError(websiteReadMessage('unsafe_url'));
+    if (body.inspectWebsite) throw new Error(websiteReadMessage(data?.code));
     throw new Error('We couldn’t finish your concept. Your answers are saved here. Please try again.');
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('We couldn’t open this concept. Please try again.');
+  if (body.inspectWebsite && !data.website) return { ...data, message: websiteReadMessage(data?.code) };
   if (data.concept) {
     const selection = parseSelection(data.concept);
     if (selection && body.format && (selection.format !== body.format || selection.edition !== body.edition)) throw new Error('We couldn’t create the direction you chose. Please try again.');

@@ -35,6 +35,15 @@ export function pendingProposal(session:ProposalSession,scope:ProposalScope,cont
   for (const stage of PROPOSAL_STAGES) if (!assets[stage]) delete assets[stage];
   return {id:newVersion(),context:{...context},website:session.website,assets,scope,previous:{...previous},instruction,selected:scope==='world'?[]:[...(session.accepted?.selected||[])],hero:scope==='world'?'':session.accepted?.hero||'',replacements:scope==='world'?[]:[...(session.accepted?.replacements||[])]};
 }
+/** A user-confirmed packaging-only recovery, never an automatic scope reinterpretation. */
+export function confirmedPackagingChange(session:ProposalSession,instruction:string):PendingProposal {
+  const accepted=session.accepted;
+  if(!accepted||!isComplete(accepted)||session.pending)throw new Error('Open the accepted complete proposal before changing its packaging.');
+  if(!instruction.trim()||instruction.length>2000)throw new Error('Describe the packaging change in under 2,000 characters.');
+  const context={...accepted.context,revisionNotes:instruction};
+  if(!isCanvasContext(context))throw new Error('This packaging direction is too long. Shorten the change; your wording has not been truncated.');
+  return pendingProposal({...session,website:accepted.website},'packaging',context,instruction);
+}
 export function isComplete(version:ProposalVersion|null):boolean {return Boolean(version && PROPOSAL_STAGES.every(stage=>version.assets[stage]));}
 export function addProposalAsset(version:PendingProposal,asset:ProposalConcept):PendingProposal {
   if (asset.stage!=='world' && asset.sourceWorldId!==version.assets.world || ['details','packaging'].includes(asset.stage) && asset.sourcePhysicalId!==version.assets.physical) throw new Error('This section belongs to a different proposal.');

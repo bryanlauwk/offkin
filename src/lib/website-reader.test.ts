@@ -4,6 +4,8 @@ import {
   validatePublicWebsiteUrl, WebsiteReadError, type WebsiteDnsResolver,
 } from '../../supabase/functions/generate-concept/website';
 
+import { WEBSITE_MAX_BYTES } from '../../supabase/functions/generate-concept/website-contract';
+
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import type { RequestOptions } from 'node:https';
@@ -148,10 +150,29 @@ describe('bounded public website reader', () => {
   });
 
   it('caps declared response length and actual streamed bytes', async () => {
-    await expect(readCompanyWebsite('acme.com', { fetch: mockFetch(page(HTML, { 'content-length': '300001' })), resolveDns })).rejects.toThrow('too large');
+    await expect(readCompanyWebsite('acme.com', { fetch: mockFetch(page(HTML, { 'content-length': String(WEBSITE_MAX_BYTES + 1) })), resolveDns })).rejects.toThrow('too large');
     await expect(readCompanyWebsite('acme.com', { fetch: mockFetch(page('x'.repeat(200), { 'content-length': '1' })), resolveDns, maxBytes: 100 })).rejects.toThrow('too large');
     // The limit is UTF-8 bytes, not character count.
     await expect(readCompanyWebsite('acme.com', { fetch: mockFetch(page('é'.repeat(60))), resolveDns, maxBytes: 100 })).rejects.toThrow('too large');
+  });
+
+  it('reads a modern 1.25 MB homepage without changing the 6,000-character evidence cap', async () => {
+    const content = `<html><head><title>Tesla-like public page</title><meta name="description" content="Electric vehicles, solar power and home energy storage."><style>${' '.repeat(1_250_000)}</style></head><body><h1>Public company page</h1></body></html>`;
+    const result = await readCompanyWebsite('company.com', { fetch: mockFetch(page(content, { 'content-length': String(new TextEncoder().encode(content).length) })), resolveDns });
+    expect(result.excerpt).toBe('Electric vehicles, solar power and home energy storage. Public company page');
+    expect(result.excerpt.length).toBeLessThanOrEqual(6000);
+  });
+
+  it('cannot raise the hard byte cap through dependency options', async () => {
+    await expect(readCompanyWebsite('company.com', { fetch: mockFetch(page('x'.repeat(WEBSITE_MAX_BYTES + 1))), resolveDns, maxBytes: WEBSITE_MAX_BYTES * 2 })).rejects.toMatchObject({ code: 'too_large' });
+  });
+
+  it('reports access-denied pages without reading them as business evidence', async () => {
+    for (const response of [new Response(null, { status: 403 }), page('<head><title>Access Denied</title></head><body>You do not have permission to access this page.</body>')]) {
+      const fetch = mockFetch(response);
+      await expect(readCompanyWebsite('company.com', { fetch, resolveDns })).rejects.toMatchObject({ code: 'blocked' });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('bounds DNS, fetch and stalled body time without depending on injected cancellation', async () => {
@@ -173,6 +194,12 @@ describe('untrusted text extraction', () => {
       <svg><text>svg-code</text></svg><iframe>frame-code</iframe><h1>Acme&nbsp;Cup</h1>
       <p>Reusable &#x2615; cups &mdash; made for &#101;veryday adventures.</p></body>`;
     expect(extractWebsiteContent(html, 'text/html')).toEqual({ title: 'Acme & Co', excerpt: 'Acme Cup Reusable ☕ cups — made for everyday adventures.' });
+  });
+
+  it('uses page metadata for a JavaScript shell without running scripts or following links', () => {
+    const html = `<head><title>Paper Studio</title><meta content='Custom paper &amp; packaging for independent shops.' NAME='description'><meta property="og:description" content="Duplicate social description"></head><body><div id="root"></div><script>secret code <meta name="description" content="Wrong description"></script></body>`;
+    expect(extractWebsiteContent(html, 'text/html')).toEqual({ title: 'Paper Studio', excerpt: 'Custom paper & packaging for independent shops.' });
+    expect(extractWebsiteContent('<head><meta property=og:description content="Paper sculpture kits for families."></head>', 'text/html').excerpt).toBe('Paper sculpture kits for families.');
   });
 
   it('drops unfinished scripts and comments and caps source/title text', () => {

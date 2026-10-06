@@ -1,5 +1,6 @@
 // No external website or AI requests: actual Deno TLS + maintained HTTP parser.
 // Generate a temporary CA:false fixture cert for company.invalid, then pass its paths.
+import { WEBSITE_MAX_BYTES } from '../supabase/functions/generate-concept/website-contract.ts';
 import { fetchNativePinnedWebsite } from '../supabase/functions/generate-concept/native-https.ts';
 const [certPath,keyPath]=Deno.args;
 const cert=await Deno.readTextFile(certPath);const key=await Deno.readTextFile(keyPath);
@@ -7,7 +8,8 @@ const abort=new AbortController();
 const listener=Deno.serve({hostname:'127.0.0.1',port:0,cert,key,signal:abort.signal,onListen:()=>{}}, req=>{
  const path=new URL(req.url).pathname;
  if(path==='/headers')return new Response('hello',{headers:{'x-long':'x'.repeat(17000)}});
- if(path==='/large')return new Response('x'.repeat(300001));
+ if(path==='/large')return new Response('x'.repeat(WEBSITE_MAX_BYTES+1));
+ if(path==='/modern')return new Response('x'.repeat(1_250_000));
  if(path==='/compressed')return new Response('not gzip',{headers:{'content-encoding':'gzip'}});
  if(path==='/redirect')return Response.redirect('https://wrong.invalid/',302);
  if(path==='/slow')return new Response(new ReadableStream({start(){}}));
@@ -21,6 +23,9 @@ try{
  const good=await fetchNativePinnedWebsite(new URL('https://company.invalid/'),'127.0.0.1',AbortSignal.timeout(1000),runtime);
  if(good.status!==200||await good.text()!=='Company business page')throw new Error('Chunked response failed');
  console.log('PASS verified TLS + chunked body');
+ const modern=await fetchNativePinnedWebsite(new URL('https://company.invalid/modern'),'127.0.0.1',AbortSignal.timeout(3000),runtime);
+ if(modern.status!==200||(await modern.text()).length!==1_250_000)throw new Error('Modern homepage body failed');
+ console.log('PASS bounded 1.25 MB homepage');
  for(const [url,timeout] of [['https://wrong.invalid/',1000],['https://company.invalid/headers',1000],['https://company.invalid/large',1000],['https://company.invalid/compressed',1000],['https://company.invalid/slow',50]] as const){let refused=false;try{await fetchNativePinnedWebsite(new URL(url),'127.0.0.1',AbortSignal.timeout(timeout),runtime);}catch{refused=true;}if(!refused)throw new Error('Expected rejection '+url);console.log('PASS rejection',url);}
  const redirect=await fetchNativePinnedWebsite(new URL('https://company.invalid/redirect'),'127.0.0.1',AbortSignal.timeout(1000),runtime);
  if(redirect.status!==302||redirect.headers.get('location')!=='https://wrong.invalid/')throw new Error('Redirect followed');
