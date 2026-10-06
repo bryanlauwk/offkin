@@ -2,7 +2,11 @@
 
 ## Experience
 
-The public root is a world-building table: guided business/story choices on the left, a large illustrated world with authored selection controls in the centre, a component tray below, and a collapsible physical concept on the right. Mobile keeps the canvas first and moves choices into bottom sheets. The original full reference boards remain inspectable.
+The public root is a quiet conversation: the exact headline, one brand/website/story composer and three small example-board thumbnails. A short audience question accepts a chip, a free-text answer or the default. A URL-only answer asks for the business story and offers a separate public-site read; typing and continuing do not fetch a website or call AI.
+
+World generation and physical generation remain two explicit actions with usage-credit disclosure. The result grows into a full-width editorial board: complete world illustration, a physical concept only when one exists, actual selected story elements, proposed interaction and collapsed design direction. Packaging, additional product views and construction are future design work, not fabricated outputs. Example boards open separately and never overwrite the draft.
+
+One composer beneath the result accumulates refinement directions verbatim. Saving a direction is local; choosing Generate also includes any pending composer text. The one optional Edit details section retains exact wording, business fields, selection, hero, replacements and physical interaction. No side panels, numbered multi-step chrome or mobile-only duplicate forms are required. The conversation is guided state, not a simulated live AI assistant.
 
 The three authored examples are independent, uncommissioned concept studies. Their boards are visual references, not validated business research, licensed film assets, mechanism specifications or manufactured products. Tesla’s rocket is an expressly speculative horizon motif.
 
@@ -21,6 +25,12 @@ Drafts stay in device storage until the user requests a website read, image gene
 ## Offline commercial path
 
 Quantity, exploratory budget and purpose can be added to a downloadable prototype brief. There is no submission destination, order, payment or reservation. Final design, a physical sample and production are separately scoped and quoted offline. This phase resolves manufacturing simplification, budget, materials, tolerances, stability and one or two meaningful motions if appropriate. The online concept has no fixed size or universal palm-sized limit.
+
+## Conversation revision validation
+
+The conversation-only revision keeps the deployed v9 backend unchanged and uses fixture-based checks. It introduces no paid agent or image-generation requests. The root UI and board tests cover composer entry, optional audience, URL-only fallback, IME input, Unicode, multiple refinement turns, pending-input inclusion, stale states, image recovery and restored/shared source isolation.
+
+Local browser visual checks are currently blocked by `net::ERR_BLOCKED_BY_CLIENT` for localhost:8080. They remain unverified; do not count component tests as desktop or mobile visual acceptance. The next approved preview/public release still requires browser checks.
 
 ## Verification and release gates
 
