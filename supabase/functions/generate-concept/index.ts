@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseSelection, designDirection, type Edition, type GiftFormat } from './options.ts';
 import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
-import { BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION, parseConceptMode, modeDesignDirection } from './prompt.ts';
+import { BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION, parseConceptMode, modeDesignDirection, CO_CREATION_CONTRACT_VERSION, MAX_CONTEXT_CHARS, LEGACY_MAX_CONTEXT_CHARS, MAX_REQUEST_BYTES, isCoCreationContext } from './prompt.ts';
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Cache-Control':'no-store'}});
 const hash = async (s:string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');
 // Temporary owner-requested test waiver. Set BRICK_ENFORCE_DAILY_LIMITS=true to restore caps.
@@ -11,7 +11,7 @@ class Failure extends Error { constructor(public status:number, message:string){
 Deno.serve(async req => {
  if(req.method==='OPTIONS')return json({});
  if(req.method==='GET'){
-  const sourceCapabilities={prompt_version:PROMPT_VERSION,capabilities:{summary_only:true,electronic_story_scene:true}};
+  const sourceCapabilities={prompt_version:PROMPT_VERSION,capabilities:{summary_only:true,electronic_story_scene:true,cocreation:true,context_max_chars:MAX_CONTEXT_CHARS}};
   const url=Deno.env.get('SUPABASE_URL'); const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if(!url||!service)return json({ready:false,...sourceCapabilities,reason:'Backend configuration is missing.'},503);
   const db=createClient(url,service);
@@ -22,13 +22,15 @@ Deno.serve(async req => {
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try {
   const reader=req.body?.getReader(); const chunks:Uint8Array[]=[]; let total=0;
-  if(reader) { try { while(true) { const {done,value}=await reader.read(); if(done)break; total+=value.byteLength; if(total>12000){await reader.cancel();return json({error:'Please shorten your brand brief.'},413);} chunks.push(value); } } finally { reader.releaseLock(); } }
+  if(reader) { try { while(true) { const {done,value}=await reader.read(); if(done)break; total+=value.byteLength; if(total>MAX_REQUEST_BYTES){await reader.cancel();return json({error:'Please shorten your brand brief.'},413);} chunks.push(value); } } finally { reader.releaseLock(); } }
   const bytesIn=new Uint8Array(total); let offset=0;for(const chunk of chunks){bytesIn.set(chunk,offset);offset+=chunk.byteLength;}
-  const raw=new TextDecoder().decode(bytesIn); if(raw.length>3000) return json({error:'Please shorten your brand brief.'},400);
+  const raw=new TextDecoder().decode(bytesIn);
   let input; try{input=JSON.parse(raw);}catch{return json({error:'Invalid request.'},400);}
   if(!input || typeof input!=='object' || Array.isArray(input))return json({error:'Invalid request.'},400);
   if(input.summaryOnly!==undefined && typeof input.summaryOnly!=='boolean')return json({error:'Invalid story request.'},400);
   if(input.inspectWebsite!==undefined && typeof input.inspectWebsite!=='boolean')return json({error:'Invalid inspection request.'},400);
+  if(input.contractVersion!==undefined && input.contractVersion!==CO_CREATION_CONTRACT_VERSION)return json({error:'This co-creation contract is not supported.'},400);
+  const coCreation=input.contractVersion===CO_CREATION_CONTRACT_VERSION;
   const selection=parseSelection(input);
   if(!input.id && !selection)return json({error:'Choose a valid edition and format. Icon is available as a brick build or miniature.'},400);
   const url=Deno.env.get('SUPABASE_URL');const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -46,8 +48,12 @@ Deno.serve(async req => {
    return data?await deliver(data):json({error:'This concept could not be found.'},404);
   }
   const brand=typeof input.brand==='string'?input.brand.trim():'';
-  const context=typeof input.context==='string'?input.context.trim():'';
-  if(brand.length<2||brand.length>120||context.length>600)return json({error:'Enter a brand (2–120 characters) and a short brief (up to 600 characters).'},400);
+  if(input.context!==undefined && typeof input.context!=='string')return json({error:'The design direction must be text.'},400);
+  // Preserve exact wording and whitespace; the versioned context limit must never silently truncate.
+  const context=typeof input.context==='string'?input.context:'';
+  const contextLimit=coCreation?MAX_CONTEXT_CHARS:LEGACY_MAX_CONTEXT_CHARS;
+  if(brand.length<2||brand.length>300||context.length>contextLimit)return json({error:`Enter a website or brand identifier (2–300 characters) and a brief up to ${contextLimit} characters.`},400);
+  if(coCreation&&!isCoCreationContext(context))return json({error:'Use a valid structured co-creation brief with text fields.'},400);
   const mode=parseConceptMode(context);
   if(!mode)return json({error:'Choose mechanical or electronic concept mode.'},400);
   if(mode==='electronic'&&(selection!.edition!=='inside'||selection!.format!=='miniature'))return json({error:'Electronic story-scene studies require the Inside edition and Miniature format.'},400);
@@ -57,7 +63,7 @@ Deno.serve(async req => {
   else try { websiteUrl=validatePublicWebsiteUrl(brand).href; } catch(error) { return json({error:error instanceof Error?error.message:'Enter a public company website.'},400); }
   const key=Deno.env.get('LOVABLE_API_KEY');const enabled=Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
   if(!input.inspectWebsite&&(!key||!enabled))throw new Failure(503,'Live generation is not available yet. Please try again later.');
-  const cacheKey=await hash(JSON.stringify([PROMPT_VERSION,websiteUrl,context,Boolean(input.summaryOnly),selection!.edition,selection!.format]));
+  const cacheKey=await hash(JSON.stringify([PROMPT_VERSION,input.contractVersion||'legacy',websiteUrl,context,Boolean(input.summaryOnly),selection!.edition,selection!.format]));
   const {data:cached,error:cacheError}=await db.from('brick_concepts').select('id,brand,title,story,image_path,edition,format,interaction,source_url,source_title').eq('cache_key',cacheKey).maybeSingle();
   if(cacheError)throw new Failure(503,'Concept generation is being set up. Please try again later.');
   if(cached&&!input.inspectWebsite)return await deliver(cached);
@@ -69,11 +75,11 @@ Deno.serve(async req => {
    if(!allowed)throw new Failure(429,'Today’s concept limit has been reached. Try again tomorrow.');
   }
   let website: {url:string;title:string;excerpt:string}|null=null;
-  if(input.summaryOnly===true && !context)return json({needsContext:true,message:'Tell us what your business does so we can start with your story.'});
+  if(input.summaryOnly===true && !context.trim())return json({needsContext:true,message:'Tell us what your business does so we can start with your story.'});
   try { if(input.summaryOnly!==true)website=await readCompanyWebsite(websiteUrl); }
   catch(error) {
    if(error instanceof WebsiteReadError && error.status===400)return json({error:error.message},400);
-   if(!context)return json({needsContext:true,message:'We could not read that public website. Add a short business summary so we can create an accurate concept without guessing.'});
+   if(!context.trim())return json({needsContext:true,message:'We could not read that public website. Add a short business summary so we can create an accurate concept without guessing.'});
   }
   if(input.inspectWebsite===true)return json({website,verified:Boolean(website),verification:website?'Website text fetched without AI generation.':'Website could not be read; no AI generation was attempted.'});
   async function ai(path:string,body:unknown){
@@ -106,3 +112,4 @@ Deno.serve(async req => {
   return await deliver(row);
  }catch(e){return json({error:e instanceof Failure?e.message:'The concept could not be completed. Please try again.'},e instanceof Failure?e.status:503);}
 });
+

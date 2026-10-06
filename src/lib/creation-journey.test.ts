@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { emptyDraft, loadCreationDraft, makeCreationContext, makeElectronicBrief, saveCreationDraft, type CreationDraft } from './creation-journey';
+import {
+  DEFAULT_CREATION_SCALE, MAX_CREATION_CONTEXT_CHARS, draftFieldLimits, emptyDraft,
+  loadCreationDraft, makeCreationContext, makeElectronicBrief, normalizeCreationDraft,
+  parseCreationDraft, saveCreationDraft, type CreationDraft,
+} from './creation-journey';
 import { angleEvidence, getStoryAngle, storyAngles } from './story-angles';
 
 const draft: CreationDraft = {
   ...emptyDraft, website: 'https://company.com', business: 'We personalise and pack gift orders by hand.',
   angle: 'ritual', hiddenDetail: 'Each ribbon is turned twice.', audience: 'Customers & fans',
   wording: '  MY brand™\nSame. Words!  ', placement: 'On the base',
+  brandIdentifiers: 'Ultramarine, the circle mark, the folded ribbon.', scale: 'A shelf-sized world',
 };
 
 beforeEach(() => { localStorage.clear(); });
@@ -16,75 +21,91 @@ describe('Customer creation context', () => {
     expect(JSON.parse(makeCreationContext(draft)).exactWording).toBe(draft.wording);
   });
 
-  it('carries the specific chosen story and hidden detail with all design decisions', () => {
+  it('carries the specific story, scale, brand identifiers and all design decisions', () => {
     expect(JSON.parse(makeCreationContext(draft))).toEqual({
-      business: draft.business, angle: 'The unseen ritual', hiddenDetail: draft.hiddenDetail,
+      mode: draft.mode, business: draft.business, angle: 'The unseen ritual', hiddenDetail: draft.hiddenDetail,
       item: draft.item, audience: draft.audience, exactWording: draft.wording,
       placement: draft.placement, style: draft.style, interaction: draft.interaction,
+      scale: draft.scale, brandIdentifiers: draft.brandIdentifiers,
     });
   });
 
-  it('preserves the customer’s supplied hidden detail rather than replacing it with a generic prompt', () => {
+  it('preserves the customer’s detail rather than replacing it with a generic prompt', () => {
     const hiddenDetail = '  We fold EVERY card by hand!\nTwice.  ';
     expect(JSON.parse(makeCreationContext({ ...draft, hiddenDetail })).hiddenDetail).toBe(hiddenDetail);
   });
 
-  it('explicitly marks electronic contexts without changing any customer-supplied wording', () => {
-    const mechanical = JSON.parse(makeCreationContext(draft));
-    const electronic = JSON.parse(makeCreationContext({ ...draft, mode: 'electronic' }));
-    expect(mechanical).not.toHaveProperty('mode');
-    expect(electronic).toEqual({ ...mechanical, mode: 'electronic', interaction: 'One button, display and LED' });
+  it('marks electronic direction without forcing new hardware or replacing chosen interaction', () => {
+    const mechanical = JSON.parse(makeCreationContext({ ...draft, interaction: 'Turn to reveal' }));
+    const electronic = JSON.parse(makeCreationContext({ ...draft, mode: 'electronic', interaction: 'Turn to reveal' }));
+    expect(mechanical.mode).toBe('mechanical');
+    expect(electronic).toEqual({ ...mechanical, mode: 'electronic' });
     expect(electronic.exactWording).toBe(draft.wording);
   });
 
-  it('keeps optional new fields absent for a legacy direction', () => {
-    const result = JSON.parse(makeCreationContext({ ...draft, angle: '', hiddenDetail: '' }));
+  it('does not invent missing story facts or brand references for legacy directions', () => {
+    const { scale: _scale, brandIdentifiers: _brand, ...legacy } = draft;
+    const result = JSON.parse(makeCreationContext({ ...legacy, angle: '', hiddenDetail: '' }));
     expect(result).not.toHaveProperty('angle');
     expect(result).not.toHaveProperty('hiddenDetail');
+    expect(result).not.toHaveProperty('brandIdentifiers');
+    expect(result.scale).toBe(DEFAULT_CREATION_SCALE);
     expect(result.exactWording).toBe(draft.wording);
   });
 
-  it('accepts the deployed 600-character limit and rejects overflow without changing lettering', () => {
-    const base = { ...draft, business: 'A', hiddenDetail: '' };
-    const spare = 600 - makeCreationContext(base).length;
-    const exactLimit = { ...base, business: `A${'x'.repeat(spare)}` };
-    expect(makeCreationContext(exactLimit)).toHaveLength(600);
-    const tooLong = { ...exactLimit, business: `${exactLimit.business}x` };
-    expect(() => makeCreationContext(tooLong)).toThrow(/shorten/);
-    expect(tooLong.wording).toBe(draft.wording);
+  it('accepts rich directions above the old 600-character limit without truncation', () => {
+    const rich = { ...draft, business: 'b'.repeat(500), hiddenDetail: 'h'.repeat(500), wording: 'w'.repeat(200), brandIdentifiers: 'i'.repeat(300) };
+    const result = makeCreationContext(rich);
+    expect(result.length).toBeGreaterThan(600);
+    expect(result.length).toBeLessThanOrEqual(6000);
+    expect(JSON.parse(result)).toMatchObject({ business: rich.business, hiddenDetail: rich.hiddenDetail, exactWording: rich.wording, brandIdentifiers: rich.brandIdentifiers });
   });
 
-  it('never silently truncates a long direction', () => {
-    expect(() => makeCreationContext({ ...draft, business: 'x'.repeat(601) })).toThrow(/shorten/);
+  it('bounds the serialized context at exactly 6000 characters, including escaped text', () => {
+    const base = { ...draft, business: '\u0001'.repeat(500), hiddenDetail: 'x'.repeat(500), wording: '' };
+    const gap = MAX_CREATION_CONTEXT_CHARS - makeCreationContext(base).length;
+    const escapes = Math.floor(gap / 5);
+    expect(escapes).toBeLessThanOrEqual(500);
+    const exact = { ...base, hiddenDetail: '\u0001'.repeat(escapes) + 'x'.repeat(500 - escapes), wording: 'x'.repeat(gap % 5) };
+    expect(makeCreationContext(exact)).toHaveLength(6000);
+    expect(() => makeCreationContext({ ...exact, wording: `${exact.wording}x` })).toThrow(/shorten/);
+  });
+
+  it('never silently truncates fields that exceed their individual limits', () => {
+    const tooLong = { ...draft, business: 'x'.repeat(501) };
+    expect(() => makeCreationContext(tooLong)).toThrow(/character limits/);
+    expect(tooLong.wording).toBe(draft.wording);
   });
 
   it.each(['', '  \n\t  '])('requires a customer-confirmed business story for %j', business => {
     expect(() => makeCreationContext({ ...draft, business })).toThrow(/known for/);
   });
+
+  it('normalizes optional UI defaults without changing exact wording or the source draft', () => {
+    const { scale: _scale, brandIdentifiers: _brand, ...legacy } = draft;
+    expect(normalizeCreationDraft(legacy)).toEqual({ ...legacy, scale: DEFAULT_CREATION_SCALE, brandIdentifiers: '' });
+    expect(legacy).not.toHaveProperty('scale');
+  });
 });
 
 describe('Exploratory electronic brief', () => {
-  it('preserves all customer answers, including exact whitespace, punctuation and line breaks', () => {
+  it('preserves review facts and exact whitespace, punctuation and line breaks', () => {
     const electronic = { ...draft, mode: 'electronic' as const };
     const brief = makeElectronicBrief(electronic);
-    expect(brief).toContain(`Business: ${electronic.business}`);
-    expect(brief).toContain(`Website: ${electronic.website}`);
+    for (const [label, answer] of [['Business', draft.business], ['Website', draft.website], ['Hidden detail', draft.hiddenDetail], ['Object', draft.item], ['Audience', draft.audience], ['Style', draft.style], ['Scale', draft.scale], ['Brand identifiers', draft.brandIdentifiers], ['Wording placement', draft.placement]]) {
+      expect(brief).toContain(`${label}: ${answer}`);
+    }
     expect(brief).toContain('Story lens: The unseen ritual');
-    expect(brief).toContain(`Hidden detail: ${electronic.hiddenDetail}`);
-    expect(brief).toContain(`Object: ${electronic.item}`);
-    expect(brief).toContain(`Audience: ${electronic.audience}`);
-    expect(brief).toContain(`Style: ${electronic.style}`);
-    expect(brief).toContain(`Wording placement: ${electronic.placement}`);
     const wording = brief.split('\n\n').find(line => line.startsWith('Exact wording: '))!;
     expect(JSON.parse(wording.slice('Exact wording: '.length))).toBe(electronic.wording);
   });
 
-  it('bounds the proposed hardware, optional AI and validation without making availability or price promises', () => {
+  it('bounds proposed hardware, optional AI and validation without availability or price promises', () => {
     const brief = makeElectronicBrief({ ...draft, mode: 'electronic' });
     expect(brief).toContain('Not a tested product, quotation or order');
     expect(brief).toMatch(/USB power.*ESP32-class controller.*one button.*small display.*LED/);
     expect(brief).toContain('not a validated specification');
-    expect(brief).toMatch(/Optional AI: a short response grounded in approved brand material/);
+    expect(brief).toContain('Optional AI: a short response grounded in approved brand material');
     expect(brief).toContain('No Muse integration is assumed');
     expect(brief).toContain('No camera, microphone or motor is required');
     expect(brief).toMatch(/Prototype review:.*electrical safety.*firmware.*network failure.*content boundaries.*data privacy/);
@@ -93,16 +114,17 @@ describe('Exploratory electronic brief', () => {
     expect(brief).toContain('RM100–500 as a range to investigate');
     expect(brief).toContain('not a promised unit price');
     expect(brief).toContain('Outsourced samples and supplier quotes');
+    expect(brief).not.toMatch(/palm-sized|palm size/i);
   });
 });
 
 describe('Device-local direction storage', () => {
-  it('defaults new directions to the existing mechanical flow', () => {
-    expect(emptyDraft.mode).toBe('mechanical');
+  it('defaults to a mechanical, illustrative story world without a size restriction', () => {
+    expect(emptyDraft).toMatchObject({ mode: 'mechanical', item: 'Sculptural story world', style: 'Illustrated & surreal', scale: DEFAULT_CREATION_SCALE });
   });
 
   it('round-trips every answer without trimming exact wording or hidden detail', () => {
-    saveCreationDraft('saved', draft);
+    expect(saveCreationDraft('saved', draft)).toBe(true);
     expect(loadCreationDraft('saved')).toEqual(draft);
     expect(JSON.parse(localStorage.getItem('dioramini:direction:saved')!)).toEqual(draft);
   });
@@ -114,13 +136,14 @@ describe('Device-local direction storage', () => {
     expect(loadCreationDraft('second')?.angle).toBe('human');
   });
 
-  it('loads older saved directions with empty new fields while retaining all existing answers', () => {
-    const { angle: _angle, hiddenDetail: _hiddenDetail, mode: _mode, ...legacy } = draft;
+  it('loads oldest saved directions with legacy fields and values intact', () => {
+    const { angle: _angle, hiddenDetail: _hidden, mode: _mode, scale: _scale, brandIdentifiers: _brand, ...rest } = draft;
+    const legacy = { ...rest, item: 'Small diorama', style: 'Minimal & architectural' };
     localStorage.setItem('dioramini:direction:old', JSON.stringify(legacy));
     expect(loadCreationDraft('old')).toEqual({ ...legacy, angle: '', hiddenDetail: '', mode: 'mechanical' });
   });
 
-  it('loads a saved story direction without mode as mechanical without losing any answers', () => {
+  it('loads a saved story direction without mode without losing answers', () => {
     const { mode: _mode, ...legacy } = draft;
     localStorage.setItem('dioramini:direction:old-story', JSON.stringify(legacy));
     expect(loadCreationDraft('old-story')).toEqual({ ...legacy, mode: 'mechanical' });
@@ -132,7 +155,7 @@ describe('Device-local direction storage', () => {
     expect(loadCreationDraft('electronic')).toEqual(electronic);
   });
 
-  it('does not persist a generated context as if it were the complete source draft', () => {
+  it('does not persist generated context as the complete source draft', () => {
     localStorage.setItem('dioramini:direction:context', makeCreationContext(draft));
     expect(loadCreationDraft('context')).toBeUndefined();
   });
@@ -146,36 +169,51 @@ describe('Device-local direction storage', () => {
     expect(loadCreationDraft('missing')).toBeUndefined();
   });
 
+  it.each(Object.entries(draftFieldLimits))('accepts the %s limit and rejects overflow', (key, limit) => {
+    expect(parseCreationDraft({ ...draft, [key]: 'x'.repeat(limit) })).toBeDefined();
+    expect(parseCreationDraft({ ...draft, [key]: 'x'.repeat(limit + 1) })).toBeUndefined();
+  });
+
   it.each([
-    ['website', 'x'.repeat(121)], ['business', 'x'.repeat(151)], ['wording', 'x'.repeat(101)],
-    ['audience', 'x'.repeat(41)], ['hiddenDetail', 'x'.repeat(121)], ['hiddenDetail', 42],
-    ['angle', 'invented-angle'], ['angle', null], ['item', 'Full-size statue'],
+    ['hiddenDetail', 42], ['angle', 'invented-angle'], ['angle', null], ['item', 'Full-size statue'],
     ['placement', 'Somewhere'], ['style', 'Invented style'], ['interaction', 'Unknown mechanism'],
-    ['summaryOnly', 'false'], ['business', null],
-    ['mode', 'unknown'], ['mode', null], ['mode', true],
+    ['summaryOnly', 'false'], ['business', null], ['mode', 'unknown'], ['mode', null], ['mode', true],
+    ['scale', null], ['scale', ['Large']], ['brandIdentifiers', { logo: 'mark' }], ['wording', false],
   ])('rejects an invalid saved %s field', (key, value) => {
     localStorage.setItem('dioramini:direction:bad', JSON.stringify({ ...draft, [key]: value }));
     expect(loadCreationDraft('bad')).toBeUndefined();
   });
 
-  it('accepts the previous supported business length so old answers are not silently dropped', () => {
-    saveCreationDraft('legacy-length', { ...draft, business: 'x'.repeat(150) });
-    expect(loadCreationDraft('legacy-length')?.business).toHaveLength(150);
+  it.each(['Sculptural story world', 'Mechanical story object', 'Scene in a frame', 'Miniature workstation', 'Small diorama'])('accepts new and legacy format %s', item => {
+    expect(parseCreationDraft({ ...draft, item })?.item).toBe(item);
   });
 
-  it('ignores extra persisted properties rather than passing them into the direction', () => {
-    localStorage.setItem('dioramini:direction:extra', JSON.stringify({ ...draft, unsupported: 'ignored' }));
+  it('ignores extra legacy properties but rejects unknown imported fields', () => {
+    const extra = { ...draft, unsupported: 'ignored' };
+    localStorage.setItem('dioramini:direction:extra', JSON.stringify(extra));
     expect(loadCreationDraft('extra')).toEqual(draft);
+    expect(parseCreationDraft(extra, { strict: true })).toBeUndefined();
+  });
+
+  it('refuses invalid writes without replacing an existing valid draft', () => {
+    saveCreationDraft('saved', draft);
+    expect(saveCreationDraft('saved', { ...draft, business: 'x'.repeat(501) })).toBe(false);
+    expect(loadCreationDraft('saved')).toEqual(draft);
   });
 
   it('allows creation to continue when the browser cannot write local storage', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage disabled'); });
-    expect(() => saveCreationDraft('saved', draft)).not.toThrow();
+    expect(saveCreationDraft('saved', draft)).toBe(false);
   });
 
   it('handles unavailable local storage while loading a shared concept', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('Storage disabled'); });
     expect(loadCreationDraft('saved')).toBeUndefined();
+  });
+
+  it('rejects oversized stored payloads before parsing them', () => {
+    localStorage.setItem('dioramini:direction:huge', ' '.repeat(24001));
+    expect(loadCreationDraft('huge')).toBeUndefined();
   });
 });
 
@@ -218,3 +256,4 @@ describe('Specific editorial story evidence', () => {
     expect(angleEvidence({ url: 'https://company.com', title: 'Company', excerpt }, '')[0]).toBe(excerpt.slice(0, 210));
   });
 });
+

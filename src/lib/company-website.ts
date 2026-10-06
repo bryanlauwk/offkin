@@ -5,6 +5,8 @@ export function normalizeCompanyWebsite(input: string): string | null {
   try {
     const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`);
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || !url.hostname.includes('.') || url.hostname.endsWith('.') || url.port) return null;
-    return `${url.protocol}//${url.hostname}${url.pathname === '/' ? '' : url.pathname}`;
+    const normalized = `${url.protocol}//${url.hostname}${url.pathname === '/' ? '' : url.pathname}`;
+    return normalized.length <= 300 ? normalized : null;
   } catch { return null; }
 }
+
