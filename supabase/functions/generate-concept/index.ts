@@ -71,7 +71,11 @@ export async function handleRequest(req: Request) {
   const key=Deno.env.get('LOVABLE_API_KEY');const enabled=Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
   async function ai(path:string,body:unknown){
    if(req.signal.aborted)throw new Failure(499,'The request was cancelled.');
-   const response=await fetch('https://ai.gateway.lovable.dev/v1/'+path,{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Lovable-API-Key':key!,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.any([req.signal,AbortSignal.timeout(100000)])});
+   const multipart=body instanceof FormData;
+   const headers:Record<string,string>={'Authorization':`Bearer ${key}`,'Lovable-API-Key':key!};
+   // Fetch supplies the multipart boundary. A manually set Content-Type would corrupt it.
+   if(!multipart)headers['Content-Type']='application/json';
+   const response=await fetch('https://ai.gateway.lovable.dev/v1/'+path,{method:'POST',headers,body:multipart?body:JSON.stringify(body),signal:AbortSignal.any([req.signal,AbortSignal.timeout(100000)])});
    if(!response.ok)throw new Failure(response.status===429?429:503,response.status===429?'The generator is busy. Please try again shortly.':'The generator is unavailable right now. Please try again later.');
    return await response.json();
   }
