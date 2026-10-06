@@ -8,8 +8,6 @@ import { toast } from 'sonner';
 import { ArrowLeft, Save, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const ADMIN_PASSWORD = 'marshmallow2024';
-
 export default function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -47,33 +45,40 @@ export default function Admin() {
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-settings', {
+        body: { password },
+      });
+      if (error || !data?.ok) {
+        toast.error('Incorrect password');
+        return;
+      }
       setIsAuthenticated(true);
       toast.success('Welcome, admin!');
-    } else {
+    } catch {
       toast.error('Incorrect password');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const updates = [
-        { key: 'logo_url', value: logoUrl },
-        { key: 'logo_link', value: logoLink },
-        { key: 'site_title', value: siteTitle },
-      ];
-
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('site_settings')
-          .update({ value: update.value })
-          .eq('key', update.key);
-        
-        if (error) throw error;
-      }
+      const { data, error } = await supabase.functions.invoke('admin-settings', {
+        body: {
+          password,
+          settings: {
+            logo_url: logoUrl,
+            logo_link: logoLink,
+            site_title: siteTitle,
+          },
+        },
+      });
+      if (error || !data?.ok) throw error ?? new Error('Save failed');
 
       toast.success('Settings saved successfully!');
     } catch (error) {
