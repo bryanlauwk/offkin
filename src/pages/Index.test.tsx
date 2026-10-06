@@ -5,7 +5,9 @@ import { CANVAS_CAPABILITIES, type CanvasConcept, type CanvasRequest } from '../
 import { CANVAS_CONTRACT_VERSION } from '@/lib/canvas-api';
 import { CANVAS_SESSION_KEY, canvasContext, decodeCanvasShare, emptyCanvasSession, encodeCanvasShare, saveCanvasSession, saveCanvasSnapshot, worldFingerprint, type CanvasSession } from '@/lib/canvas-session';
 import { worldReferences } from '@/lib/world-references';
-import Index from './Index';
+import CanvasStudio from '@/components/CanvasStudio';
+// The preserved v9 canvas has its own regression suite; v10 root routing is tested in ProposalStudio.test.tsx.
+const Index = CanvasStudio;
 
 const settings = vi.hoisted(() => ({ values: [{ key: 'site_title', value: 'OFFKIN' }] }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: () => ({ select: async () => ({ data: settings.values }) }) } }));
