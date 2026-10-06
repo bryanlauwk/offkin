@@ -9,3 +9,6 @@
 
 .cw-hotspot::before{content:"";position:absolute;inset:-9px;border-radius:50%}.cw-hotspot:focus-visible{outline:3px solid #d05b25;outline-offset:5px}.cw-tools button,.cw-icon-button{min-height:30px}
 @media(max-width:900px){.cw-mobile-nav button{min-height:36px}.cw-canvas-controls .cw-icon-button{min-width:32px;min-height:32px}.cw-reference-tabs button{min-height:32px}.cw-element-card{min-height:90px}.cw-mobile-sheet .cw-url-row>button{min-width:44px;min-height:44px}}
+
+.cw-reference-tabs button{display:inline-flex;align-items:center;gap:4px}.cw-reference-tabs button>span{display:inline-flex;margin-left:0}.cw-interactions button>span{display:inline-flex}
+@media(min-width:901px){.cw-intro{padding-top:30px;padding-bottom:28px}.cw-eyebrow{margin-bottom:12px!important}}

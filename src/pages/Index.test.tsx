@@ -428,3 +428,34 @@ describe('Restore lifecycle regressions', () => {
     expect(screen.getByText(/Your story has changed/)).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Generate physical concept' })).toBeDisabled(); expect(posted(posts)).toEqual({ id: worldId });
   });
 });
+
+describe('Responsive sheet accessibility', () => {
+  it('mounts one uniquely labelled story form on a narrow viewport and keeps its answers after closing', async () => {
+    vi.stubGlobal('innerWidth',390); const {posts}=installFetch(); mount();
+    expect(screen.queryByLabelText('WHAT SHOULD WE KNOW?')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Your story'}));
+    let dialog=screen.getByRole('dialog',{name:'Your business story'});
+    const field=within(dialog).getByLabelText('WHAT SHOULD WE KNOW?');
+    expect(document.querySelectorAll('#canvas-business')).toHaveLength(1);
+    fireEvent.change(field,{target:{value:business}});
+    fireEvent.click(within(dialog).getByRole('button',{name:'Close'}));
+    expect(screen.queryByLabelText('WHAT SHOULD WE KNOW?')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:'Your story'}));
+    dialog=screen.getByRole('dialog',{name:'Your business story'});
+    expect(within(dialog).getByLabelText('WHAT SHOULD WE KNOW?')).toHaveValue(business);
+    expect(document.querySelectorAll('#canvas-business')).toHaveLength(1);
+    expect(posts).not.toHaveBeenCalled();
+  });
+  it('mounts one element editor on narrow screens and closes the sheet cleanly on desktop resize', async () => {
+    vi.stubGlobal('innerWidth',390); installFetch(); mount();
+    fireEvent.click(element('Bélo landmark'));
+    const dialog=screen.getByRole('dialog',{name:'Shape the story elements'});
+    expect(within(dialog).getByLabelText('OR REPLACE WITH ANOTHER IDEA')).toBeInTheDocument();
+    expect(document.querySelectorAll('#replace-element')).toHaveLength(1);
+    vi.stubGlobal('innerWidth',1280); fireEvent(window,new Event('resize'));
+    await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(document.querySelectorAll('#replace-element')).toHaveLength(1);
+    expect(document.querySelectorAll('#canvas-business')).toHaveLength(1);
+    expect(screen.getByLabelText('WHAT SHOULD WE KNOW?')).toBeInTheDocument();
+  });
+});
