@@ -213,7 +213,7 @@ describe('Commercial co-creation entry', () => {
     settings.title = 'My Studio';
     mount();
     await screen.findByRole('link', { name: 'My Studio home' });
-    await waitFor(() => expect(document.title).toBe('My Studio — Your business DNA. Made collectible.'));
+    await waitFor(() => expect(document.title).toBe('My Studio — Illustrated Brand Worlds, Made Collectible'));
   });
 
   it.each(['DIORAMINI', 'BRIQ2.0', 'form.', 'STIVE'])('rebrands the legacy %s setting', async title => {
@@ -221,7 +221,7 @@ describe('Commercial co-creation entry', () => {
     await act(async () => { mount(); });
     expect(screen.getByRole('link', { name: 'OFFKIN home' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: `${title} home` })).not.toBeInTheDocument();
-    expect(document.title).toBe('OFFKIN｜异趣伙伴 — Your business DNA. Made collectible.');
+    expect(document.title).toBe('OFFKIN｜异趣伙伴 — Illustrated Brand Worlds, Made Collectible');
   });
 
   it('retires old sample URL parameters without selecting or generating a client concept', async () => {

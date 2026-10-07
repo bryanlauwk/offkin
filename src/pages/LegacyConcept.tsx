@@ -42,7 +42,7 @@ export default function Index() {
     }); return () => { active = false; };
   }, []);
   useEffect(() => {
-    document.title = selected ? `${selected.title} — ${displayStudioName(settings.siteTitle)}` : `${displayStudioName(settings.siteTitle)} — ${studioBrand.headline}`;
+    document.title = selected ? `${selected.title} — ${displayStudioName(settings.siteTitle)}` : `${displayStudioName(settings.siteTitle)} — ${studioBrand.pageTitleSuffix}`;
     setImageFailed(false); setShareStatus(''); window.scrollTo(0, 0);
   }, [selected, settings.siteTitle]);
   useEffect(() => { setEditing(false); setStatus(''); setDraft(conceptId ? directions.current.get(conceptId) || loadCreationDraft(conceptId) : undefined); }, [conceptId]);

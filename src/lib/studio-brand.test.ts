@@ -15,8 +15,10 @@ describe('OFFKIN identity', () => {
   it('ships matching metadata and an original OFFKIN favicon', () => {
     const html = readFileSync('index.html', 'utf8');
     const favicon = readFileSync('public/favicon.png');
-    expect(html).toContain('<title>OFFKIN｜异趣伙伴 — Your business DNA. Made collectible.</title>');
-    expect(html).toContain('content="OFFKIN｜异趣伙伴 — Your business DNA. Made collectible."');
+    const title = `${studioBrand.displayName} — ${studioBrand.pageTitleSuffix}`;
+    expect(html).toContain(`<title>${title}</title>`);
+    expect(html).toContain(`content="${title}"`);
+    expect(html).toContain(`content="${studioBrand.metaDescription}"`);
     expect(html).toContain('href="/favicon.png"');
     expect(html).not.toMatch(/dioramini/i);
     expect(favicon.length).toBeGreaterThan(500);
