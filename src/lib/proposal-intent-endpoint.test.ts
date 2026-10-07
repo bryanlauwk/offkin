@@ -55,15 +55,15 @@ const design = {
   interaction: 'Server-derived', design: 'Server-derived', worldElements: elements,
 };
 function visual(action: ConstructionIntent['action']): BriefVisualChoice {
-  return { version: 'construction-visual-v1', parts: [
-    { role: 'body', storyElementIds: ['archive-ribbon'], geometry: 'ribbon', profile: 'asymmetric', finish: 'matte', colors: ['#198C86'] },
-    { role: 'hero', storyElementIds: ['paper-moth'], geometry: 'organic', profile: 'layered', finish: 'selective-color', colors: ['#8156A8', '#DDD3EC'] },
-    ...(action === 'press-reveal-manual-reset' ? [{ role: 'retainer' as const, storyElementIds: [], geometry: 'sculpted' as const, profile: 'rounded' as const, finish: 'matte' as const, colors: ['#198C86'] }] : []),
+  return { version: 'construction-visual-v2', parts: [
+    { role: 'body', representation:'single-form', storyElementIds: ['archive-ribbon'], geometry: 'ribbon', profile: 'asymmetric', finish: 'matte', colors: ['#198C86'] },
+    { role: 'hero', representation:'single-form', storyElementIds: ['paper-moth'], geometry: 'organic', profile: 'layered', finish: 'selective-color', colors: ['#8156A8', '#DDD3EC'] },
+    ...(action === 'press-reveal-manual-reset' ? [{ role: 'retainer' as const, representation:'support' as const, storyElementIds: [], geometry: 'sculpted' as const, profile: 'rounded' as const, finish: 'matte' as const, colors: ['#198C86'] }] : []),
   ] };
 }
 function worldRequest(action: ConstructionIntent['action']): ProposalRequest {
   const constructionIntent: ConstructionIntent = { version: 'construction-intent-v1', action };
-  return { contractVersion: PROPOSAL_CONTRACT_VERSION, stage: 'world', brand: 'no-website', constructionIntent,
+  return { contractVersion: PROPOSAL_CONTRACT_VERSION, stage: 'world', brand: 'no-website', customerIdentity:{version:'customer-brand-v1',name:design.brand}, constructionIntent,
     context: {
       business: 'Nacre Letterworks is a fictional illustrated stationery studio. Create a violet folded-paper moth and a teal archive ribbon as dimensional sculptural forms.',
       style: 'A floating asymmetric folded-paper composition with dimensional fins, a sweeping ribbon and open gaps.',
@@ -390,4 +390,48 @@ describe('actual proposal entry point with explicit per-brief construction inten
     expect(result.status).toBe(400); expect(await result.json()).toHaveProperty('error');
     expectNoGeneration(); expect(state.rows).toHaveLength(0);
   });
+});
+
+
+describe('explicit customer identity through actual deployed entry point',()=>{
+ it.each(['OFFKIN Collective','',null])('pins the customer name instead of a model substitution %s',brand=>{
+  return (async()=>{
+   const request=worldRequest('static');request.customerIdentity={version:'customer-brand-v1',name:'月页 · Nacre'};
+   state.output={...design,brand,constructionVisual:visual('static')};
+   const world=await generate(request);expect(world.brand).toBe(request.customerIdentity.name);expect(world.customerIdentity).toEqual(request.customerIdentity);
+   expect(parseProposalManifest(String(state.rows[0].story))?.customerIdentity).toEqual(request.customerIdentity);
+   expect(imagePrompt(0)).toContain(request.customerIdentity.name);expect(imagePrompt(0)).not.toContain('OFFKIN Collective');
+   state.output=undefined;const physical=await generate(physicalRequest(world,request));expect(physical.customerIdentity).toEqual(world.customerIdentity);expect(physical.brand).toBe(world.brand);
+  })();
+ });
+ it('clarifies a prose-only new world before any provider, quota, download or save',async()=>{
+  const request=worldRequest('static');delete request.customerIdentity;
+  const before=structuredClone(request),response=await post(request);
+  expect(await response.json()).toEqual({needsContext:true,message:expect.stringContaining('exact customer brand name')});expectNoGeneration();expect(state.rows).toHaveLength(0);expect(request).toEqual(before);
+ });
+ it.each([null,{}, {version:'invented',name:'Nacre'}, {version:'customer-brand-v1',name:''}, {version:'customer-brand-v1',name:' '.repeat(4)}, {version:'customer-brand-v1',name:'x'.repeat(121)}, {version:'customer-brand-v1',name:'Nacre\nRename'}, {version:'customer-brand-v1',name:'Nacre',reviewed:true}])('rejects an invalid explicit identity without providers %#',async customerIdentity=>{
+  const response=await post({...worldRequest('static'),customerIdentity});expect(response.status).toBe(400);expectNoGeneration();
+ });
+ it('separates identity in cache and construction source binding and preserves cache hits',async()=>{
+  const request=worldRequest('static'),first=await generate(request);const firstSource=first.constructionOrigin?.sourceDigest;
+  resetTransports();expect((await generate(request)).id).toBe(first.id);expectNoGeneration();
+  const second=await generate({...request,customerIdentity:{version:'customer-brand-v1',name:'Fictional Copperleaf'}});
+  expect(second.id).not.toBe(first.id);expect(second.brand).toBe('Fictional Copperleaf');expect(second.constructionOrigin?.sourceDigest).not.toBe(firstSource);expect(state.rows).toHaveLength(2);
+ });
+ it('rejects a descendant brand change before paid work, and allows an explicit new-world revision',async()=>{
+  const request=worldRequest('static'),world=await generate(request);const saved=structuredClone(state.rows);
+  resetTransports();const changed={version:'customer-brand-v1' as const,name:'Fictional Copperleaf'};
+  const result=await post({...physicalRequest(world,request),customerIdentity:changed});expect(result.status).toBe(400);expectNoGeneration();expect(state.rows).toEqual(saved);
+  const revision=await generate({...request,previousAssetId:world.id,customerIdentity:changed});expect(revision.brand).toBe(changed.name);expect(state.rows[0]).toEqual(saved[0]);
+ });
+ it('inherits an explicitly saved name for a world revision and rejects a corrupt row/name on restore',async()=>{
+  const request=worldRequest('static'),world=await generate(request);delete request.customerIdentity;
+  const revision=await generate({...request,previousAssetId:world.id});expect(revision.brand).toBe(world.brand);expect(revision.customerIdentity).toEqual(world.customerIdentity);
+  state.rows[0].brand='Model overwrite';resetTransports();const response=await post({id:world.id});expect(response.status).not.toBe(200);expectNoGeneration();
+ });
+ it('does not let model identity or fake request bypass flags become authority',async()=>{
+  state.output={...design,customerIdentity:{version:'customer-brand-v1',name:'Model alias'},constructionVisual:visual('static')};
+  const response=await post(worldRequest('static'));expect(await response.json()).toHaveProperty('needsConstruction',true);expect(state.imageCalls).toBe(0);
+  resetTransports();const rejected=await post({...worldRequest('static'),requireCustomerIdentity:false});expect(rejected.status).toBe(400);expectNoGeneration();
+ });
 });

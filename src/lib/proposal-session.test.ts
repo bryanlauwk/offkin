@@ -1,3 +1,4 @@
+import { CUSTOMER_IDENTITY_VERSION, type CustomerIdentity } from '../../supabase/functions/generate-concept/proposal';
 import { CONSTRUCTION_INTENT_VERSION, constructionInteraction, type ConstructionIntent } from '../../supabase/functions/generate-concept/construction-intent';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { addProposalAsset, assetsForVersion, confirmedPackagingChange, decodeProposalShare, emptyProposalSession, encodeProposalShare, isComplete, loadProposalSession, loadProposalSnapshot, parseProposalSession, pendingProposal, proposalBrief, requestForStage, saveProposalSession, saveProposalSnapshot, type ProposalSession } from './proposal-session';
@@ -8,8 +9,45 @@ function session():ProposalSession{const s=emptyProposalSession();s.context.busi
 function asset(stage:ProposalStage):ProposalConcept {const s=session();return {contractVersion:'offkin-proposal-v10',stageVersion:'proposal-assets-v1',stage,id:ids[stage],brand:'Paper',title:stage,story:'Paper world story',design:'One rich world',interaction:'Turn to reveal',context:s.context,worldElements:[{id:'house',label:'House',description:'Proposed paper house',kind:'proposal'}],sourceImageIds:stage==='world'?[]:stage==='physical'?[ids.world]:stage==='details'?[ids.physical]:[ids.physical,ids.world],image:`https://images.example/${stage}.png?signed=secret`,sourceUrl:'',sourceTitle:'',...(stage!=='world'?{sourceWorldId:ids.world,selectedElementIds:['house'],heroElementId:'house',replacements:[]}:{}),...(['details','packaging'].includes(stage)?{sourcePhysicalId:ids.physical}:{})};}
 afterEach(()=>{localStorage.clear();vi.restoreAllMocks();});
 describe('Proposal sessions and immutable versions',()=>{
+ it('preserves exact authoritative customer identity through sessions, versions, shares and briefs',()=>{
+   const s=session();const identity:CustomerIdentity={version:CUSTOMER_IDENTITY_VERSION,name:'  Fable Finch 字 Café 🪁  '};s.customerIdentity=identity;s.accepted!.customerIdentity={...identity};
+   expect(saveProposalSession(s)).toBe(true);expect(loadProposalSession()?.customerIdentity).toEqual(identity);
+   const pending=pendingProposal(s,'packaging',s.context);expect(pending.customerIdentity).toEqual(identity);expect(pending.customerIdentity).not.toBe(identity);
+   expect(requestForStage(pending,'packaging')).toMatchObject({brand:'no-website',customerIdentity:identity});
+   expect(decodeProposalShare(encodeProposalShare(s))?.customerIdentity).toEqual(identity);
+   const images=decodeProposalShare(encodeProposalShare(s,true))!;expect(images.customerIdentity).toEqual(identity);expect(images.accepted?.customerIdentity).toEqual(identity);
+   expect(decodeProposalShare(encodeProposalShare({...s,customerIdentity:undefined}))?.customerIdentity).toEqual(identity);
+   expect(proposalBrief(s,{})).toContain(`Exact brand name: ${JSON.stringify(identity.name)}`);
+   const world={...asset('world'),customerIdentity:identity,brand:identity.name};expect(saveProposalSnapshot(world)).toBe(true);expect(loadProposalSnapshot(world.id)?.customerIdentity).toEqual(identity);
+ });
+ it('keeps saved accepted identity authoritative over editable drafts for every revision scope',()=>{
+   const s=session();const identity:CustomerIdentity={version:CUSTOMER_IDENTITY_VERSION,name:'Fable Finch'};s.accepted!.customerIdentity=identity;s.customerIdentity={version:CUSTOMER_IDENTITY_VERSION,name:'Unrelated Orchard'};
+   for(const scope of ['world','physical','packaging'] as const)expect(pendingProposal(s,scope,s.context).customerIdentity).toEqual(identity);
+   expect(confirmedPackagingChange(s,'A navy box').customerIdentity).toEqual(identity);
+   delete s.accepted!.customerIdentity;expect(pendingProposal(s,'physical',s.context).customerIdentity).toBeUndefined();
+ });
+ it('rejects malformed identity at each saved-state boundary while accepting old sessions',()=>{
+   expect(parseProposalSession(session())).not.toBeNull();
+   for(const identity of [{version:CUSTOMER_IDENTITY_VERSION,name:''},{version:CUSTOMER_IDENTITY_VERSION,name:'   '},{version:CUSTOMER_IDENTITY_VERSION,name:'a'.repeat(121)},{version:'customer-brand-v2',name:'Fable Finch'},{version:CUSTOMER_IDENTITY_VERSION,name:'Fable Finch',inferred:true}]){
+     const s=session();expect(parseProposalSession({...s,customerIdentity:identity})).toBeNull();expect(parseProposalSession({...s,accepted:{...s.accepted,customerIdentity:identity}})).toBeNull();expect(parseProposalSession({...s,pending:{...pendingProposal(s,'world',s.context),customerIdentity:identity}})).toBeNull();
+   }
+ });
+ it('requires explicit identity for a new world and legacy world revisions without guessing from prose',()=>{
+   const s=emptyProposalSession();s.context={...s.context,business:'Fable Finch brings the Sunbeam community together',brandIdentifiers:'Orange Sunbeam emblem',interaction:'Display only'};s.constructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};
+   const pending=pendingProposal(s,'world',s.context);expect(pending.customerIdentity).toBeUndefined();expect(()=>requestForStage(pending,'world')).toThrow(/exact brand name/);
+   const revision={...pendingProposal(session(),'world',s.context),constructionIntent:s.constructionIntent};expect(()=>requestForStage(revision,'world')).toThrow(/exact brand name/);
+ });
+ it('rejects missing or changed identity before accepting or displaying an expected customer asset',()=>{
+   const s=session();const identity:CustomerIdentity={version:CUSTOMER_IDENTITY_VERSION,name:'Fable Finch'};s.accepted!.customerIdentity=identity;
+   const pending=pendingProposal(s,'packaging',s.context);
+   for(const changed of [asset('packaging'),{...asset('packaging'),customerIdentity:{...identity,name:'Unrelated Orchard'},brand:'Unrelated Orchard'},{...asset('packaging'),customerIdentity:identity,brand:'Unrelated Orchard'}]){
+     expect(()=>addProposalAsset(pending,changed)).toThrow(/different customer brand/);expect(assetsForVersion(s.accepted,{[changed.id]:changed})).toEqual({});
+   }
+   const matching={...asset('packaging'),customerIdentity:identity,brand:identity.name};expect(addProposalAsset(pending,matching).assets.packaging).toBe(matching.id);expect(assetsForVersion(s.accepted,{[matching.id]:matching}).packaging).toEqual(matching);
+ });
+
  it.each(['static','press-reveal-manual-reset'] as const)('persists optional %s intent in schema 10 without marking it reviewed',action=>{
-   const s=emptyProposalSession();const intent:ConstructionIntent={version:CONSTRUCTION_INTENT_VERSION,action};s.constructionIntent=intent;s.context={...s.context,mode:'mechanical',interaction:constructionInteraction(intent)};
+   const s=emptyProposalSession();s.customerIdentity={version:CUSTOMER_IDENTITY_VERSION,name:'Fable Finch'};const intent:ConstructionIntent={version:CONSTRUCTION_INTENT_VERSION,action};s.constructionIntent=intent;s.context={...s.context,mode:'mechanical',interaction:constructionInteraction(intent)};
    s.pending=pendingProposal(s,'world',s.context);expect(s.pending.constructionIntent).toEqual(intent);expect(saveProposalSession(s)).toBe(true);expect(loadProposalSession()).toEqual(s);expect(JSON.stringify(s)).not.toContain('reviewed');
    for(const stage of ['world','physical'] as const)expect(requestForStage(s.pending,stage).constructionIntent).toEqual(intent);
    for(const stage of ['details','packaging'] as const)expect(requestForStage(s.pending,stage)).not.toHaveProperty('constructionIntent');

@@ -54,7 +54,7 @@ vi.mock('../../supabase/functions/generate-concept/proposal-handler', async impo
   const original = await importOriginal<typeof import('../../supabase/functions/generate-concept/proposal-handler')>();
   return { ...original, handleProposal: (...[input, request, runtime]: Parameters<typeof original.handleProposal>) => {
     state.proposalRuntime(runtime);
-    return original.handleProposal(input, request, { ...runtime,
+    return original.handleProposal(input, request, { ...runtime, requireCustomerIdentity:false,
       ...(state.requireConstructionIntent ? {} : { requireConstructionIntent: false }),
       reserve: async () => { state.reserve(); await runtime.reserve(); },
     });

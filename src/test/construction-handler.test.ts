@@ -14,7 +14,7 @@ function harness(binding?:ConstructionBinding) {
   const state={rows:[] as Row[],blobs:new Map<string,Uint8Array>(),output:undefined as unknown,stage:'world',abortOnText:null as AbortController|null};
   const fixture=constructionFixture();
   const respond=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
-  const runtime:ProposalRuntime={enabled:true,requireConstructionIntent:false,textModel:'mock-text',imageModel:'openai/gpt-image-2',construction:binding,
+  const runtime:ProposalRuntime={enabled:true,requireConstructionIntent:false,requireCustomerIdentity:false,textModel:'mock-text',imageModel:'openai/gpt-image-2',construction:binding,
     hash:vi.fn(async text=>createHash('sha256').update(text).digest('hex')),reserve:vi.fn(async()=>{}),respond,
     deliver:async row=>respond({concept:restoreProposalRow(row,`https://private.invalid/${row.id}.png`)}),
     db:{from:()=>({select:()=>({eq:(field:string,value:unknown)=>({maybeSingle:async()=>({data:state.rows.find(r=>r[field]===value)||null})})}),insert:async(row:Row)=>{state.rows.push(row);return {};}}),storage:{from:()=>({download:async(path:string)=>{const bytes=state.blobs.get(path);return {data:bytes?{size:bytes.length,type:'image/png',arrayBuffer:async()=>Uint8Array.from(bytes).buffer}:undefined};},upload:async(path:string,bytes:Uint8Array)=>{state.blobs.set(path,bytes);return {};},remove:async(paths:string[])=>{paths.forEach(p=>state.blobs.delete(p));return {};}})}} as ProposalDatabase,
