@@ -1,3 +1,4 @@
+import { PROPOSAL_GENERATION_PAUSED, PROPOSAL_PAUSE_MESSAGE } from './proposal-availability';
 import {
   PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGES, hasProposalCapabilities, isProposalConcept,
   validateProposalRequest, type ProposalRequest, type ProposalConcept, type RevisionPlanRequest, type RevisionPlanResponse,
@@ -6,7 +7,7 @@ export { PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGES };
 export type { ProposalRequest, ProposalConcept, ProposalStage, RevisionPlanRequest, RevisionPlanResponse } from '../../supabase/functions/generate-concept/proposal';
 export class ProposalContextNeededError extends Error {}
 export class ProposalUnavailableError extends Error {
-  constructor() { super('Complete proposal generation is not available on this backend yet. Your direction is saved on this device.'); }
+  constructor() { super(PROPOSAL_GENERATION_PAUSED ? PROPOSAL_PAUSE_MESSAGE : 'Complete proposal generation is not available on this backend yet. Your direction is saved on this device.'); }
 }
 const active = (signal: AbortSignal) => { if (signal.aborted) throw new DOMException('Cancelled', 'AbortError'); };
 function target() {
@@ -15,6 +16,7 @@ function target() {
   return { url: `${url}/functions/v1/generate-concept`, key };
 }
 export async function supportsProposalGeneration(signal: AbortSignal): Promise<boolean> {
+  if (PROPOSAL_GENERATION_PAUSED) return false;
   try { active(signal); const { url, key } = target(); const response = await fetch(url, { headers: { apikey: key }, signal }); const data = await response.json(); return response.ok && !signal.aborted && hasProposalCapabilities(data); } catch { return false; }
 }
 async function post(body: unknown, signal: AbortSignal): Promise<unknown> {
