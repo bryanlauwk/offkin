@@ -84,7 +84,7 @@ export async function handleRequest(req: Request) {
    return await response.json();
   }
   if(proposal){
-   return await handleProposal(input,req,{db,enabled:Boolean(key)&&enabled&&proposalEnabled(),textModel:Deno.env.get('BRICK_TEXT_MODEL')||'google/gemini-3-flash-preview',imageModel:proposalImageModel(),ai,hash,respond:json,deliver,
+   return await handleProposal(input,req,{db,requireConstructionIntent:true,enabled:Boolean(key)&&enabled&&proposalEnabled(),textModel:Deno.env.get('BRICK_TEXT_MODEL')||'google/gemini-3-flash-preview',imageModel:proposalImageModel(),ai,hash,respond:json,deliver,
     reserve:async()=>{
      if(!dailyLimitsEnforced())return;
      const client=await hash(service+':'+(req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'unknown'));

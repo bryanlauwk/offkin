@@ -7,13 +7,15 @@ import {
   type ProposalConcept, type ProposalRequest, type RevisionPlanRequest,
 } from '../../supabase/functions/generate-concept/proposal';
 import { makeProductPlan } from '../test/product-plan-fixture';
+import { legacyRockerRequest } from '../test/legacy-rocker-request';
 import { serializeCanvasManifest } from '../../supabase/functions/generate-concept/canvas';
 
 const state = vi.hoisted(() => ({
   env: {} as Record<string, string | undefined>, rows: [] as Record<string, unknown>[],
   blobs: new Map<string, Uint8Array>(), allowed: true, dbError: false, uploadError: false, saveError: false,
   downloadError: false, fakeDownloadSize: 0, output: null as unknown, repairOutput: undefined as unknown, imageOutput: null as unknown,
-  promptRevision: 'test-prompt-v1',
+  promptRevision: 'test-prompt-v1', requireConstructionIntent: false,
+  proposalRuntime: vi.fn(), reserve: vi.fn(),
   textCalls: 0, imageCalls: 0, rpc: vi.fn(), upload: vi.fn(), download: vi.fn(), remove: vi.fn(), sign: vi.fn(), readWebsite: vi.fn(),
 }));
 vi.mock('https://esm.sh/@supabase/supabase-js@2', () => ({ createClient: () => ({
@@ -46,6 +48,18 @@ vi.mock('../../supabase/functions/generate-concept/website', async importOrigina
   const original = await importOriginal<typeof import('../../supabase/functions/generate-concept/website')>();
   return { ...original, readCompanyWebsite: (...args: unknown[]) => state.readWebsite(...args) };
 });
+// These historical provider/repair tests deliberately opt into the legacy ProductPlan path.
+// Production-gate cases set the flag true, leaving the deployed runtime gate unchanged.
+vi.mock('../../supabase/functions/generate-concept/proposal-handler', async importOriginal => {
+  const original = await importOriginal<typeof import('../../supabase/functions/generate-concept/proposal-handler')>();
+  return { ...original, handleProposal: (...[input, request, runtime]: Parameters<typeof original.handleProposal>) => {
+    state.proposalRuntime(runtime);
+    return original.handleProposal(input, request, { ...runtime,
+      ...(state.requireConstructionIntent ? {} : { requireConstructionIntent: false }),
+      reserve: async () => { state.reserve(); await runtime.reserve(); },
+    });
+  } };
+});
 vi.mock('../../supabase/functions/generate-concept/proposal-prompt', async importOriginal => {
   const original = await importOriginal<typeof import('../../supabase/functions/generate-concept/proposal-prompt')>();
   return { ...original, get PROPOSAL_PROMPT_REVISION() { return state.promptRevision; } };
@@ -70,8 +84,8 @@ beforeEach(() => {
   state.env = { SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'test-server-only', LOVABLE_API_KEY: 'test-not-real', BRICK_GENERATION_ENABLED: 'true', BRICK_PROPOSAL_ENABLED: 'true' };
   state.rows = []; state.blobs.clear(); state.allowed = true; state.dbError = false; state.uploadError = false; state.saveError = false;
   state.downloadError = false; state.fakeDownloadSize = 0; state.output = null; state.repairOutput = undefined; state.imageOutput = null; state.textCalls = 0; state.imageCalls = 0;
-  state.promptRevision = 'test-prompt-v1';
-  for (const fn of [state.rpc, state.upload, state.download, state.remove, state.sign, state.readWebsite]) fn.mockReset();
+  state.promptRevision = 'test-prompt-v1'; state.requireConstructionIntent = false;
+  for (const fn of [state.proposalRuntime, state.reserve, state.rpc, state.upload, state.download, state.remove, state.sign, state.readWebsite]) fn.mockReset();
   state.readWebsite.mockResolvedValue({ url: 'https://studio.example/', title: 'Paper Studio', excerpt: 'We make stationery.' });
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith('/chat/completions')) {
@@ -112,7 +126,80 @@ function modelPayloadText(value: unknown): string {
     [key, typeof part === 'string' ? part : { name: part.name, type: part.type, size: part.size }])) : String(value);
 }
 
-describe('complete proposal backend with mocked providers only', () => {
+describe('deployed proposal construction-intent gate with mocked providers only', () => {
+  beforeEach(() => {
+    state.requireConstructionIntent = true;
+    state.env.BRICK_ENFORCE_DAILY_LIMITS = 'true';
+  });
+  const expectNoGeneration = () => {
+    expect(state.proposalRuntime).toHaveBeenCalledWith(expect.objectContaining({ requireConstructionIntent: true }));
+    expect(state.textCalls).toBe(0); expect(state.imageCalls).toBe(0);
+    expect(state.reserve).not.toHaveBeenCalled(); expect(state.rpc).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled(); expect(state.readWebsite).not.toHaveBeenCalled();
+    expect(state.upload).not.toHaveBeenCalled(); expect(state.download).not.toHaveBeenCalled();
+  };
+  const expectConstructionClarification = async (request: unknown) => {
+    const result = await post(request);
+    const body = await result.json();
+    expect(result.status).toBe(200);
+    expect(body).toEqual({ needsConstruction: true, clarification: expect.any(String) });
+    expect(body.clarification.trim()).not.toBe('');
+    expectNoGeneration();
+  };
+
+  it('advertises construction-intent-v1 in readiness', async () => {
+    const readiness = await (await handleRequest(new Request('https://edge.invalid/'))).json();
+    expect(PROPOSAL_CAPABILITIES).toHaveProperty('proposal_construction_intent_version', 'construction-intent-v1');
+    expect(readiness.capabilities).toMatchObject(PROPOSAL_CAPABILITIES);
+    expect(hasProposalCapabilities(readiness)).toBe(true);
+    expect(fetch).not.toHaveBeenCalled(); expect(state.reserve).not.toHaveBeenCalled();
+  });
+
+  it('clarifies a world request with missing intent before text, images or quota reservation', async () => {
+    const before = structuredClone(worldRequest);
+    await expectConstructionClarification(worldRequest);
+    expect(worldRequest).toEqual(before); expect(state.rows).toHaveLength(0);
+  });
+
+  it('clarifies a physical request with missing intent without modifying its legacy source', async () => {
+    const worldId = '57e6f841-f55f-49b3-96d7-595ec2132c4f';
+    state.rows.push({ id: worldId, brand: design.brand, title: design.title,
+      story: serializeProposalManifest({ contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION,
+        stage: 'world', context: worldRequest.context, story: design.story, design: design.design,
+        worldElements: elements, sourceImageIds: [] }),
+      image_path: `${worldId}.png`, prompt_version: PROPOSAL_CONTRACT_VERSION,
+    });
+    const saved = structuredClone(state.rows);
+    const request = { ...worldRequest, stage: 'physical', sourceWorldId: worldId,
+      selectedElementIds: elements.map(element => element.id), heroElementId: elements[0].id, replacements: [] };
+    const before = structuredClone(request);
+    await expectConstructionClarification(request);
+    expect(request).toEqual(before); expect(state.rows).toEqual(saved);
+  });
+
+  it('clarifies a synthetic unsupported rocker/gravity brief without rewriting it or generating', async () => {
+    const before = structuredClone(legacyRockerRequest);
+    expect(legacyRockerRequest.context.interaction).toBe('Press the moth to drive a rocker lever that raises an archive marker. Release for a proposed gravity reset.');
+    await expectConstructionClarification(legacyRockerRequest);
+    expect(state.proposalRuntime).toHaveBeenCalledOnce();
+    expect(legacyRockerRequest).toEqual(before); expect(state.rows).toHaveLength(0);
+  });
+
+  it.each([
+    ['reviewed', true],
+    ['construction', { reviewed: true, binding: {} }],
+    ['constructionBinding', { reviewed: true }],
+    ['requireConstructionIntent', false],
+    ['constructionIntent', { version: 'construction-intent-v1', reviewed: true, binding: {} }],
+  ])('rejects client %s authority before any provider or quota reservation', async (field, value) => {
+    const result = await post({ ...worldRequest, [String(field)]: value });
+    expect(result.status).toBe(400);
+    expect(await result.json()).toHaveProperty('error');
+    expectNoGeneration(); expect(state.rows).toHaveLength(0);
+  });
+});
+
+describe('legacy ProductPlan compatibility: complete proposal backend with mocked providers only', () => {
   it('advertises the separate capability only with explicit enablement, keeping v9 intact', async () => {
     const enabled = await (await handleRequest(new Request('https://edge.invalid/'))).json();
     expect(enabled.capabilities).toMatchObject({ ...PROPOSAL_CAPABILITIES, canvas_contract_version: 'offkin-canvas-v9', canvas_stages: ['world', 'physical'] });
@@ -404,7 +491,7 @@ describe('complete proposal backend with mocked providers only', () => {
   });
 });
 
-describe('bounded product-plan correction with mocked providers only', () => {
+describe('legacy ProductPlan compatibility: bounded correction with mocked providers only', () => {
   const selectedIds = elements.map(element => element.id);
   const validPlan = () => makeProductPlan(selectedIds);
   const textPayloads = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/chat/completions')).map(([, init]) => JSON.parse(String(init?.body)));
@@ -599,8 +686,9 @@ describe('bounded product-plan correction with mocked providers only', () => {
     expect(invalid.productIntent).toHaveLength(33000);
   });
 
-  it('preserves the exact approved QA context and its requested mechanical action through correction', async () => {
-    // Transport/validation fixture only; this does not assert real fabrication or live model success.
+  it('preserves the historical spring-return QA context on the explicit legacy correction path', async () => {
+    // Historical assistant-authored transport fixture only, not the reviewed rocker/gravity brief.
+    // This legacy-path test does not assert deployed construction acceptance or fabrication evidence.
     const context: ProposalRequest['context'] = {
       "business": "Tesla develops electric vehicles, charging, solar power and battery energy storage. Create a compact physical desk collectible as a corporate gift for clients and partners. Its story is sunlight to home to storage to driving. Use one tapering three-tier silhouette, an oversized sun at upper left, one supported looping red road, one fixed red car, a solar-roof home, a battery-storage block and two small white companion figures. Keep generous gaps and a few bold, charming, deliberately disproportionate forms. Propose separate parts and an assembly sequence for later print and prototype review. Specifications are prototype proposals; exact scale is unresolved. Do not claim CAD readiness, verified printability or working hardware.",
       "audience": "Clients & partners",
@@ -650,7 +738,7 @@ describe('bounded product-plan correction with mocked providers only', () => {
   });
 });
 
-describe('proposal deadline integration without real waits', () => {
+describe('legacy ProductPlan compatibility: proposal deadlines without real waits', () => {
   let elapsed: number;
   let clock: ReturnType<typeof vi.spyOn>;
   let timeouts: ReturnType<typeof vi.spyOn>;
@@ -752,7 +840,7 @@ describe('proposal deadline integration without real waits', () => {
   });
 });
 
-describe('bounded conversational revision planning', () => {
+describe('legacy ProductPlan compatibility: bounded conversational revision planning', () => {
   it('plans packaging-only changes without image calls or changing the approved object', async () => {
     const { world, physical } = await pair(); const before = state.imageCalls;
     state.output = { scope: 'packaging', context: { ...worldRequest.context, revisionNotes: 'Dark blue box; preserve the object.' }, summary: 'Update only the packaging.' };

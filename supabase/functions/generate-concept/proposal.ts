@@ -1,3 +1,5 @@
+import { CONSTRUCTION_INTENT_VERSION, isConstructionIntent, type ConstructionIntent } from './construction-intent.ts';
+import { isConstructionOrigin, type ConstructionOrigin } from './construction.ts';
 import { PRODUCT_PLAN_VERSION, isProductPlan, type ProductPlan } from './product-plan.ts';
 import {
   CANVAS_CONTEXT_MAX_CHARS, CANVAS_MAX_ELEMENTS, CanvasFailure, isCanvasContext,
@@ -16,6 +18,7 @@ export type ProposalRequest = {
   stage: ProposalStage;
   brand: string;
   context: CanvasContext;
+  constructionIntent?: ConstructionIntent;
   sourceWorldId?: string;
   sourcePhysicalId?: string;
   previousAssetId?: string;
@@ -31,13 +34,15 @@ export type ProposalManifest = Omit<ProposalRequest, 'brand'> & {
   sourceImageIds: string[];
   /** Optional only for restoring or continuing legacy visual-only assets. */
   productPlan?: ProductPlan;
+  /** Optional on legacy assets; immutable server-authored origin, never manufacturing approval. */
+  constructionOrigin?: ConstructionOrigin;
 };
 /** Public metadata exposes only this version's current sources, never revision ancestors. */
 export type ProposalConcept = Omit<ProposalManifest, 'previousAssetId'> & {
   id: string; brand: string; title: string; image: string; interaction: string;
   sourceUrl: string; sourceTitle: string;
 };
-export type ProposalResponse = { concept?: ProposalConcept; needsContext?: boolean; message?: string };
+export type ProposalResponse = { concept?: ProposalConcept; needsContext?: boolean; message?: string; needsConstruction?: boolean; clarification?: string };
 export type RevisionScope = 'world' | 'physical' | 'packaging';
 export type RevisionPlanRequest = {
   contractVersion: typeof PROPOSAL_CONTRACT_VERSION;
@@ -60,17 +65,19 @@ export const PROPOSAL_CAPABILITIES = {
   proposal_context_max_chars: PROPOSAL_CONTEXT_MAX_CHARS,
   proposal_reference_images: true,
   proposal_product_plan_version: PRODUCT_PLAN_VERSION,
+  proposal_construction_intent_version: CONSTRUCTION_INTENT_VERSION,
 };
 const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const text = (v: unknown, max: number, empty = false): v is string => typeof v === 'string' && v.length <= max && (empty || Boolean(v.trim()));
 const onlyKeys = (v: Record<string, unknown>, keys: readonly string[]) => Object.keys(v).every(k => keys.includes(k));
-const requestKeys = ['contractVersion', 'stage', 'brand', 'context', 'sourceWorldId', 'sourcePhysicalId', 'previousAssetId', 'selectedElementIds', 'heroElementId', 'replacements'];
+const requestKeys = ['contractVersion', 'stage', 'brand', 'context', 'constructionIntent', 'sourceWorldId', 'sourcePhysicalId', 'previousAssetId', 'selectedElementIds', 'heroElementId', 'replacements'];
 const selectionKeys = ['selectedElementIds', 'heroElementId', 'replacements'];
 export function validateProposalRequest(value: unknown): ProposalRequest {
   if (!record(value) || !onlyKeys(value, requestKeys) || value.contractVersion !== PROPOSAL_CONTRACT_VERSION ||
     !PROPOSAL_STAGES.includes(value.stage as ProposalStage) || !text(value.brand, 300) || value.brand.trim().length < 2 || !isCanvasContext(value.context)) {
     throw new CanvasFailure(400, 'Use a complete, supported proposal brief. Your wording has not been shortened.');
   }
+  if (value.constructionIntent !== undefined && (!isConstructionIntent(value.constructionIntent) || (value.stage !== 'world' && value.stage !== 'physical'))) throw new CanvasFailure(400, 'Choose a supported construction action for the new world or physical concept.');
   if (value.previousAssetId !== undefined && !isConceptId(value.previousAssetId)) throw new CanvasFailure(400, 'Choose a valid previous proposal image.');
   if (value.stage === 'world') {
     if (['sourceWorldId', 'sourcePhysicalId', ...selectionKeys].some(k => value[k] !== undefined)) throw new CanvasFailure(400, 'A new world cannot include another stage’s selection.');
@@ -94,7 +101,7 @@ export function validateRevisionPlanRequest(value: unknown): RevisionPlanRequest
   }
   return value as RevisionPlanRequest;
 }
-const manifestKeys = [...requestKeys.filter(k => k !== 'brand'), 'stageVersion', 'story', 'design', 'worldElements', 'sourceImageIds', 'productPlan'];
+const manifestKeys = [...requestKeys.filter(k => k !== 'brand'), 'stageVersion', 'story', 'design', 'worldElements', 'sourceImageIds', 'productPlan', 'constructionOrigin'];
 const prefix = 'OFFKIN_PROPOSAL_V10\n';
 export function isProposalManifest(value: unknown): value is ProposalManifest {
   if (!record(value) || !onlyKeys(value, manifestKeys) || value.stageVersion !== PROPOSAL_STAGE_VERSION ||
@@ -102,10 +109,14 @@ export function isProposalManifest(value: unknown): value is ProposalManifest {
     !Array.isArray(value.sourceImageIds) || value.sourceImageIds.length > 3 || !value.sourceImageIds.every(isConceptId) ||
     new Set(value.sourceImageIds).size !== value.sourceImageIds.length || JSON.stringify(value).length > 44000) return false;
   if (value.productPlan !== undefined && !isProductPlan(value.productPlan, value.worldElements.map(e => e.id))) return false;
+  if (value.constructionOrigin !== undefined && (!value.productPlan || !isConstructionOrigin(value.constructionOrigin))) return false;
+  if (value.constructionIntent !== undefined && !isConstructionIntent(value.constructionIntent)) return false;
+  const origin=value.constructionOrigin as ConstructionOrigin | undefined;
+  if (origin?.version === 'construction-origin-v2' && (!value.constructionIntent || canonicalProposal(value.constructionIntent)!==canonicalProposal(origin.intent))) return false;
   try {
     const request = Object.fromEntries(Object.entries(value).filter(([k]) => requestKeys.includes(k)));
     // Details carry inherited selection in saved metadata, but never accept it from the client.
-    if (value.stage === 'details' || value.stage === 'packaging') for (const k of selectionKeys) delete request[k];
+    if (value.stage === 'details' || value.stage === 'packaging') { for (const k of selectionKeys) delete request[k]; delete request.constructionIntent; }
     validateProposalRequest({ ...request, brand: 'saved-proposal' });
     if (value.stage !== 'world') {
       validateCanvasRequest({ contractVersion: 'offkin-canvas-v9', stage: 'physical', brand: 'saved-proposal', context: value.context,
@@ -147,7 +158,7 @@ export function isProposalConcept(value: unknown): value is ProposalConcept {
 export function hasProposalCapabilities(value: unknown): boolean {
   if (!record(value) || value.ready !== true || !record(value.capabilities)) return false;
   const c = value.capabilities;
-  return c.proposal === true && c.proposal_contract_version === PROPOSAL_CONTRACT_VERSION && c.proposal_reference_images === true && c.proposal_product_plan_version === PRODUCT_PLAN_VERSION &&
+  return c.proposal === true && c.proposal_contract_version === PROPOSAL_CONTRACT_VERSION && c.proposal_reference_images === true && c.proposal_product_plan_version === PRODUCT_PLAN_VERSION && c.proposal_construction_intent_version === CONSTRUCTION_INTENT_VERSION &&
     c.proposal_context_max_chars === PROPOSAL_CONTEXT_MAX_CHARS && JSON.stringify(c.proposal_stages) === JSON.stringify(PROPOSAL_STAGES);
 }
 export function canonicalProposal(value: unknown): string {

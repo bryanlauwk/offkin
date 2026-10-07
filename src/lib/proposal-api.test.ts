@@ -1,20 +1,58 @@
+import { CONSTRUCTION_INTENT_VERSION } from '../../supabase/functions/generate-concept/construction-intent';
 import { makeProductPlan } from '../test/product-plan-fixture';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PROPOSAL_CAPABILITIES, type ProposalConcept, type ProposalRequest } from '../../supabase/functions/generate-concept/proposal';
-import { planProposalRevision, requestProposalAsset, restoreProposalAsset, supportsProposalGeneration } from './proposal-api';
+import { ProposalConstructionNeededError, ProposalContextNeededError, planProposalRevision, requestProposalAsset, restoreProposalAsset, supportsProposalGeneration } from './proposal-api';
 const availability=vi.hoisted(()=>({paused:false}));
 vi.mock('./proposal-availability',async original=>({...await original<object>(),get PROPOSAL_GENERATION_PAUSED(){return availability.paused;}}));
-const id='00000000-0000-4000-8000-000000000001';const world:ProposalRequest={contractVersion:'offkin-proposal-v10',stage:'world',brand:'no-website',context:{business:'Paper gifts',exactWording:'  字\nCafé 🪁 '}};
+const id='00000000-0000-4000-8000-000000000001';const world:ProposalRequest={contractVersion:'offkin-proposal-v10',stage:'world',brand:'no-website',constructionIntent:{version:CONSTRUCTION_INTENT_VERSION,action:'static'},context:{mode:'mechanical',interaction:'Display only',business:'Paper gifts',exactWording:'  字\nCafé 🪁 '}};
 function concept(overrides:Partial<ProposalConcept>={}):ProposalConcept{return {...world,id,stageVersion:'proposal-assets-v1',brand:'Paper',title:'Paper world',story:'A rich paper city.',design:'Many connected scenes',interaction:'Explore',worldElements:[{id:'house',label:'Paper house',description:'A proposed story home',kind:'proposal'}],sourceImageIds:[],productPlan:makeProductPlan(['house']),image:'https://images.example/world.png',sourceUrl:'',sourceTitle:'',...overrides};}
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status});
 const readiness=()=>reply({ready:true,capabilities:PROPOSAL_CAPABILITIES});
 beforeEach(()=>{availability.paused=false;vi.stubEnv('VITE_SUPABASE_URL','https://test.invalid');vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY','public-key');});
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.restoreAllMocks();});
 describe('Proposal API fail-closed negotiation',()=>{
+ it.each([undefined,'construction-intent-v0','construction-intent-v2'])('requires the exact construction-intent capability %j before sending a generation request',async version=>{
+   const fetch=vi.fn(async(_url:string,_init:RequestInit)=>reply({ready:true,capabilities:{...PROPOSAL_CAPABILITIES,proposal_construction_intent_version:version}}));vi.stubGlobal('fetch',fetch);
+   await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/not available/);expect(fetch).toHaveBeenCalledOnce();expect(fetch.mock.calls[0][1]).not.toHaveProperty('body');
+ });
+ it('requires an explicit matching action before generation even with a capable backend',async()=>{
+   const fetch=vi.fn(async()=>readiness());vi.stubGlobal('fetch',fetch);
+   await expect(requestProposalAsset({...world,constructionIntent:undefined},new AbortController().signal)).rejects.toThrow(/Choose a construction action/);
+   await expect(requestProposalAsset({...world,context:{...world.context,interaction:'Turn automatically'}},new AbortController().signal)).rejects.toThrow();expect(fetch).not.toHaveBeenCalled();
+ });
+ it('rejects a response that loses the selected construction intent',async()=>{
+   vi.stubGlobal('fetch',vi.fn(async(_url,init)=>init.method==='POST'?reply({concept:concept({constructionIntent:undefined})}):readiness()));
+   await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/does not match your construction choice/);
+ });
+ it('restores pre-intent assets despite an unavailable new capability',async()=>{
+   const fetch=vi.fn(async(_url:string,_init:RequestInit)=>reply({concept:concept({constructionIntent:undefined,productPlan:undefined})}));vi.stubGlobal('fetch',fetch);
+   expect((await restoreProposalAsset(id,new AbortController().signal)).constructionIntent).toBeUndefined();expect(fetch).toHaveBeenCalledOnce();expect(JSON.parse(String(fetch.mock.calls[0][1].body))).toEqual({id});
+ });
+
  it('holds new paid work without a request while saved restore remains available',async()=>{availability.paused=true;const fetch=vi.fn(async()=>reply({concept:concept()}));vi.stubGlobal('fetch',fetch);expect(await supportsProposalGeneration(new AbortController().signal)).toBe(false);await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/temporarily unavailable/);expect(fetch).not.toHaveBeenCalled();await restoreProposalAsset(id,new AbortController().signal);expect(fetch).toHaveBeenCalledOnce();});
  it('reads readiness without transmitting the direction',async()=>{const fetch=vi.fn(async(_url:string,_init:RequestInit)=>readiness());vi.stubGlobal('fetch',fetch);expect(await supportsProposalGeneration(new AbortController().signal)).toBe(true);expect(fetch.mock.calls[0][1]).not.toHaveProperty('body');});
  it('never downgrades v10 to the v9 backend',async()=>{const fetch=vi.fn(async()=>reply({ready:true,capabilities:{canvas:true,canvas_contract_version:'offkin-canvas-v9'}}));vi.stubGlobal('fetch',fetch);await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/not available/);expect(fetch).toHaveBeenCalledOnce();});
  it('rechecks capabilities immediately before generation and preserves exact context',async()=>{const fetch=vi.fn(async(_url,init)=>init.method==='POST'?reply({concept:concept()}):readiness());vi.stubGlobal('fetch',fetch);const c=await requestProposalAsset(world,new AbortController().signal);expect(c.context.exactWording).toBe(world.context.exactWording);expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual(world);});
+ it('keeps construction clarification separate from missing business facts',async()=>{
+ const clarification='Should pressing the sun lift the scene or slide a panel?';
+ const fetch=vi.fn(async(_url,init)=>init.method==='POST'?reply({needsConstruction:true,clarification}):readiness());vi.stubGlobal('fetch',fetch);
+ const error=await requestProposalAsset(world,new AbortController().signal).catch(error=>error);
+ expect(error).toBeInstanceOf(ProposalConstructionNeededError);expect(error).not.toBeInstanceOf(ProposalContextNeededError);expect(error.message).toBe(clarification);expect(fetch).toHaveBeenCalledTimes(2);
+ });
+ it.each([undefined,null,42,'','   ','x'.repeat(601)])('uses a safe construction fallback for invalid clarification %j',async clarification=>{
+ vi.stubGlobal('fetch',vi.fn(async(_url,init)=>init.method==='POST'?reply({needsConstruction:true,clarification,message:'Do not route this into the business question.'}):readiness()));
+ await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(new ProposalConstructionNeededError('The physical construction needs a little more detail.'));
+ });
+ it('accepts a construction clarification at the exact length limit',async()=>{
+ const clarification='x'.repeat(600);vi.stubGlobal('fetch',vi.fn(async(_url,init)=>init.method==='POST'?reply({needsConstruction:true,clarification}):readiness()));
+ await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(new ProposalConstructionNeededError(clarification));
+ });
+ it('requires the explicit construction flag and preserves factual-context errors',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async(_url,init)=>init.method==='POST'?reply({needsConstruction:'true',clarification:'A construction question',needsContext:true,message:'What does the business do?'}):readiness()));
+ const error=await requestProposalAsset(world,new AbortController().signal).catch(error=>error);
+ expect(error).toBeInstanceOf(ProposalContextNeededError);expect(error).not.toBeInstanceOf(ProposalConstructionNeededError);expect(error.message).toBe('What does the business do?');
+ });
  it('requires explicit product-plan support and a plan on new images but allows old restores',async()=>{
  const old={...PROPOSAL_CAPABILITIES};delete old.proposal_product_plan_version;
  vi.stubGlobal('fetch',vi.fn(async()=>reply({ready:true,capabilities:old})));expect(await supportsProposalGeneration(new AbortController().signal)).toBe(false);
