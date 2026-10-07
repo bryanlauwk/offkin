@@ -6,6 +6,7 @@ import {
   hasProposalCapabilities, isProposalConcept, parseProposalManifest, parseRevisionPlan, serializeProposalManifest,
   type ProposalConcept, type ProposalRequest, type RevisionPlanRequest,
 } from '../../supabase/functions/generate-concept/proposal';
+import { makeProductPlan } from '../test/product-plan-fixture';
 import { serializeCanvasManifest } from '../../supabase/functions/generate-concept/canvas';
 
 const state = vi.hoisted(() => ({
@@ -72,8 +73,8 @@ beforeEach(() => {
   state.promptRevision = 'test-prompt-v1';
   for (const fn of [state.rpc, state.upload, state.download, state.remove, state.sign, state.readWebsite]) fn.mockReset();
   state.readWebsite.mockResolvedValue({ url: 'https://studio.example/', title: 'Paper Studio', excerpt: 'We make stationery.' });
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-    if (url.endsWith('/chat/completions')) { state.textCalls++; return response({ choices: [{ message: { content: JSON.stringify(state.output || design) } }] }); }
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/chat/completions')) { state.textCalls++; const sent = JSON.parse(String(init?.body)); const direction = JSON.parse(sent.messages[1].content); const plan = direction.sourcePhysical ? {} : { productPlan: makeProductPlan((direction.selectedElements || elements).map((e: {id:string}) => e.id)) }; return response({ choices: [{ message: { content: JSON.stringify(state.output || { ...design, ...plan }) } }] }); }
     if (url.endsWith('/images/generations') || url.endsWith('/images/edits')) { state.imageCalls++; return response(state.imageOutput || { data: [{ b64_json: png }] }); }
     throw new Error(`Unexpected network target: ${url}`);
   }));
@@ -143,6 +144,51 @@ describe('complete proposal backend with mocked providers only', () => {
     }
     expect(state.download).toHaveBeenCalledWith('brick-concepts', expect.stringMatching(/\.png$/));
     for (const row of state.rows) expect(parseProposalManifest(String(row.story))?.stageVersion).toBe(PROPOSAL_STAGE_VERSION);
+  });
+  it('validates a product plan before image generation and carries it unchanged through supplements', async () => {
+    const {world, physical} = await pair();
+    const details = await generate(supplement('details', world, physical));
+    const packaging = await generate(supplement('packaging', world, physical));
+    expect(world.productPlan?.status).toBe('unverified-prototype-plan');
+    expect(details.productPlan).toEqual(physical.productPlan);
+    expect(packaging.productPlan).toEqual(physical.productPlan);
+    const prompt = multipartBody(imageCalls()[2][1]?.body).get('prompt');
+    expect(prompt).toContain(JSON.stringify(physical.productPlan));
+    const restored = await (await post({id:physical.id})).json();
+    expect(restored.concept.productPlan).toEqual(physical.productPlan);
+    expect(restored.concept).not.toHaveProperty('previousAssetId');
+  });
+  it.each(['missing', 'wrong-hero', 'unrequested-action'] as const)('rejects %s product logic before an image call', async problem => {
+    const plan=makeProductPlan(elements.map(e=>e.id));
+    if(problem==='wrong-hero') plan.heroPartId='display-base';
+    if(problem==='unrequested-action') {
+      plan.actions=[{action:'Press',response:'Reveal',partIds:['story-hero'],validation:{status:'unverified',check:'Test action'}}];
+      plan.verificationGates.push({id:'interaction-test',status:'unverified'});
+    }
+    state.output={...design,...(problem==='missing'?{}:{productPlan:plan})};
+    expect((await post(worldRequest)).status).toBe(502);
+    expect(state.textCalls).toBe(1);expect(state.imageCalls).toBe(0);expect(state.rows).toHaveLength(0);
+  });
+  it('uses the product plan action authority despite a stray visual interaction',async()=>{
+    const {world,physical}=await pair();state.output={...design,interaction:'Turn a motorized lever and flash every light.'};
+    const details=await generate(supplement('details',world,physical));
+    expect(details.interaction).toBe('Static display. No mechanical or electronic response is proposed.');
+    const prompt=String(multipartBody(imageCalls().at(-1)![1]?.body).get('prompt'));
+    expect(prompt).not.toContain('Turn a motorized lever');expect(prompt).toContain('Static display. No mechanical or electronic response is proposed.');
+  });
+  it('rejects a supplement that changes the accepted product plan', async () => {
+    const {world,physical}=await pair(); const plan=structuredClone(physical.productPlan!);plan.silhouette='An unrelated tower';
+    state.output={...design,productPlan:plan};
+    expect((await post(supplement('packaging',world,physical))).status).toBe(502);
+    expect(state.imageCalls).toBe(2);
+  });
+  it('preserves legacy v10 restores and partial supplements without inventing construction evidence',async()=>{
+    const {world,physical}=await pair();
+    const row=state.rows.find(r=>r.id===physical.id)!;const manifest=parseProposalManifest(String(row.story))!;delete manifest.productPlan;row.story=serializeProposalManifest(manifest);
+    const restored=await(await post({id:physical.id})).json();expect(restored.concept).not.toHaveProperty('productPlan');
+    const details=await generate(supplement('details',world,physical));expect(details).not.toHaveProperty('productPlan');
+    expect(multipartBody(imageCalls().at(-1)![1]?.body).get('prompt')).toContain('legacy-visual-only-no-construction-plan');
+    expect(multipartBody(imageCalls().at(-1)![1]?.body).get('prompt')).toContain('LEGACY VISUAL-ONLY OVERRIDE');
   });
   it('conditions revisions on the actual previous image as well as current upstream images', async () => {
     const { world, physical } = await pair();
@@ -221,7 +267,7 @@ describe('complete proposal backend with mocked providers only', () => {
   it('preserves an explicitly supplied non-capability identifier in exact wording', async () => {
     const customerReference = crypto.randomUUID();
     const context = { ...worldRequest.context, exactWording: `Reference ${customerReference}` };
-    state.output = { ...design, story: `A concept for reference ${customerReference}.` };
+    state.output = { ...design, productPlan: makeProductPlan(elements.map(e=>e.id)), story: `A concept for reference ${customerReference}.` };
     const result = await generate({ ...worldRequest, context });
     expect(result.context.exactWording).toBe(context.exactWording);
     expect(String(imageCalls().at(-1)![1]?.body)).toContain(customerReference);

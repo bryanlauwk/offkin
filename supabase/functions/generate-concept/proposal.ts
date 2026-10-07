@@ -1,3 +1,4 @@
+import { PRODUCT_PLAN_VERSION, isProductPlan, type ProductPlan } from './product-plan.ts';
 import {
   CANVAS_CONTEXT_MAX_CHARS, CANVAS_MAX_ELEMENTS, CanvasFailure, isCanvasContext,
   isConceptId, isWorldElements, validateCanvasRequest,
@@ -28,6 +29,8 @@ export type ProposalManifest = Omit<ProposalRequest, 'brand'> & {
   design: string;
   worldElements: WorldElement[];
   sourceImageIds: string[];
+  /** Optional only for restoring or continuing legacy visual-only assets. */
+  productPlan?: ProductPlan;
 };
 /** Public metadata exposes only this version's current sources, never revision ancestors. */
 export type ProposalConcept = Omit<ProposalManifest, 'previousAssetId'> & {
@@ -56,6 +59,7 @@ export const PROPOSAL_CAPABILITIES = {
   proposal_stages: [...PROPOSAL_STAGES],
   proposal_context_max_chars: PROPOSAL_CONTEXT_MAX_CHARS,
   proposal_reference_images: true,
+  proposal_product_plan_version: PRODUCT_PLAN_VERSION,
 };
 const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const text = (v: unknown, max: number, empty = false): v is string => typeof v === 'string' && v.length <= max && (empty || Boolean(v.trim()));
@@ -90,13 +94,14 @@ export function validateRevisionPlanRequest(value: unknown): RevisionPlanRequest
   }
   return value as RevisionPlanRequest;
 }
-const manifestKeys = [...requestKeys.filter(k => k !== 'brand'), 'stageVersion', 'story', 'design', 'worldElements', 'sourceImageIds'];
+const manifestKeys = [...requestKeys.filter(k => k !== 'brand'), 'stageVersion', 'story', 'design', 'worldElements', 'sourceImageIds', 'productPlan'];
 const prefix = 'OFFKIN_PROPOSAL_V10\n';
 export function isProposalManifest(value: unknown): value is ProposalManifest {
   if (!record(value) || !onlyKeys(value, manifestKeys) || value.stageVersion !== PROPOSAL_STAGE_VERSION ||
     !text(value.story, 2000) || !text(value.design, 8000) || !isWorldElements(value.worldElements) ||
     !Array.isArray(value.sourceImageIds) || value.sourceImageIds.length > 3 || !value.sourceImageIds.every(isConceptId) ||
     new Set(value.sourceImageIds).size !== value.sourceImageIds.length || JSON.stringify(value).length > 44000) return false;
+  if (value.productPlan !== undefined && !isProductPlan(value.productPlan, value.worldElements.map(e => e.id))) return false;
   try {
     const request = Object.fromEntries(Object.entries(value).filter(([k]) => requestKeys.includes(k)));
     // Details carry inherited selection in saved metadata, but never accept it from the client.
@@ -142,7 +147,7 @@ export function isProposalConcept(value: unknown): value is ProposalConcept {
 export function hasProposalCapabilities(value: unknown): boolean {
   if (!record(value) || value.ready !== true || !record(value.capabilities)) return false;
   const c = value.capabilities;
-  return c.proposal === true && c.proposal_contract_version === PROPOSAL_CONTRACT_VERSION && c.proposal_reference_images === true &&
+  return c.proposal === true && c.proposal_contract_version === PROPOSAL_CONTRACT_VERSION && c.proposal_reference_images === true && c.proposal_product_plan_version === PRODUCT_PLAN_VERSION &&
     c.proposal_context_max_chars === PROPOSAL_CONTEXT_MAX_CHARS && JSON.stringify(c.proposal_stages) === JSON.stringify(PROPOSAL_STAGES);
 }
 export function canonicalProposal(value: unknown): string {
