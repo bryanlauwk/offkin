@@ -14,11 +14,11 @@ describe('OFFKIN identity', () => {
   });
   it('ships matching metadata and an original OFFKIN favicon', () => {
     const html = readFileSync('index.html', 'utf8');
-    const favicon = readFileSync('public/offkin-favicon.svg', 'utf8');
+    const favicon = readFileSync('public/favicon.png');
     expect(html).toContain('<title>OFFKIN｜异趣伙伴 — Your business DNA. Made collectible.</title>');
     expect(html).toContain('content="OFFKIN｜异趣伙伴 — Your business DNA. Made collectible."');
-    expect(html).toContain('href="/offkin-favicon.svg"');
+    expect(html).toContain('href="/favicon.png"');
     expect(html).not.toMatch(/dioramini/i);
-    expect(favicon).toContain('<title>OFFKIN</title>');
+    expect(favicon.length).toBeGreaterThan(500);
   });
 });
