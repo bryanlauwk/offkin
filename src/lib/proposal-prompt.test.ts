@@ -14,8 +14,17 @@ const request: RevisionPlanRequest = {
 };
 
 describe('proposal prompt corrections from live output review', () => {
+  it('audits every existing assembly relationship before the one correction returns', () => {
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('EVERY declared part and join');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('A previously assembled part is not implicitly included');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('steps [a,b] then [b,c] cover both');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('Do not append a blanket all-parts step');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('productPlan.purchasedParts[i]');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('productPlan.joins[i].partIds');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('Diagnostics are bounded');
+  });
   it('versions prompt cache identity separately from saved manifest compatibility', () => {
-    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v5-bounded-plan-correction');
+    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v6-assembly-coverage-feedback');
     expect(PROPOSAL_STAGE_VERSION).toBe('proposal-assets-v1');
   });
   it('makes the plan a nested property without overriding the outer stage JSON', () => {

@@ -240,20 +240,32 @@ export function productPlanIssues(value: unknown, storyElementIds?: readonly str
     check(new Set(joins.map(join => join.id)).size === joins.length, 'productPlan.joins', 'duplicate-id');
     check(connected(allIds, joins), 'productPlan.joins', 'disconnected-parts');
     if (!check(array(plan.assembly, 1, 32), 'productPlan.assembly', 'invalid-array')) return issues;
+    let assemblyStructureValid = true;
     for (const [index, item] of (plan.assembly as unknown[]).entries()) {
       const path = `productPlan.assembly[${index}]`;
-      if (!check(record(item, ['step', 'partIds', 'instruction']), path, 'invalid-object')) continue;
+      if (!check(record(item, ['step', 'partIds', 'instruction']), path, 'invalid-object')) { assemblyStructureValid = false; continue; }
       const step = item as Record<string, unknown>;
-      check(step.step === index + 1, `${path}.step`, 'invalid-value');
+      if (!check(step.step === index + 1, `${path}.step`, 'invalid-value')) assemblyStructureValid = false;
       if (check(ids(step.partIds, 1, 24, partIds), `${path}.partIds`, 'invalid-reference')) {
         check(connected(step.partIds as string[], joins), `${path}.partIds`, 'disconnected-assembly');
-      }
-      check(text(step.instruction, 320), `${path}.instruction`, 'invalid-text');
+      } else assemblyStructureValid = false;
+      if (!check(text(step.instruction, 320), `${path}.instruction`, 'invalid-text')) assemblyStructureValid = false;
     }
-    if (issues.length) return issues;
+    // Connectivity failures do not make otherwise validated reference arrays unsafe.
+    // Expose coverage failures in the same bounded correction instead of hiding them
+    // until a later pass. Never infer, append or normalize a part, join or assembly step.
+    if (!assemblyStructureValid) return issues;
+    const hadConnectivityIssues = issues.length > 0;
     const assembly = plan.assembly as ProductPlan['assembly'];
     const assembled = new Set(assembly.flatMap(step => step.partIds));
-    check(assembled.size === partIds.size && joins.every(join => assembly.some(step => join.partIds.every(item => step.partIds.includes(item)))), 'productPlan.assembly', 'incomplete-assembly');
+    const joinCovered = (join: ProductPlan['joins'][number]) => assembly.some(step => join.partIds.every(item => step.partIds.includes(item)));
+    if (!check(assembled.size === partIds.size && joins.every(joinCovered), 'productPlan.assembly', 'incomplete-assembly')) {
+      // Paths use only schema names and bounded indexes, never customer IDs or values.
+      parts.forEach((part, index) => check(assembled.has(part.id), `productPlan.parts[${index}]`, 'incomplete-assembly'));
+      purchasedParts.forEach((part, index) => check(assembled.has(part.id), `productPlan.purchasedParts[${index}]`, 'incomplete-assembly'));
+      joins.forEach((join, index) => check(joinCovered(join), `productPlan.joins[${index}].partIds`, 'incomplete-assembly'));
+    }
+    if (hadConnectivityIssues) return issues;
     if (!check(array(plan.actions, 0, 2), 'productPlan.actions', 'invalid-array')) return issues;
     const actions = plan.actions as unknown[];
     check(!requirements.displayOnly || actions.length === 0, 'productPlan.actions', 'display-only-action');
