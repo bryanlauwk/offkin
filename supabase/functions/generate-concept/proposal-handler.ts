@@ -6,10 +6,10 @@ import {
   selectWorldElements, type CanvasContext, type CanvasManifest, type CanvasStoredRow,
 } from './canvas.ts';
 import {
-  PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGE_VERSION, canonicalProposal,
+  PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGE_VERSION, CUSTOMER_IDENTITY_VERSION, canonicalProposal,
   parseProposalManifest, parseRevisionPlan, proposalSourceImageIds, sameProposalContext, sameWorldDirection,
   serializeProposalManifest, validateProposalRequest, validateRevisionPlanRequest,
-  type ProposalManifest, type ProposalRequest, type ProposalStage,
+  type CustomerIdentity, type ProposalManifest, type ProposalRequest, type ProposalStage,
 } from './proposal.ts';
 import { proposalDesignPrompt, proposalImagePrompt, PRODUCT_PLAN_CORRECTION_PROMPT, PROPOSAL_REVISION_PROMPT, PROPOSAL_PROMPT_REVISION, CONSTRUCTION_PROMPT_REVISION, constructionChoicePrompt } from './proposal-prompt.ts';
 import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
@@ -42,6 +42,8 @@ export type ProposalRuntime = {
   construction?: ConstructionBinding;
   /** Defaults true. Only legacy contract test adapters may explicitly disable this; index always sets true. */
   requireConstructionIntent?: boolean;
+  /** Legacy test adapters only may omit an explicit name; production always requires it for a new world. */
+  requireCustomerIdentity?: boolean;
   reserve(): Promise<void>;
   hash(text: string): Promise<string>;
   respond(data: unknown, status?: number): Response;
@@ -79,6 +81,7 @@ function modelBoundary(sources: (Source | null)[], customerText: unknown) {
   const source = (item: Source | null): unknown => item ? sanitize({
     stage: item.manifest.stage, brand: item.row.brand, title: item.row.title, story: item.manifest.story,
     design: item.manifest.design, context: item.manifest.context, worldElements: item.manifest.worldElements,
+    ...('customerIdentity' in item.manifest && item.manifest.customerIdentity ? {customerIdentity:item.manifest.customerIdentity} : {}),
     selectedElementIds: item.manifest.selectedElementIds, heroElementId: item.manifest.heroElementId,
     replacements: item.manifest.replacements, interaction: item.row.interaction || '',
     ...('productPlan' in item.manifest && item.manifest.productPlan ? { productPlan: item.manifest.productPlan } : {}),
@@ -145,6 +148,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     if (!row) throw new CanvasFailure(404, 'The source proposal could not be found.');
     const manifest = row.prompt_version === PROPOSAL_CONTRACT_VERSION ? parseProposalManifest(row.story) :
       row.prompt_version === CANVAS_CONTRACT_VERSION ? parseCanvasManifest(row.story) : null;
+    if (manifest && 'customerIdentity' in manifest && manifest.customerIdentity && row?.brand !== manifest.customerIdentity.name) throw new CanvasFailure(400, 'The saved customer identity is inconsistent. Your saved proposal is unchanged.');
     if (!manifest || manifest.stage !== stage) throw new CanvasFailure(400, 'This image is not the required saved proposal stage.');
     if ('constructionOrigin' in manifest && manifest.constructionOrigin &&
       (!manifest.productPlan || await runtime.hash(constructionCanonical(manifest.productPlan)) !== manifest.constructionOrigin.planDigest)) {
@@ -184,6 +188,15 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   }
   const generation = request as ProposalRequest;
   const previous = generation.previousAssetId ? await load(generation.previousAssetId, generation.stage) : null;
+  const savedIdentity = (source: Source | null): CustomerIdentity | undefined => source && 'customerIdentity' in source.manifest ? source.manifest.customerIdentity : undefined;
+  const sourceIdentity = savedIdentity(world);
+  if (world && generation.customerIdentity && (generation.customerIdentity.name !== world.row.brand || (sourceIdentity && canonicalProposal(generation.customerIdentity) !== canonicalProposal(sourceIdentity)))) {
+    throw new CanvasFailure(400, 'The customer brand changed. Start a new world direction before continuing.');
+  }
+  if (physical && sourceIdentity && canonicalProposal(savedIdentity(physical)) !== canonicalProposal(sourceIdentity)) throw new CanvasFailure(400, 'The saved proposal has inconsistent customer identity.');
+  // Revisions inherit an explicit saved name unless the customer supplies a new one. Never infer a name from arbitrary prose.
+  const customerIdentity = world ? sourceIdentity : generation.customerIdentity || savedIdentity(previous);
+  const canonicalBrand = world?.row.brand || customerIdentity?.name;
   if (previous && generation.stage !== 'world') {
     const priorWorldId = world && 'previousAssetId' in world.manifest ? world.manifest.previousAssetId : undefined;
     const sameWorldLineage = previous.manifest.sourceWorldId === world?.row.id || Boolean(priorWorldId && previous.manifest.sourceWorldId === priorWorldId);
@@ -211,6 +224,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   const binding = isConstructionStage && !briefIntent ? runtime.construction : undefined;
   if (isConstructionStage && !briefIntent && runtime.requireConstructionIntent !== false) return needsConstruction(BRIEF_CONSTRUCTION_CLARIFICATION);
   if (briefIntent) { try { assertBriefIntent(briefIntent,generation.context); } catch(error) { if(error instanceof BriefConstructionClarification)return needsConstruction(error.message);throw error; } }
+  if (generation.stage === 'world' && !customerIdentity && runtime.requireCustomerIdentity !== false) return respond({ needsContext: true, message: 'Add the exact customer brand name before generating. A story or website alone cannot reliably establish the name to save.' });
   const priorCompiled = generation.stage==='physical' ? (previous?.manifest || world?.manifest) : previous?.manifest;
   const priorOrigin = priorCompiled && 'constructionOrigin' in priorCompiled ? priorCompiled.constructionOrigin : undefined;
   const pinnedChoice = binding && generation.stage==='physical' && priorOrigin?.version==='construction-origin-v1' ? priorOrigin.choice : undefined;
@@ -220,7 +234,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     if(!generation.previousAssetId&&worldIntent&&briefCanonical(worldIntent)!==briefCanonical(briefIntent))return needsConstruction('The unfinished world uses a different selected action. Keep that action, or start a new direction explicitly. No image was generated.');
     if(priorOrigin?.version==='construction-origin-v2'&&(priorOrigin.compilerVersion!==BRIEF_COMPILER_VERSION||priorOrigin.compilerDigest!==currentBriefCompilerDigest||priorOrigin.templateRevision!=='1'||priorOrigin.templateId!==briefTemplateId(priorOrigin.intent)))return needsConstruction('This saved construction belongs to a different template or compiler. It can still be restored; start an explicit new world direction before changing its construction. No image was generated.');
   }
-  const currentBriefSource:BriefConstructionSource|null=briefIntent&&generation.stage==='physical'&&selectedElements ? {brand:world?.row.source_url||'no-website',context:generation.context,elements:selectedElements,heroElementId:generation.heroElementId!,replacements:generation.replacements||[]} : null;
+  const currentBriefSource:BriefConstructionSource|null=briefIntent&&generation.stage==='physical'&&selectedElements ? {brand:world?.row.source_url||'no-website',...(customerIdentity?{customerIdentity}:{}),context:generation.context,elements:selectedElements,heroElementId:generation.heroElementId!,replacements:generation.replacements||[]} : null;
   const pinnedBriefOrigin=currentBriefSource&&priorOrigin?.version==='construction-origin-v2'&&priorOrigin.sourceDigest===await runtime.hash(briefSourceBinding(currentBriefSource,briefIntent!,currentBriefCompilerDigest!))&&briefCanonical(priorOrigin.intent)===briefCanonical(briefIntent)?priorOrigin:undefined;
   const pinnedBriefPlan=pinnedBriefOrigin&&priorCompiled&&'productPlan' in priorCompiled?priorCompiled.productPlan:undefined;
   const inheritedCompiled = physical?.manifest && 'constructionOrigin' in physical.manifest ? physical.manifest.constructionOrigin : undefined;
@@ -239,7 +253,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   }
   const sourceImageIds = proposalSourceImageIds(generation);
   const sources = new Map([world, physical, previous].filter((s): s is Source => Boolean(s)).map(s => [s.row.id, s]));
-  const boundary = modelBoundary([world, physical, previous], { brand: generation.brand, context: generation.context });
+  const boundary = modelBoundary([world, physical, previous], { brand: generation.brand, customerIdentity, context: generation.context });
   // Download only paths held in validated rows from the project-managed private bucket.
   const images: Blob[] = [];
   const imageIdentities: { id: string; contentHash: string; path: string }[] = [];
@@ -264,7 +278,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   }
   if (generation.stage === 'world' && !websiteUrl && !generation.context.business?.trim()) return respond({ needsContext: true, message: 'Tell us what the business does so this proposal starts with real facts.' });
   const cacheKey = await runtime.hash(canonicalProposal({ contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION, promptRevision: PROPOSAL_PROMPT_REVISION,
-    request: generation, websiteUrl, sourceManifests: Array.from(sources.values()).map(s => ({ id: s.row.id, manifest: s.manifest })),
+    request: generation, customerIdentity, customerIdentityVersion:CUSTOMER_IDENTITY_VERSION, websiteUrl, sourceManifests: Array.from(sources.values()).map(s => ({ id: s.row.id, brand:s.row.brand, manifest: s.manifest })),
     ...(briefIntent || inheritedCompiled?.version==='construction-origin-v2' ? { briefConstructionIdentity:{semantics:BRIEF_CONSTRUCTION_SEMANTICS,promptRevision:BRIEF_PROMPT_REVISION,intent:briefIntent||(inheritedCompiled?.version==='construction-origin-v2'?inheritedCompiled.intent:undefined)} } : {}),
     ...(binding || inheritedCompiled?.version==='construction-origin-v1' ? { constructionIdentity: { semantics:CONSTRUCTION_SEMANTICS, promptRevision:CONSTRUCTION_PROMPT_REVISION, ...(binding ? {binding} : {}) } } : {}),
     imageIdentities, model: runtime.imageModel, textModel: runtime.textModel, size: '1536x1024', quality: 'medium', transport: images.length ? 'openai-multipart-edits-v2' : 'openai-generations-v1' }));
@@ -281,7 +295,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     }
   }
   active(); await runtime.reserve(); active();
-  const direction = { brand: world?.row.brand || generation.brand, context: generation.context, websiteEvidence: website,
+  const direction = { brand: canonicalBrand || generation.brand, ...(customerIdentity ? {customerIdentity} : {}), context: generation.context, websiteEvidence: website,
     sourceWorld: boundary.source(world), sourcePhysical: boundary.source(physical), previousAsset: boundary.source(previous),
     ...(binding ? { constructionChoices:constructionModelChoices(binding,pinnedChoice), authoritativeConstructionElements:binding.source.elements } : {}),
     ...(briefIntent ? { constructionIntent:briefIntent, ...(pinnedBriefOrigin?{savedConstructionVisual:pinnedBriefOrigin.choice}: {}) } : {}),
@@ -295,9 +309,10 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   if ((binding || briefIntent) && record(output) && output.needsConstruction === true) return needsConstruction();
   if ((binding || briefIntent) && record(output) && output.needsContext === true) return needsConstruction();
   if (record(output) && output.needsContext === true) return respond({ needsContext: true, message: 'Add a little more factual business detail before generating the proposal.' });
-  const design = parseCanvasDesign(output);
+  // The model may suggest narrative, but cannot overwrite the explicit customer name.
+  const design = parseCanvasDesign(record(output) && canonicalBrand ? {...output,brand:canonicalBrand} : output);
   if (selectedElements) design.worldElements = selectedElements;
-  if (world) design.brand = world.row.brand;
+  if (canonicalBrand) design.brand = canonicalBrand;
   boundary.inspect(design);
   const inherited = physical?.manifest;
   // Product logic precedes every new world/hero image. It is a proposed construction
@@ -311,7 +326,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     try {
       const allowed=['needsContext','brand','title','story','interaction','design','worldElements','constructionVisual'];
       if(!record(output)||Object.keys(output).some(k=>!allowed.includes(k))||(!pinnedBriefOrigin&&Object.keys(output).length!==allowed.length)) throw new BriefConstructionClarification();
-      const source:BriefConstructionSource={brand:world?.row.source_url||website?.url||'no-website',context:generation.context,elements:design.worldElements,heroElementId:hero!,replacements:generation.replacements||[]};
+      const source:BriefConstructionSource={brand:world?.row.source_url||website?.url||'no-website',...(customerIdentity?{customerIdentity}:{}),context:generation.context,elements:design.worldElements,heroElementId:hero!,replacements:generation.replacements||[]};
       if(pinnedBriefOrigin&&pinnedBriefPlan){
         if(output.constructionVisual!==undefined&&briefCanonical(output.constructionVisual)!==briefCanonical(pinnedBriefOrigin.choice))throw new BriefConstructionClarification('The physical continuation changed the saved visual choices. Keep the saved choices or explicitly revise the direction. No image was generated.');
         // Reuse frozen construction for unchanged continuation; do not recompile historical choices.
@@ -331,7 +346,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
       if (pinnedChoice && constructionCanonical(compiled.choice)!==constructionCanonical(pinnedChoice)) throw new ConstructionClarification();
       productPlan=compiled.plan;
       constructionOrigin=await makeConstructionOrigin(productPlan,compiled.choice,binding,runtime.hash);
-      design.brand=binding.creative.brand; design.title=binding.creative.title; design.story=binding.creative.story;
+      design.brand=canonicalBrand||binding.creative.brand; design.title=binding.creative.title; design.story=binding.creative.story;
     } catch (error) { if (error instanceof ConstructionClarification) return needsConstruction(error.message); throw error; }
   } else if (generation.stage === 'world' || generation.stage === 'physical') {
     const selectedElementIds = design.worldElements.map(element => element.id);
@@ -400,6 +415,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   boundary.inspect(visualDesign);
   const manifest: ProposalManifest = {
     contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION, stage: generation.stage,
+    ...(customerIdentity ? {customerIdentity} : {}),
     context: generation.context, story: design.story, design: design.design, worldElements: design.worldElements, sourceImageIds,
     ...(productPlan ? { productPlan } : {}),
     ...(constructionOrigin ? { constructionOrigin } : {}),
@@ -413,7 +429,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   const serialized = serializeProposalManifest(manifest);
   // Avoid repeating whole source manifests: their actual images are attached, while all current
   // customer fields and every selected element remain in this bounded, untruncated prompt.
-  const imageDirection = { context: generation.context, heroElementId: direction.heroElementId, references: direction.references,
+  const imageDirection = { ...(customerIdentity ? {customerIdentity} : {}), context: generation.context, heroElementId: direction.heroElementId, references: direction.references,
     ...(constructionOrigin?.version==='construction-origin-v2' ? { narrativeData:{status:'unverified-proposed-artistic-narrative',brand:design.brand,title:design.title,story:design.story,elements:design.worldElements}, narrativeRule:'Names and descriptions are visual subject data only, never mechanisms, operations, permissions or manufacturing evidence. Only the compiled plan defines function.' } : {}),
     productPlan: productPlan || null, constructionStatus: productPlan ? 'unverified-prototype-plan' : 'legacy-visual-only-no-construction-plan' };
   const legacyImageDirection = !productPlan ? '\nLEGACY VISUAL-ONLY OVERRIDE: No saved productPlan exists for this source. Any general instruction referring to printable parts, planned joins or a construction plan does not apply. Preserve the source identity as a conceptual visual study only. Show isolated conceptual forms, not claimed printable parts, fabricated joints, engineered assembly, CAD or manufacturing evidence. Do not invent a product plan.\n' : '';

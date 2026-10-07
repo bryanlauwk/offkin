@@ -24,7 +24,7 @@ describe('proposal prompt corrections from live output review', () => {
     expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('Diagnostics are bounded');
   });
   it('versions prompt cache identity separately from saved manifest compatibility', () => {
-    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v6-assembly-coverage-feedback');
+    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v7-customer-identity');
     expect(PROPOSAL_STAGE_VERSION).toBe('proposal-assets-v1');
   });
   it('makes the plan a nested property without overriding the outer stage JSON', () => {

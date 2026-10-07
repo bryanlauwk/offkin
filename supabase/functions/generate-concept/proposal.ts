@@ -10,6 +10,15 @@ import {
 /** Separate contract: old v9 clients still negotiate their unchanged two-stage API. */
 export const PROPOSAL_CONTRACT_VERSION = 'offkin-proposal-v10';
 export const PROPOSAL_STAGE_VERSION = 'proposal-assets-v1';
+/** Explicit customer text, never inferred from model prose or a website address. */
+export const CUSTOMER_IDENTITY_VERSION = 'customer-brand-v1';
+export type CustomerIdentity = { version: typeof CUSTOMER_IDENTITY_VERSION; name: string };
+export function isCustomerIdentity(value: unknown): value is CustomerIdentity {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return Object.keys(v).length === 2 && v.version === CUSTOMER_IDENTITY_VERSION && typeof v.name === 'string' &&
+    v.name.trim().length > 0 && v.name.length <= 120 && Array.from(v.name).every(c => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127);
+}
 export const PROPOSAL_STAGES = ['world', 'physical', 'details', 'packaging'] as const;
 export const PROPOSAL_CONTEXT_MAX_CHARS = CANVAS_CONTEXT_MAX_CHARS;
 export type ProposalStage = typeof PROPOSAL_STAGES[number];
@@ -17,6 +26,7 @@ export type ProposalRequest = {
   contractVersion: typeof PROPOSAL_CONTRACT_VERSION;
   stage: ProposalStage;
   brand: string;
+  customerIdentity?: CustomerIdentity;
   context: CanvasContext;
   constructionIntent?: ConstructionIntent;
   sourceWorldId?: string;
@@ -65,18 +75,20 @@ export const PROPOSAL_CAPABILITIES = {
   proposal_context_max_chars: PROPOSAL_CONTEXT_MAX_CHARS,
   proposal_reference_images: true,
   proposal_product_plan_version: PRODUCT_PLAN_VERSION,
+  proposal_customer_identity_version: CUSTOMER_IDENTITY_VERSION,
   proposal_construction_intent_version: CONSTRUCTION_INTENT_VERSION,
 };
 const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const text = (v: unknown, max: number, empty = false): v is string => typeof v === 'string' && v.length <= max && (empty || Boolean(v.trim()));
 const onlyKeys = (v: Record<string, unknown>, keys: readonly string[]) => Object.keys(v).every(k => keys.includes(k));
-const requestKeys = ['contractVersion', 'stage', 'brand', 'context', 'constructionIntent', 'sourceWorldId', 'sourcePhysicalId', 'previousAssetId', 'selectedElementIds', 'heroElementId', 'replacements'];
+const requestKeys = ['contractVersion', 'stage', 'brand', 'customerIdentity', 'context', 'constructionIntent', 'sourceWorldId', 'sourcePhysicalId', 'previousAssetId', 'selectedElementIds', 'heroElementId', 'replacements'];
 const selectionKeys = ['selectedElementIds', 'heroElementId', 'replacements'];
 export function validateProposalRequest(value: unknown): ProposalRequest {
   if (!record(value) || !onlyKeys(value, requestKeys) || value.contractVersion !== PROPOSAL_CONTRACT_VERSION ||
     !PROPOSAL_STAGES.includes(value.stage as ProposalStage) || !text(value.brand, 300) || value.brand.trim().length < 2 || !isCanvasContext(value.context)) {
     throw new CanvasFailure(400, 'Use a complete, supported proposal brief. Your wording has not been shortened.');
   }
+  if (value.customerIdentity !== undefined && !isCustomerIdentity(value.customerIdentity)) throw new CanvasFailure(400, 'Supply an exact customer brand name of 1–120 characters.');
   if (value.constructionIntent !== undefined && (!isConstructionIntent(value.constructionIntent) || (value.stage !== 'world' && value.stage !== 'physical'))) throw new CanvasFailure(400, 'Choose a supported construction action for the new world or physical concept.');
   if (value.previousAssetId !== undefined && !isConceptId(value.previousAssetId)) throw new CanvasFailure(400, 'Choose a valid previous proposal image.');
   if (value.stage === 'world') {
@@ -144,7 +156,7 @@ export function parseProposalManifest(value: string): ProposalManifest | null {
 }
 export function restoreProposalRow(row: CanvasStoredRow, image: string): ProposalConcept | null {
   const manifest = parseProposalManifest(row.story);
-  if (!manifest || row.prompt_version !== PROPOSAL_CONTRACT_VERSION) return null;
+  if (!manifest || row.prompt_version !== PROPOSAL_CONTRACT_VERSION || (manifest.customerIdentity && row.brand !== manifest.customerIdentity.name)) return null;
   const { previousAssetId: _privateAncestor, ...current } = manifest;
   return { ...current, sourceImageIds: proposalSourceImageIds({ ...current, brand: row.brand }),
     id: row.id, brand: row.brand, title: row.title, image, interaction: row.interaction || '', sourceUrl: row.source_url || '', sourceTitle: row.source_title || '' };
@@ -153,12 +165,13 @@ export function isProposalConcept(value: unknown): value is ProposalConcept {
   if (!record(value) || Object.prototype.hasOwnProperty.call(value, 'previousAssetId') || !isConceptId(value.id) || !text(value.brand, 120) || !text(value.title, 100) ||
     !text(value.interaction, 700, true) || typeof value.sourceUrl !== 'string' || typeof value.sourceTitle !== 'string' || typeof value.image !== 'string') return false;
   try { if (new URL(value.image).protocol !== 'https:') return false; } catch { return false; }
+  if (value.customerIdentity !== undefined && (!isCustomerIdentity(value.customerIdentity) || value.brand !== value.customerIdentity.name)) return false;
   return isProposalManifest(Object.fromEntries(Object.entries(value).filter(([k]) => manifestKeys.includes(k))));
 }
 export function hasProposalCapabilities(value: unknown): boolean {
   if (!record(value) || value.ready !== true || !record(value.capabilities)) return false;
   const c = value.capabilities;
-  return c.proposal === true && c.proposal_contract_version === PROPOSAL_CONTRACT_VERSION && c.proposal_reference_images === true && c.proposal_product_plan_version === PRODUCT_PLAN_VERSION && c.proposal_construction_intent_version === CONSTRUCTION_INTENT_VERSION &&
+  return c.proposal === true && c.proposal_contract_version === PROPOSAL_CONTRACT_VERSION && c.proposal_reference_images === true && c.proposal_customer_identity_version === CUSTOMER_IDENTITY_VERSION && c.proposal_product_plan_version === PRODUCT_PLAN_VERSION && c.proposal_construction_intent_version === CONSTRUCTION_INTENT_VERSION &&
     c.proposal_context_max_chars === PROPOSAL_CONTEXT_MAX_CHARS && JSON.stringify(c.proposal_stages) === JSON.stringify(PROPOSAL_STAGES);
 }
 export function canonicalProposal(value: unknown): string {

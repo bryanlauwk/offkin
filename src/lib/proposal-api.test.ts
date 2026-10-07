@@ -1,17 +1,43 @@
 import { CONSTRUCTION_INTENT_VERSION } from '../../supabase/functions/generate-concept/construction-intent';
 import { makeProductPlan } from '../test/product-plan-fixture';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PROPOSAL_CAPABILITIES, type ProposalConcept, type ProposalRequest } from '../../supabase/functions/generate-concept/proposal';
+import { CUSTOMER_IDENTITY_VERSION, PROPOSAL_CAPABILITIES, type ProposalConcept, type ProposalRequest } from '../../supabase/functions/generate-concept/proposal';
 import { ProposalConstructionNeededError, ProposalContextNeededError, planProposalRevision, requestProposalAsset, restoreProposalAsset, supportsProposalGeneration } from './proposal-api';
 const availability=vi.hoisted(()=>({paused:false}));
 vi.mock('./proposal-availability',async original=>({...await original<object>(),get PROPOSAL_GENERATION_PAUSED(){return availability.paused;}}));
-const id='00000000-0000-4000-8000-000000000001';const world:ProposalRequest={contractVersion:'offkin-proposal-v10',stage:'world',brand:'no-website',constructionIntent:{version:CONSTRUCTION_INTENT_VERSION,action:'static'},context:{mode:'mechanical',interaction:'Display only',business:'Paper gifts',exactWording:'  字\nCafé 🪁 '}};
-function concept(overrides:Partial<ProposalConcept>={}):ProposalConcept{return {...world,id,stageVersion:'proposal-assets-v1',brand:'Paper',title:'Paper world',story:'A rich paper city.',design:'Many connected scenes',interaction:'Explore',worldElements:[{id:'house',label:'Paper house',description:'A proposed story home',kind:'proposal'}],sourceImageIds:[],productPlan:makeProductPlan(['house']),image:'https://images.example/world.png',sourceUrl:'',sourceTitle:'',...overrides};}
+const id='00000000-0000-4000-8000-000000000001';const world:ProposalRequest={contractVersion:'offkin-proposal-v10',stage:'world',brand:'no-website',customerIdentity:{version:CUSTOMER_IDENTITY_VERSION,name:'  Fable Finch 字 Café 🪁  '},constructionIntent:{version:CONSTRUCTION_INTENT_VERSION,action:'static'},context:{mode:'mechanical',interaction:'Display only',business:'Paper gifts',exactWording:'  字\nCafé 🪁 '}};
+function concept(overrides:Partial<ProposalConcept>={}):ProposalConcept{return {...world,id,stageVersion:'proposal-assets-v1',brand:world.customerIdentity!.name,title:'Paper world',story:'A rich paper city.',design:'Many connected scenes',interaction:'Explore',worldElements:[{id:'house',label:'Paper house',description:'A proposed story home',kind:'proposal'}],sourceImageIds:[],productPlan:makeProductPlan(['house']),image:'https://images.example/world.png',sourceUrl:'',sourceTitle:'',...overrides};}
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status});
 const readiness=()=>reply({ready:true,capabilities:PROPOSAL_CAPABILITIES});
 beforeEach(()=>{availability.paused=false;vi.stubEnv('VITE_SUPABASE_URL','https://test.invalid');vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY','public-key');});
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.restoreAllMocks();});
 describe('Proposal API fail-closed negotiation',()=>{
+ it.each([undefined,'customer-brand-v0','customer-brand-v2'])('requires exact customer identity capability %j before generation',async version=>{
+   const fetch=vi.fn(async()=>reply({ready:true,capabilities:{...PROPOSAL_CAPABILITIES,proposal_customer_identity_version:version}}));vi.stubGlobal('fetch',fetch);
+   await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/not available/);expect(fetch).toHaveBeenCalledOnce();
+ });
+ it('rejects a saved section with a different or missing expected identity without generating',async()=>{
+   const fetch=vi.fn(async()=>reply({concept:concept({customerIdentity:undefined,brand:'Legacy Paper'})}));vi.stubGlobal('fetch',fetch);
+   await expect(restoreProposalAsset(id,new AbortController().signal,world.customerIdentity)).rejects.toThrow(/does not match this customer brand/);expect(fetch).toHaveBeenCalledOnce();
+ });
+
+ it('requires a separately supplied exact identity before any new-world network request',async()=>{
+   const fetch=vi.fn();vi.stubGlobal('fetch',fetch);
+   await expect(requestProposalAsset({...world,customerIdentity:undefined,context:{...world.context,business:'Fable Finch brings the Sunbeam community together',brandIdentifiers:'The Sunbeam story'}},new AbortController().signal)).rejects.toThrow(/exact brand name/);expect(fetch).not.toHaveBeenCalled();
+ });
+ it.each([undefined,{version:CUSTOMER_IDENTITY_VERSION,name:'Unrelated Orchard'}] as const)('rejects response identity %j when a specific customer was requested',async customerIdentity=>{
+   vi.stubGlobal('fetch',vi.fn(async(_url,init)=>init.method==='POST'?reply({concept:concept({customerIdentity,brand:customerIdentity?.name||'Legacy Paper'})}):readiness()));
+   await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/does not match|incomplete/);
+ });
+ it('rejects a response display name that contradicts its declared identity',async()=>{
+   vi.stubGlobal('fetch',vi.fn(async(_url,init)=>init.method==='POST'?reply({concept:concept({brand:'Unrelated Orchard'})}):readiness()));
+   await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/does not match|incomplete/);
+ });
+ it('restores older no-identity assets without guessing their authority from the display name',async()=>{
+   const fetch=vi.fn(async()=>reply({concept:concept({customerIdentity:undefined,brand:'Legacy Paper'})}));vi.stubGlobal('fetch',fetch);
+   const restored=await restoreProposalAsset(id,new AbortController().signal);expect(restored.customerIdentity).toBeUndefined();expect(restored.brand).toBe('Legacy Paper');expect(fetch).toHaveBeenCalledOnce();
+ });
+
  it.each([undefined,'construction-intent-v0','construction-intent-v2'])('requires the exact construction-intent capability %j before sending a generation request',async version=>{
    const fetch=vi.fn(async(_url:string,_init:RequestInit)=>reply({ready:true,capabilities:{...PROPOSAL_CAPABILITIES,proposal_construction_intent_version:version}}));vi.stubGlobal('fetch',fetch);
    await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/not available/);expect(fetch).toHaveBeenCalledOnce();expect(fetch.mock.calls[0][1]).not.toHaveProperty('body');

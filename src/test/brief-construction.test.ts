@@ -8,7 +8,7 @@ const hash=async(text:string)=>createHash('sha256').update(text).digest('hex');
 function fixture(action:ConstructionIntent['action']='static'){
  const intent:ConstructionIntent={version:'construction-intent-v1',action};
  const source:BriefConstructionSource={brand:'no-website',context:{business:'Fictional Moonfern paper objects for adult collectors',interaction:constructionInteraction(intent),mode:'mechanical',style:'Lively folded forest shapes with lavender and moss colors'},elements:[{id:'paper-fox',label:'Folded fox',description:'A proposed fox-shaped paper-inspired collectible hero',kind:'proposal'},{id:'folded-grove',label:'Folded grove',description:'Dimensional forest folds and grouped leaf masses',kind:'proposal'}],heroElementId:'paper-fox',replacements:[]};
- const choice:BriefVisualChoice={version:'construction-visual-v1',parts:[{role:'body',storyElementIds:['folded-grove'],geometry:'organic',profile:'layered',finish:'matte',colors:['#778866']},{role:'hero',storyElementIds:['paper-fox'],geometry:'character',profile:'angular',finish:'selective-color',colors:['#9977AA']},...(action==='static'?[]:[{role:'retainer' as const,storyElementIds:[],geometry:'sculpted' as const,profile:'rounded' as const,finish:'matte' as const,colors:['#778866']}])]};
+ const choice:BriefVisualChoice={version:'construction-visual-v2',parts:[{role:'body',representation:'single-form',storyElementIds:['folded-grove'],geometry:'organic',profile:'layered',finish:'matte',colors:['#778866']},{role:'hero',representation:'single-form',storyElementIds:['paper-fox'],geometry:'character',profile:'angular',finish:'selective-color',colors:['#9977AA']},...(action==='static'?[]:[{role:'retainer' as const,representation:'support' as const,storyElementIds:[],geometry:'sculpted' as const,profile:'rounded' as const,finish:'matte' as const,colors:['#778866']}])]};
  return {intent,source,choice};
 }
 describe('wired per-brief construction grammar',()=>{
@@ -30,7 +30,7 @@ describe('wired per-brief construction grammar',()=>{
  });
  it('covers all 32 authored optional-module sets across the static and moving cores',()=>{
   let count=0;for(const action of ['static','press-reveal-manual-reset'] as const)for(let mask=0;mask<16;mask++){
-   const f=fixture(action);for(const [i,role] of (['form-a','form-b','form-c','form-d'] as const).entries())if((mask>>i)&1)f.choice.parts.push({role,storyElementIds:[],geometry:'sculpted',profile:'asymmetric',finish:'satin',colors:['#ABCDEF']});
+   const f=fixture(action);for(const [i,role] of (['form-a','form-b','form-c','form-d'] as const).entries())if((mask>>i)&1)f.choice.parts.push({role,representation:'support',storyElementIds:[],geometry:'sculpted',profile:'asymmetric',finish:'satin',colors:['#ABCDEF']});
    const r=compileBriefConstruction(f.choice,f.intent,f.source);expect(productPlanIssues(r.plan,f.source.elements.map(e=>e.id))).toEqual([]);expect(r.plan.parts).toHaveLength((action==='static'?2:3)+mask.toString(2).replace(/0/g,'').length);count++;
   }expect(count).toBe(32);
  });
@@ -53,7 +53,7 @@ describe('wired per-brief construction grammar',()=>{
  });
  it('source binding covers intent, template and compiler identity rather than a bare brief hash',async()=>{
   const f=fixture(),digest=await hash(BRIEF_CONSTRUCTION_SEMANTICS),bound=JSON.parse(briefSourceBinding(f.source,f.intent,digest));
-  expect(bound).toMatchObject({source:f.source,intent:f.intent,templateId:'static-sculpture-v1',templateRevision:'1',compilerVersion:'brief-construction-compiler-v1',compilerDigest:digest});
+  expect(bound).toMatchObject({source:f.source,intent:f.intent,templateId:'static-sculpture-v1',templateRevision:'1',compilerVersion:'brief-construction-compiler-v2',compilerDigest:digest});
   expect(await hash(briefSourceBinding(f.source,f.intent,digest))).not.toBe(await hash(briefSourceBinding(f.source,f.intent,'a'.repeat(64))));
   expect(briefSourceBinding(f.source,f.intent,digest)).not.toBe(briefSourceBinding(f.source,fixture('press-reveal-manual-reset').intent,digest));
  });
@@ -61,5 +61,42 @@ describe('wired per-brief construction grammar',()=>{
   const f=fixture(),r=compileBriefConstruction(f.choice,f.intent,f.source),origin=await makeBriefOrigin(r.plan,r.choice,f.intent,f.source,hash);
   expect(origin.kind).toBe('compiled-visual-proposal');expect(origin.evidence).toBe('unverified-design-proposal');expect(isBriefConstructionOrigin(origin)).toBe(true);expect(r.plan.verificationGates.every(g=>g.status==='unverified')).toBe(true);
   expect(isBriefConstructionOrigin({...origin,evidence:'engineering-approved'})).toBe(false);
+ });
+});
+
+
+describe('v2 support and scenic story assignments',()=>{
+ it('never allows the rear retainer to carry scenic story coverage',()=>{
+  const f=fixture('press-reveal-manual-reset');
+  f.choice.parts[0].storyElementIds=[];f.choice.parts[0].representation='support';
+  f.choice.parts[2].storyElementIds=['folded-grove'];f.choice.parts[2].representation='single-form';
+  const before=briefCanonical(f);expect(()=>compileBriefConstruction(f.choice,f.intent,f.source)).toThrow();expect(briefCanonical(f)).toBe(before);
+ });
+ it('requires explicit bounded integral composition rather than anonymous multi-story forms',()=>{
+  const f=fixture();f.source.elements.push({id:'paper-bird',label:'Paper bird',description:'A second fictional folded form',kind:'proposal'});
+  f.choice.parts[0].storyElementIds.push('paper-bird');expect(()=>compileBriefConstruction(f.choice,f.intent,f.source)).toThrow();
+  f.choice.parts[0].representation='integral-cluster';const result=compileBriefConstruction(f.choice,f.intent,f.source);
+  expect(result.plan.parts[0].form).toContain('never scattered disconnected objects');
+  expect(result.plan.parts[0].form).toContain('Connectivity and geometry remain unverified');
+  expect(result.plan.joins.map(j=>j.id)).toEqual(['hero-seat']);
+ });
+ it('rejects duplicate coverage, an overloaded cluster, and secondary meanings on the hero',()=>{
+  const duplicate=fixture();duplicate.choice.parts[0].representation='integral-cluster';duplicate.choice.parts[0].storyElementIds.push('paper-fox');expect(()=>compileBriefConstruction(duplicate.choice,duplicate.intent,duplicate.source)).toThrow();
+  const overloaded=fixture();for(let i=0;i<3;i++){const id=`leaf-${i}`;overloaded.source.elements.push({id,label:'Leaf',description:'Fictional integral leaf',kind:'proposal'});overloaded.choice.parts[0].storyElementIds.push(id);}overloaded.choice.parts[0].representation='integral-cluster';expect(()=>compileBriefConstruction(overloaded.choice,overloaded.intent,overloaded.source)).toThrow();
+  const hero=fixture();hero.choice.parts[0].storyElementIds=[];hero.choice.parts[0].representation='support';hero.choice.parts[1].storyElementIds.push('folded-grove');hero.choice.parts[1].representation='integral-cluster';expect(()=>compileBriefConstruction(hero.choice,hero.intent,hero.source)).toThrow();
+ });
+ it.each(['static','press-reveal-manual-reset'] as const)('preserves sixteen meanings through finite explicit clusters for %s',action=>{
+  const f=fixture(action);f.source.elements=Array.from({length:16},(_,i)=>({id:`fold-${i}`,label:`Fold ${i}`,description:'One meaning in a proposed integral folded-paper composition',kind:'proposal'}));f.source.heroElementId='fold-0';
+  f.choice.parts[1].storyElementIds=['fold-0'];
+  for(const role of ['form-a','form-b','form-c','form-d'] as const)f.choice.parts.push({...f.choice.parts[0],role});
+  const scenic=f.choice.parts.filter(p=>p.role!=='hero'&&p.role!=='retainer');scenic.forEach((p,i)=>{p.representation='integral-cluster';p.storyElementIds=f.source.elements.slice(1+i*3,4+i*3).map(e=>e.id);});
+  const {plan}=compileBriefConstruction(f.choice,f.intent,f.source);expect(plan.parts).toHaveLength(action==='static'?6:7);expect(plan.parts.flatMap(p=>p.storyElementIds).sort()).toEqual(f.source.elements.map(e=>e.id).sort());expect(productPlanIssues(plan,f.source.elements.map(e=>e.id))).toEqual([]);
+ });
+ it('reads historical v1 overloaded choices unchanged but refuses to compile them anew',async()=>{
+  const f=fixture('press-reveal-manual-reset'),r=compileBriefConstruction(f.choice,f.intent,f.source),origin=await makeBriefOrigin(r.plan,r.choice,f.intent,f.source,hash);
+  const legacy={version:'construction-visual-v1',parts:f.choice.parts.map(({representation:_representation,...p})=>({...p}))};
+  legacy.parts[2].storyElementIds=['folded-grove'];legacy.parts[0].storyElementIds=[];
+  const historical={...origin,compilerVersion:'brief-construction-compiler-v1',choice:legacy};const before=briefCanonical(historical);
+  expect(isBriefConstructionOrigin(historical)).toBe(true);expect(briefCanonical(historical)).toBe(before);expect(()=>compileBriefConstruction(legacy,f.intent,f.source)).toThrow();
  });
 });
