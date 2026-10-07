@@ -41,3 +41,6 @@
 /* Anton is a regular-only face: preserve its designed spacing and stroke weight. */
 .pb-board{font-synthesis:none}
 .pb-board h2,.pb-board h3,.pb-board h4,.pb-brand{font-weight:400;letter-spacing:0;line-height:1.15}
+
+/* Keep a CJK brand name together when it fits; still contain oversized names. */
+.pb-brand{word-break:keep-all;overflow-wrap:anywhere}
