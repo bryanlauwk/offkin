@@ -1,0 +1,128 @@
+{
+  "date": "2026-10-07",
+  "generation_method": "Native image generation: four original assets and two layout-only atlas revisions",
+  "classification": "Illustrative marketing concepts; not customer outputs, manufactured products or CAD evidence",
+  "delivery_conversion": "WebP quality90; original dimensions retained; hero alpha byte-identical to source",
+  "assets": [
+    {
+      "file": "public/marketing/offkin-hero.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 641364,
+      "sha256": "a29fe55482dfcf8038d3b66ca8f9e6fe858a97dd21b1fe68d9be6ba92acfa0b1",
+      "original_png_sha256": "a2067285b2e63c734b73e426dc946e8e1c69c5cc175e8031bfbedc71f0da6314",
+      "prompt": "Use case: ads-marketing. Asset type: standalone cutout hero illustration for OFFKIN art collectible studio, NOT a webpage or poster. Create one elaborate tactile miniature architectural world, entirely isolated on genuinely transparent alpha background. Composition: landscape 3:2, three-quarter camera front view, all sculpture and shadow fit within frame with comfortable margins, sculptural world fills most of image. A large tiered cream stone/sand/plaster architectural toy-world: densely detailed stacked arches and rounded rooms, miniature workshops, miniature yellow staircases, vivid yellow winding pathways that connect the levels, a coral-orange sculptural tree on the upper left rooftop, another tiny coral tree, dark olive bonsai shrubs, tall whimsical sculptural spires in rear, tiny busy artisan people in dark clothes and mustard accents, little doors and lamps. High central stone facade has bold black lettering OFFKIN only. A large vivid yellow ribbed mechanical knob attaches to the lower right, no hand in this hero asset. Base is rough dark gray mineral stone with rounded corners. Front rooms show a cozy orange-lit tiny artist studio, tiny figurine display, black-and-white friendly round cat illustration inset as a collectible pattern. Sophisticated Japanese editorial/toy packaging mood, handcrafted rather than glossy plastic. Highly detailed realistic miniature product photography with fine granular plaster and speckled stone surfaces, hand-painted miniature humans, rich warm shadows and soft studio light. Palette cream, sand, charcoal, mustard yellow, warm coral, muted olive. Keep the entire sculptural silhouette readable with no props disconnected outside it. No webpage, no headings, no body copy, no captions, no labels, no UI, no buttons, no border, no watermark. No lettering anywhere except one restrained OFFKIN on central facade. Actual transparent background, not checkered illustration.",
+      "display_regions": {
+        "hero": [
+          0,
+          0,
+          1536,
+          1024
+        ]
+      }
+    },
+    {
+      "file": "public/marketing/offkin-applications.webp",
+      "width": 1448,
+      "height": 1086,
+      "bytes": 240070,
+      "sha256": "bc396bd0a70d81f798bfc845ea9ed4792ae6e57b8bca34a24bb3f8845549b4d0",
+      "original_png_sha256": "8b77236cc766671a49164a26faf877cacf647c1bc8bddca36f88357b1fe00b56",
+      "prompt": "Use case: compositing. Layout-only revision of the supplied OFFKIN application artwork atlas. Preserve the same three collectible scenes, their subjects, palette, materials, lighting, packaging art, tiny figures, and product designs. Do not add new concepts or change the product identity. Recompose the atlas into an overall LANDSCAPE 4:3 canvas, divided exactly into a 2×2 grid of FOUR equal LANDSCAPE 4:3 rectangular cells. Suggested output dimensions 2048×1536; actual aspect ratio must be exactly 4:3 so each quarter is 4:3. TOP LEFT: the reference's left scene, complete collectible WITH its full illustrated retail box. TOP RIGHT: the reference's middle scene, all three coral/purple/yellow collectible editions WITH their full illustrated boxes. BOTTOM LEFT: the reference's right scene, the full stone artisan-room collectible with coral tree and the hand turning the yellow knob. BOTTOM RIGHT: entirely blank plain warm beige cream background only, no objects or marks. Keep each scene fully confined to its exact cell with a clear safe margin: preserve complete boxes, tree canopies, stone bases, knob, and meaningful details, with NO cropping of products. Widen compositions by arranging subjects and adding background around them, never by stretching or distorting subjects. The hand can enter from the right border of its cell but must not cross into the adjacent blank cell. Cell boundaries at exact 50% width and 50% height. No gutters, borders, dividers, webpage, UI, labels, captions, headings or watermarks. Retain only existing small OFFKIN branding on packaging; add no other words. All four cells share the same light warm beige photo studio background. This is a layout-only aspect-ratio correction, with no changes to hero or footer art.",
+      "display_regions": {
+        "collectible-with-packaging": [
+          0,
+          0,
+          724,
+          543
+        ],
+        "campaign-color-editions": [
+          724,
+          0,
+          724,
+          543
+        ],
+        "hand-turning-yellow-knob": [
+          0,
+          543,
+          724,
+          543
+        ],
+        "blank": [
+          724,
+          543,
+          724,
+          543
+        ]
+      },
+      "initial_generation_prompt": "Use case: product-mockup. Asset type: reusable OFFKIN product photography triptych atlas, illustration-only. ONE very wide canvas in a 3:1 aspect ratio, ideally 3072 by 1024 pixels, split into exactly THREE equally sized SQUARE rectangular cells side by side. Cell boundaries at precisely one-third and two-thirds of canvas width. No gutters or frames. Every cell must be self-contained, straight rectangular cropped, no object or light painted across a cell boundary. No captions, cell numbers, titles, controls, website text or watermarks. Unified refined Japanese editorial miniature collectible photography: detailed tactile speckled cream plaster, rough mineral stone, coral-orange trees, yellow interactive knobs, tiny black-clothed artisan figures, warm beige photo studio background. All three photographs have their own full light beige backdrop filling their exact cell.\nLEFT CELL: tabletop close product shot, elaborate tiny handcrafted toy-world about 15cm tall on dark rough stone base: cream rounded arch, coral terracotta small facade, miniature coral-orange tree, round yellow inset display with a charming black-and-cream cat motif, yellow ribbed mechanical knob at right, little yellow stairs and miniature black-haired person. Behind stands a pale cardboard retail package illustrated with matching coral-tree-and-arch landscape. ONLY small black OFFKIN text near upper left of box, no other package text. Richly detailed tangible collectible.\nMIDDLE CELL: three color editions of a smaller architectural collectible arranged beautifully on a studio tabletop, with their matching illustrated tall rectangular retail cartons behind. One coral orange, one deep purple with crescent moon, one sunshine yellow. Tiny matching miniature arch, stone base, coral/white/yellow sculptural tree or lunar decoration, tiny white round friendly cat character. Keep all three objects and cartons fully in this middle cell. Cartons can have small OFFKIN text only, otherwise illustration without any lettering. Varied heights, dense but orderly composition.\nRIGHT CELL: macro tactile interaction photograph of a real human hand entering from right to gently turn a large yellow ribbed knob mounted on a little cream-speckled stone artist-room collectible. A detailed coral tree on roof, black miniature person, yellow lamp; front open rounded room glows orange and contains a miniature artisan at work with small cat illustration on inset wall. Natural anatomically plausible hand, thumb and index finger touching knob. Crop close on the product and hand. No text. The whole output contains three separate equal-size square photographs, not a website screenshot."
+    },
+    {
+      "file": "public/marketing/offkin-process.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 259640,
+      "sha256": "f9e618e0bc6b18c20ca99a4172962e82f180acea1a569d21a9dbe9287d72e9ca",
+      "original_png_sha256": "02603d073a53341c7e3542ce111f5d2e6022d09767ffee67f081d7b719b4ea10",
+      "prompt": "Use case: compositing. Layout-only revision of the supplied OFFKIN four-stage miniature process illustration atlas. Preserve the exact same four subjects, original cream cat design, artisan figures, coral trees, story sketch drawings, exploded collectible components, packaging box art, palette, materials and soft lighting. Recompose into an overall LANDSCAPE 3:2 canvas, divided exactly into a 2×2 grid of FOUR equal LANDSCAPE 3:2 cells. Suggested output 1536×1024 so each cell is768×512; actual overall aspect ratio MUST be3:2, and each quarter must be3:2. Boundaries at exactly50%width and50%height. NO borders, lines, gutters, labels, stage numbers, words, captions or UI. All four cells share the same plain warm ivory #f6f0e3 background. TOP LEFT: story sketch workshop, the same designer and six sketches with complete paper edges and drawing tools. TOP RIGHT: sculptural friendly cream cat and two stone spires, same artisan on yellow stool, full pedestal and tools. BOTTOM LEFT: the same exploded architectural collectible including dark base, cream arched shell, coral inset room, yellow knob with axle, yellow disk, cream roof slab with coral tree, back panel and thin yellow assembly arrows. BOTTOM RIGHT: the same complete cream illustrated packaging box with charcoal rocks, coral trees and yellow sun, kneeling designer, flat packaging sketches and tools. CRITICAL: Keep all entire subjects, especially box corners, stone bases, tree canopies, cat ears, tools, and assembly pieces. Widen layout by rearranging the scene carefully and adding appropriate background, NEVER stretch subjects and never cut objects to fill cells. Leave a safe ivory margin around each composition and keep every object and contact shadow wholly inside its assigned cell. No objects may cross central grid boundaries. This is only an aspect ratio layout correction, not a new creative concept; no text or letters anywhere.",
+      "display_regions": {
+        "story-sketches": [
+          0,
+          0,
+          768,
+          512
+        ],
+        "sculptural-collectible": [
+          768,
+          0,
+          768,
+          512
+        ],
+        "exploded-components": [
+          0,
+          512,
+          768,
+          512
+        ],
+        "packaging-concept": [
+          768,
+          512,
+          768,
+          512
+        ]
+      },
+      "safe_region_note": {
+        "story-sketches": [
+          0,
+          0,
+          768,
+          528
+        ],
+        "exploded-components": [
+          0,
+          528,
+          768,
+          496
+        ]
+      },
+      "initial_generation_prompt": "Use case: stylized-concept. Asset type: reusable four-stage OFFKIN miniature design process illustration atlas, NOT a webpage. Generate one SQUARE image divided into exactly FOUR equal SQUARE cells in a clean 2 by 2 grid. Cell boundaries are exactly 50% width and 50% height. No drawn dividers, no gutters, no frames, no numbered stages, no text, no labels, no captions, no UI. Each cell is its own freestanding tightly composed scene on the exact same plain warm ivory background color #f6f0e3; preserve generous empty ivory margins around each scene, and a clear safe gap at all cell edges so no subject or shadow crosses any cell boundary. Do not connect cells. Highly detailed handcrafted sculptural product illustration, sophisticated Japanese editorial miniature worlds, tactile cream stone, speckled plaster, charcoal mineral rocks, coral tree, vivid yellow accents, tiny people. Camera three-quarter front slightly elevated. Small soft realistic contact shadows only.\nTOP LEFT CELL: story exploration workshop. A small standing black-haired designer with tiny coral backpack examines six irregularly arranged off-white sketch sheets pinned upright and laid on floor. Graphite and charcoal pencil drawings show arches, coral-tree-shaped forms, little cats, rocks and architectural miniature worlds, strictly no letters or words. Include a pencil cup, a tiny olive shrub, small plaster sample blocks and a small crumpled paper. The whole scene compact and centered.\nTOP RIGHT CELL: collectible sculpture development. A friendly original round cream-white cat sculpture, simple black dot eyes, tiny whiskers and small pointed ears, seated on a pale rough stone pedestal with two narrow sculptural stone spires behind. A tiny dark-haired artisan standing on a low yellow stool works on the cat with a small brush. Small chisels, pencil cup, stone offcuts at base. No resemblance to any known character. Center entire composition in cell with clear margins.\nBOTTOM LEFT CELL: exploded components and interaction concept. A scientifically plausible imagined assembly of a small tactile stone arch collectible separated into around eight recognizable parts floating in organized isometric arrangement: rough dark square base below, cream arch-shell, inset coral room module, yellow ribbed knob and short axle, circular yellow display disk with a tiny black cat motif, cream roof slab, coral tree mounted above, and a small rectangular cream back panel. Small thin muted yellow curved arrows inside this cell may indicate assembly motion, but absolutely no text or numerals. Every component fits comfortably within cell. All pieces belong to one small collectible and feel manufactured and tangible.\nBOTTOM RIGHT CELL: packaging concept workshop. A cream cardboard toy retail box printed only with artistic black stone mountains, coral-orange trees, yellow sun, and cream arch imagery. NO letters or words at all. A miniature designer kneels next to the box with flat packaging sketches, small paper swatches, ruler, pencils, glue jar, a tiny yellow handled model tool. Box is fully visible, angled to show two sides and top. Center compact arrangement. Keep the same background and scale feel across all four scenes."
+    },
+    {
+      "file": "public/marketing/offkin-footer.webp",
+      "width": 2172,
+      "height": 724,
+      "bytes": 223518,
+      "sha256": "751316eea50c9e3e5391629f18f4197a9167245c8ea9d5bb75d6d7b6bfe32d3b",
+      "original_png_sha256": "7a8a850fa7e22937900dd563a3114ca8457260df25185950a5db3acc6995adb1",
+      "prompt": "Use case: ads-marketing. Asset type: OFFKIN wide landscape footer illustration background, artwork only, no webpage. Generate cinematic ultra-wide 3:1 landscape. A sophisticated handcrafted miniature world made of chalky cream limestone, rough charcoal stone, speckled plaster and fine sand sits against a nearly black night backdrop (#171716). The LEFT 45 PERCENT of the entire image must remain almost empty dark charcoal space, subtly textured with only one or two tiny ivory stars; leave room for actual webpage text added separately later, DO NOT draw any lettering. Terrain begins softly along lower left edge and increases toward right. On the right half, a bright vivid yellow winding path snakes across craggy tactile stone mountains from bottom center toward a tiny tall sculptural cream arch portal on the far-right hill, yellow light glows inside doorway. A small contemplative black-haired miniature traveler in cream shirt, dark trousers, carrying a vivid yellow backpack stands back-facing on the path at about 67% canvas width, looking toward the portal. Tiny coral-orange sculptural trees flank the arch. A textured cream moon floats in the sky near 75% canvas width and 18% image height, a few sparse tiny stars. Dense hand-crafted granular rock details, warm shadowed miniature toy photography blended with Japanese editorial illustration, restrained surreal storytelling, beautiful tactile imperfect materials, crisp but warm. The miniature world stays low in frame, rock plateau is largest at bottom right, leave ample black sky. No text whatsoever, no OFFKIN logo, no labels, no captions, no UI, no button, no border, no watermark.",
+      "display_regions": {
+        "footer": [
+          0,
+          0,
+          2172,
+          724
+        ]
+      }
+    }
+  ]
+}
