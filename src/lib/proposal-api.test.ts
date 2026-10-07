@@ -2,13 +2,16 @@ import { makeProductPlan } from '../test/product-plan-fixture';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PROPOSAL_CAPABILITIES, type ProposalConcept, type ProposalRequest } from '../../supabase/functions/generate-concept/proposal';
 import { planProposalRevision, requestProposalAsset, restoreProposalAsset, supportsProposalGeneration } from './proposal-api';
+const availability=vi.hoisted(()=>({paused:false}));
+vi.mock('./proposal-availability',async original=>({...await original<object>(),get PROPOSAL_GENERATION_PAUSED(){return availability.paused;}}));
 const id='00000000-0000-4000-8000-000000000001';const world:ProposalRequest={contractVersion:'offkin-proposal-v10',stage:'world',brand:'no-website',context:{business:'Paper gifts',exactWording:'  字\nCafé 🪁 '}};
 function concept(overrides:Partial<ProposalConcept>={}):ProposalConcept{return {...world,id,stageVersion:'proposal-assets-v1',brand:'Paper',title:'Paper world',story:'A rich paper city.',design:'Many connected scenes',interaction:'Explore',worldElements:[{id:'house',label:'Paper house',description:'A proposed story home',kind:'proposal'}],sourceImageIds:[],productPlan:makeProductPlan(['house']),image:'https://images.example/world.png',sourceUrl:'',sourceTitle:'',...overrides};}
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status});
 const readiness=()=>reply({ready:true,capabilities:PROPOSAL_CAPABILITIES});
-beforeEach(()=>{vi.stubEnv('VITE_SUPABASE_URL','https://test.invalid');vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY','public-key');});
+beforeEach(()=>{availability.paused=false;vi.stubEnv('VITE_SUPABASE_URL','https://test.invalid');vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY','public-key');});
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.restoreAllMocks();});
 describe('Proposal API fail-closed negotiation',()=>{
+ it('holds new paid work without a request while saved restore remains available',async()=>{availability.paused=true;const fetch=vi.fn(async()=>reply({concept:concept()}));vi.stubGlobal('fetch',fetch);expect(await supportsProposalGeneration(new AbortController().signal)).toBe(false);await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/temporarily unavailable/);expect(fetch).not.toHaveBeenCalled();await restoreProposalAsset(id,new AbortController().signal);expect(fetch).toHaveBeenCalledOnce();});
  it('reads readiness without transmitting the direction',async()=>{const fetch=vi.fn(async(_url:string,_init:RequestInit)=>readiness());vi.stubGlobal('fetch',fetch);expect(await supportsProposalGeneration(new AbortController().signal)).toBe(true);expect(fetch.mock.calls[0][1]).not.toHaveProperty('body');});
  it('never downgrades v10 to the v9 backend',async()=>{const fetch=vi.fn(async()=>reply({ready:true,capabilities:{canvas:true,canvas_contract_version:'offkin-canvas-v9'}}));vi.stubGlobal('fetch',fetch);await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/not available/);expect(fetch).toHaveBeenCalledOnce();});
  it('rechecks capabilities immediately before generation and preserves exact context',async()=>{const fetch=vi.fn(async(_url,init)=>init.method==='POST'?reply({concept:concept()}):readiness());vi.stubGlobal('fetch',fetch);const c=await requestProposalAsset(world,new AbortController().signal);expect(c.context.exactWording).toBe(world.context.exactWording);expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual(world);});
