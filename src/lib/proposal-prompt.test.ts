@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROPOSAL_PROMPT_REVISION, PROPOSAL_REVISION_PROMPT, proposalDesignPrompt, proposalImagePrompt } from '../../supabase/functions/generate-concept/proposal-prompt';
+import { PRODUCT_PLAN_CORRECTION_PROMPT, PROPOSAL_PROMPT_REVISION, PROPOSAL_REVISION_PROMPT, proposalDesignPrompt, proposalImagePrompt } from '../../supabase/functions/generate-concept/proposal-prompt';
 import { PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGE_VERSION, parseRevisionPlan, type RevisionPlanRequest } from '../../supabase/functions/generate-concept/proposal';
 
 const current = {
@@ -15,8 +15,27 @@ const request: RevisionPlanRequest = {
 
 describe('proposal prompt corrections from live output review', () => {
   it('versions prompt cache identity separately from saved manifest compatibility', () => {
-    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v4-printable-product-plan');
+    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v5-bounded-plan-correction');
     expect(PROPOSAL_STAGE_VERSION).toBe('proposal-assets-v1');
+  });
+  it('makes the plan a nested property without overriding the outer stage JSON', () => {
+    const prompt = proposalDesignPrompt('world');
+    expect(prompt).toContain('"worldElements":[{"id":string');
+    expect(prompt).toContain('Nested productPlan schema');
+    expect(prompt).toContain('NOT the whole stage response');
+    expect(prompt).not.toContain('Return one JSON object with exactly the following schema');
+    expect(prompt).toContain('6000–8500 characters total');
+    expect(prompt).toContain('ceilings, not targets');
+  });
+  it('bounds correction while preserving customer authority and unverified construction', () => {
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('exactly one outer property: {"productPlan":PRODUCT_PLAN}');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('only correction attempt');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('Recheck the WHOLE plan');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('never drop a selection or replace the hero');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('actions MUST be []');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('10000 characters');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('Never claim supplier confirmation');
+    expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('No saved-image UUIDs');
   });
   it.each(['world', 'physical', 'details', 'packaging'] as const)('preserves grounded brand identity and exact wording while excluding invented microcopy for %s', stage => {
     const design = proposalDesignPrompt(stage);

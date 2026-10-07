@@ -1,4 +1,4 @@
-import { parseProductPlan, productPlanInteraction } from './product-plan.ts';
+import { parseProductPlan, productPlanInteraction, productPlanIssues, productPlanRepairFailure, type ProductPlanIssue } from './product-plan.ts';
 import {
   CANVAS_CONTRACT_VERSION, CanvasFailure, parseCanvasDesign, parseCanvasManifest,
   selectWorldElements, type CanvasContext, type CanvasManifest, type CanvasStoredRow,
@@ -9,8 +9,9 @@ import {
   serializeProposalManifest, validateProposalRequest, validateRevisionPlanRequest,
   type ProposalManifest, type ProposalRequest, type ProposalStage,
 } from './proposal.ts';
-import { proposalDesignPrompt, proposalImagePrompt, PROPOSAL_REVISION_PROMPT, PROPOSAL_PROMPT_REVISION } from './proposal-prompt.ts';
+import { proposalDesignPrompt, proposalImagePrompt, PRODUCT_PLAN_CORRECTION_PROMPT, PROPOSAL_REVISION_PROMPT, PROPOSAL_PROMPT_REVISION } from './proposal-prompt.ts';
 import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
+import { proposalCallTimeout, type ProposalProviderCall } from './proposal-budget.ts';
 
 type StoredRow = CanvasStoredRow & { cache_key?: string; edition?: 'inside'; format?: 'miniature' };
 type Result<T> = { data?: T; error?: unknown };
@@ -32,7 +33,9 @@ export type ProposalRuntime = {
   enabled: boolean;
   textModel: string;
   imageModel: string;
-  ai(path: string, body: unknown): Promise<unknown>;
+  ai(path: string, body: unknown, timeoutMs?: number): Promise<unknown>;
+  /** Monotonic clock injection for deterministic deadline tests. */
+  now?(): number;
   reserve(): Promise<void>;
   hash(text: string): Promise<string>;
   respond(data: unknown, status?: number): Response;
@@ -40,6 +43,8 @@ export type ProposalRuntime = {
 };
 const columns = 'id,cache_key,brand,title,story,image_path,interaction,source_url,source_title,prompt_version';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+// Bound the one correction input without ever truncating a plan or customer selection.
+const MAX_PLAN_CORRECTION_CHARS = 32000;
 const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const imageModels = ['openai/gpt-image-2', 'openai/gpt-image-2-2026-04-21'];
 export const supportsProposalModel = (model: string): boolean => imageModels.includes(model);
@@ -111,7 +116,19 @@ function imageResult(result: unknown): { bytes: Uint8Array; mime: string } {
 /** One asset per request. Successful rows survive later-stage failure; no background-job claim. */
 export async function handleProposal(input: unknown, req: Request, runtime: ProposalRuntime): Promise<Response> {
   const { db, respond, deliver } = runtime;
+  const now = runtime.now || (() => performance.now());
+  const started = now();
   const active = () => { if (req.signal.aborted) throw new CanvasFailure(499, 'The request was cancelled.'); };
+  const providerBudget = (call: ProposalProviderCall): number => {
+    active();
+    const timeoutMs = proposalCallTimeout(call, now() - started);
+    if (!timeoutMs) throw new CanvasFailure(504, 'This proposal took too long to prepare. Please retry; your brief and existing images are unchanged. No image was generated.');
+    return timeoutMs;
+  };
+  function failedCorrection(stage: ProposalStage, issues: ProductPlanIssue[]): never {
+    console.warn('ProductPlan validation failed', { stage, attempt: 2, issues });
+    throw productPlanRepairFailure(issues);
+  }
   const isPlan = record(input) && input.action === 'plan-revision';
   const request = isPlan ? validateRevisionPlanRequest(input) : validateProposalRequest(input);
   active();
@@ -226,7 +243,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     references: sourceImageIds.map((id, index) => ({ index: index + 1, role: id === previous?.row.id ? 'previous-same-role-image' : id === physical?.row.id ? 'approved-physical-identity' : 'approved-world-artwork' })) };
   const text = await runtime.ai('chat/completions', { model: runtime.textModel,
     messages: [{ role: 'system', content: proposalDesignPrompt(generation.stage) }, { role: 'user', content: JSON.stringify(boundary.sanitize(direction)) }],
-    response_format: { type: 'json_object' }, max_tokens: 9500 });
+    response_format: { type: 'json_object' }, max_tokens: 9500 }, providerBudget('design'));
   active();
   const output = boundary.inspect(textResult(text));
   if (record(output) && output.needsContext === true) return respond({ needsContext: true, message: 'Add a little more factual business detail before generating the proposal.' });
@@ -238,15 +255,47 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   // Product logic precedes every new world/hero image. It is a proposed construction
   // brief, never CAD or proof of manufacturability. Supplements cannot mutate it.
   const inheritedPlan = inherited && 'productPlan' in inherited ? inherited.productPlan : undefined;
-  const productPlan = generation.stage === 'world' || generation.stage === 'physical'
-    ? parseProductPlan(record(output) ? output.productPlan : undefined, design.worldElements.map(e => e.id))
-    : inheritedPlan;
+  const hero = generation.stage === 'world' ? design.worldElements[0]?.id : generation.heroElementId || inherited?.heroElementId;
+  const requirements = { heroElementId: hero, displayOnly: /^display only[.!]?$/i.test(generation.context.interaction?.trim() || '') };
+  let productPlan = inheritedPlan;
+  if (generation.stage === 'world' || generation.stage === 'physical') {
+    const selectedElementIds = design.worldElements.map(element => element.id);
+    let candidate = record(output) ? output.productPlan : undefined;
+    let issues = productPlanIssues(candidate, selectedElementIds, requirements);
+    if (issues.length) {
+      // Diagnostics deliberately contain only bounded schema paths/codes, never customer data.
+      console.warn('ProductPlan validation failed', { stage: generation.stage, attempt: 1, issues });
+      const correction = JSON.stringify(boundary.sanitize({
+        invalidProductPlan: candidate ?? null, issues,
+        authoritative: { selectedElementIds, selectedElements: design.worldElements,
+          heroElementId: hero, displayOnly: requirements.displayOnly, context: generation.context,
+          brand: design.brand, title: design.title, story: design.story, design: design.design },
+      }));
+      if (correction.length > MAX_PLAN_CORRECTION_CHARS) throw productPlanRepairFailure(issues);
+      active();
+      // Exactly one additional text call; no loop, image request or implicit normalization.
+      const corrected = await runtime.ai('chat/completions', { model: runtime.textModel,
+        messages: [{ role: 'system', content: PRODUCT_PLAN_CORRECTION_PROMPT }, { role: 'user', content: correction }],
+        response_format: { type: 'json_object' }, max_tokens: 5000 }, providerBudget('correction'));
+      active();
+      let correctedOutput: unknown;
+      try { correctedOutput = textResult(corrected); }
+      catch { failedCorrection(generation.stage, [{ path: 'productPlan', code: 'invalid-object' }]); }
+      const repaired = boundary.inspect(correctedOutput);
+      if (!record(repaired) || Object.keys(repaired).length !== 1 || !Object.prototype.hasOwnProperty.call(repaired, 'productPlan')) {
+        failedCorrection(generation.stage, [{ path: 'productPlan', code: 'invalid-object' }]);
+      }
+      candidate = repaired.productPlan;
+      issues = productPlanIssues(candidate, selectedElementIds, requirements);
+      if (issues.length) failedCorrection(generation.stage, issues);
+    }
+    productPlan = parseProductPlan(candidate, selectedElementIds, requirements);
+  }
   if (productPlan) {
-    const hero = generation.stage === 'world' ? design.worldElements[0]?.id : generation.heroElementId || inherited?.heroElementId;
     if (!productPlan.parts.find(part => part.id === productPlan.heroPartId)?.storyElementIds.includes(hero || '')) {
       throw new CanvasFailure(502, 'The proposed product does not preserve the selected hero. No image was generated.');
     }
-    if (/^display only[.!]?$/i.test(generation.context.interaction?.trim() || '') && productPlan.actions.length) {
+    if (requirements.displayOnly && productPlan.actions.length) {
       throw new CanvasFailure(502, 'The proposed product added an unrequested action. No image was generated.');
     }
     if (generation.stage !== 'world' && generation.stage !== 'physical' && record(output) && output.productPlan !== undefined &&
@@ -290,7 +339,8 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     body = form;
   }
   // Reference bytes remain multipart; do not downgrade to text-only generation.
-  const result = await runtime.ai(images.length ? 'images/edits' : 'images/generations', body);
+  active();
+  const result = await runtime.ai(images.length ? 'images/edits' : 'images/generations', body, providerBudget('image'));
   active();
   const { bytes, mime } = imageResult(result);
   const id = crypto.randomUUID(); const imagePath = `${id}.${mime.split('/')[1]}`;

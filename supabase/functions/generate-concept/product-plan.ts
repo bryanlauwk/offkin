@@ -47,7 +47,8 @@ Keep scale story-led: there is no universal palm-size requirement. Do not add el
 Use conservative proposed print strategies, joins, assembly and finishing; explicitly record unresolved material, equipment, geometry, fit, cost and sample questions. Do not invent numerical fabrication standards or certification claims.
 Any proposed dimension must state its units and remain provisional. If proposing a fit or clearance, explain which mating features it concerns, whether the number is diametral, radial or per side, and whether it means a gap or interference; retain the fit-test gate. Prefer explicit unknowns over unsupported numbers.
 
-Return one JSON object with exactly the following schema. All properties are required except purchasedParts. No additional keys are allowed at any nesting level; never return comments, markdown or undefined.
+Nested productPlan schema (the productPlan property of the requested response, NOT the whole stage response):
+Use exactly the following object for productPlan. All properties are required except purchasedParts. No additional keys are allowed inside productPlan at any nesting level; never return comments, markdown or undefined. Keep the outer response schema specified by the stage or correction request.
 {
   "version": "product-plan-v1",
   "status": "unverified-prototype-plan",
@@ -78,7 +79,7 @@ Bounds and references:
 - Every validation.status and every verificationGates status is exactly "unverified". Never claim supplier-certified, physically-tested, passed, approved or completed validation.
 - verificationGates contains exactly one each of "cad-review", "slicer-review", "fit-test", "physical-prototype", "finish-assembly-review". If actions is nonempty, also include exactly one "interaction-test"; otherwise omit that gate. No other gate IDs are allowed.
 - All strings are nonempty after trimming, except that arrays expressly allowing zero entries may be empty. Maximum string lengths: productIntent 480; silhouette 480; scale.direction 320; part.name 80; part.form 320; part.printStrategy 320; part.finish 240; purchasedPart.name 80; purchasedPart.purpose 240; join.method 120; join.rationale 240; validation.check 240; assembly.instruction 320; action.action 160; action.response 240; each risk 280; each manufacturingUnknown 240.
-- The complete compact JSON serialization must be at most 10000 characters. Do not truncate the brief or drop selected story elements to meet the bound; keep the plan concise.
+- The complete compact productPlan JSON serialization must be at most 10000 characters. Aim for 6000–8500 characters total, using brief concrete phrases, not prose paragraphs or repetitive disclaimers. These per-field maxima are ceilings, not targets. Group related story meanings into coherent parts without dropping any selected story IDs. Do not truncate the brief or drop selected story elements to meet the bound; keep the plan concise.
 `.trim();
 
 const processes: readonly string[] = ['fdm', 'resin', 'hybrid', 'undecided'];
@@ -90,6 +91,25 @@ const planKeys = [
   'joins', 'assembly', 'actions', 'risks', 'manufacturingUnknowns', 'verificationGates',
 ];
 const failureMessage = 'The printable collectible plan is incomplete or inconsistent. Please retry; your brief and existing images are unchanged.';
+
+export type ProductPlanIssueCode =
+  | 'invalid-object' | 'invalid-value' | 'invalid-text' | 'invalid-id' | 'invalid-array'
+  | 'invalid-reference' | 'duplicate-id' | 'missing-story-mapping' | 'disconnected-parts'
+  | 'disconnected-assembly' | 'incomplete-assembly' | 'invalid-gates' | 'plan-too-large'
+  | 'hero-story-mismatch' | 'display-only-action';
+/** Only static schema paths and numeric indexes, never model values or property names. */
+export type ProductPlanIssue = { path: string; code: ProductPlanIssueCode };
+export type ProductPlanRequirements = { heroElementId?: string; displayOnly?: boolean };
+export const PRODUCT_PLAN_MAX_ISSUES = 12;
+/** Trusted callers may inspect safe diagnostics; HTTP handlers expose only the message. */
+export class ProductPlanFailure extends CanvasFailure {
+  readonly issues: readonly ProductPlanIssue[];
+  constructor(message: string, issues: readonly ProductPlanIssue[]) {
+    super(502, message);
+    this.name = 'ProductPlanFailure';
+    this.issues = issues.slice(0, PRODUCT_PLAN_MAX_ISSUES).map(issue => ({ ...issue }));
+  }
+}
 
 /** Exact JSON objects only: no hidden fields, inherited data, accessors or custom serializers. */
 function record(value: unknown, required: readonly string[], optional: readonly string[] = []): value is Record<string, unknown> {
@@ -125,9 +145,6 @@ function ids(value: unknown, min: number, max: number, allowed?: ReadonlySet<str
   return array(value, min, max) && value.every(story ? storyId : id) &&
     new Set(value).size === value.length && (!allowed || value.every(item => allowed.has(item as string)));
 }
-function validation(value: unknown): value is ProductValidation {
-  return record(value, ['status', 'check']) && value.status === 'unverified' && text(value.check, 240);
-}
 function connected(partIds: readonly string[], joins: ProductPlan['joins']): boolean {
   const allowed = new Set(partIds);
   const visited = new Set([partIds[0]]);
@@ -142,69 +159,158 @@ function connected(partIds: readonly string[], joins: ProductPlan['joins']): boo
   return visited.size === allowed.size;
 }
 
-function validPlan(value: unknown, storyElementIds?: readonly string[]): value is ProductPlan {
-  if (!record(value, planKeys, ['purchasedParts']) || value.version !== PRODUCT_PLAN_VERSION || value.status !== 'unverified-prototype-plan' ||
-    !text(value.productIntent, 480) || !text(value.silhouette, 480) || !process(value.process) ||
-    !record(value.scale, ['status', 'direction']) || !['unresolved', 'proposed'].includes(value.scale.status as string) || !text(value.scale.direction, 320)) return false;
-
-  if (storyElementIds !== undefined && !ids(storyElementIds, 0, 16, undefined, true)) return false;
-  const expectedStoryIds = storyElementIds === undefined ? undefined : new Set(storyElementIds);
-  if (!array(value.parts, 2, 16) || !value.parts.every(part =>
-    record(part, ['id', 'name', 'storyElementIds', 'form', 'process', 'printStrategy', 'finish']) &&
-    id(part.id) && text(part.name, 80) && ids(part.storyElementIds, 0, 16, expectedStoryIds, true) &&
-    text(part.form, 320) && process(part.process) && text(part.printStrategy, 320) && text(part.finish, 240))) return false;
-  const parts = value.parts as ProductPlan['parts'];
-  if (!id(value.heroPartId) || !parts.some(part => part.id === value.heroPartId)) return false;
-  const mappedStoryIds = new Set(parts.flatMap(part => part.storyElementIds));
-  if (mappedStoryIds.size > 16 || (expectedStoryIds && [...expectedStoryIds].some(item => !mappedStoryIds.has(item)))) return false;
-
-  let purchasedParts: NonNullable<ProductPlan['purchasedParts']> = [];
-  if (Object.prototype.hasOwnProperty.call(value, 'purchasedParts')) {
-    if (!array(value.purchasedParts, 0, 8) || !value.purchasedParts.every(part =>
-      record(part, ['id', 'name', 'purpose', 'specificationStatus']) && id(part.id) && text(part.name, 80) &&
-      text(part.purpose, 240) && part.specificationStatus === 'unselected')) return false;
-    purchasedParts = value.purchasedParts as NonNullable<ProductPlan['purchasedParts']>;
+/** A single strict validator powers acceptance and bounded, value-free diagnostics. */
+export function productPlanIssues(value: unknown, storyElementIds?: readonly string[], requirements: ProductPlanRequirements = {}): ProductPlanIssue[] {
+  const issues: ProductPlanIssue[] = [];
+  const check = (valid: boolean, path: string, code: ProductPlanIssueCode): boolean => {
+    if (!valid && issues.length < PRODUCT_PLAN_MAX_ISSUES) issues.push({ path, code });
+    return valid;
+  };
+  const fields = (item: Record<string, unknown>, path: string, bounds: Record<string, number>) => {
+    for (const [key, max] of Object.entries(bounds)) check(text(item[key], max), `${path}.${key}`, 'invalid-text');
+  };
+  const checkValidation = (item: unknown, path: string) => {
+    if (!check(record(item, ['status', 'check']), path, 'invalid-object')) return;
+    const validation = item as Record<string, unknown>;
+    check(validation.status === 'unverified', `${path}.status`, 'invalid-value');
+    check(text(validation.check, 240), `${path}.check`, 'invalid-text');
+  };
+  try {
+    if (!check(record(value, planKeys, ['purchasedParts']), 'productPlan', 'invalid-object')) return issues;
+    const plan = value as Record<string, unknown>;
+    check(plan.version === PRODUCT_PLAN_VERSION, 'productPlan.version', 'invalid-value');
+    check(plan.status === 'unverified-prototype-plan', 'productPlan.status', 'invalid-value');
+    fields(plan, 'productPlan', { productIntent: 480, silhouette: 480 });
+    check(process(plan.process), 'productPlan.process', 'invalid-value');
+    if (check(record(plan.scale, ['status', 'direction']), 'productPlan.scale', 'invalid-object')) {
+      const scale = plan.scale as Record<string, unknown>;
+      check(['unresolved', 'proposed'].includes(scale.status as string), 'productPlan.scale.status', 'invalid-value');
+      check(text(scale.direction, 320), 'productPlan.scale.direction', 'invalid-text');
+    }
+    if (!check(storyElementIds === undefined || ids(storyElementIds, 0, 16, undefined, true), 'selectedElementIds', 'invalid-reference')) return issues;
+    const expectedStoryIds = storyElementIds === undefined ? undefined : new Set(storyElementIds);
+    if (!check(array(plan.parts, 2, 16), 'productPlan.parts', 'invalid-array')) return issues;
+    for (const [index, item] of (plan.parts as unknown[]).entries()) {
+      const path = `productPlan.parts[${index}]`;
+      if (!check(record(item, ['id', 'name', 'storyElementIds', 'form', 'process', 'printStrategy', 'finish']), path, 'invalid-object')) continue;
+      const part = item as Record<string, unknown>;
+      check(id(part.id), `${path}.id`, 'invalid-id');
+      fields(part, path, { name: 80, form: 320, printStrategy: 320, finish: 240 });
+      check(ids(part.storyElementIds, 0, 16, expectedStoryIds, true), `${path}.storyElementIds`, 'invalid-reference');
+      check(process(part.process), `${path}.process`, 'invalid-value');
+    }
+    // Dependent graph checks only inspect fully validated structure. Never invoke getters or serializers.
+    if (issues.length) return issues;
+    const parts = plan.parts as ProductPlan['parts'];
+    check(id(plan.heroPartId) && parts.some(part => part.id === plan.heroPartId), 'productPlan.heroPartId', 'invalid-reference');
+    const mappedStoryIds = new Set(parts.flatMap(part => part.storyElementIds));
+    check(mappedStoryIds.size <= 16 && (!expectedStoryIds || [...expectedStoryIds].every(item => mappedStoryIds.has(item))), 'productPlan.parts', 'missing-story-mapping');
+    if (requirements.heroElementId !== undefined) {
+      check(Boolean(parts.find(part => part.id === plan.heroPartId)?.storyElementIds.includes(requirements.heroElementId)), 'productPlan.heroPartId', 'hero-story-mismatch');
+    }
+    let purchasedParts: NonNullable<ProductPlan['purchasedParts']> = [];
+    if (Object.prototype.hasOwnProperty.call(plan, 'purchasedParts')) {
+      if (!check(array(plan.purchasedParts, 0, 8), 'productPlan.purchasedParts', 'invalid-array')) return issues;
+      for (const [index, item] of (plan.purchasedParts as unknown[]).entries()) {
+        const path = `productPlan.purchasedParts[${index}]`;
+        if (!check(record(item, ['id', 'name', 'purpose', 'specificationStatus']), path, 'invalid-object')) continue;
+        const part = item as Record<string, unknown>;
+        check(id(part.id), `${path}.id`, 'invalid-id');
+        fields(part, path, { name: 80, purpose: 240 });
+        check(part.specificationStatus === 'unselected', `${path}.specificationStatus`, 'invalid-value');
+      }
+      purchasedParts = plan.purchasedParts as NonNullable<ProductPlan['purchasedParts']>;
+    }
+    if (issues.length) return issues;
+    const allIds = [...parts, ...purchasedParts].map(part => part.id);
+    const partIds = new Set(allIds);
+    check(partIds.size === allIds.length, 'productPlan.parts', 'duplicate-id');
+    if (!check(array(plan.joins, 1, 32), 'productPlan.joins', 'invalid-array')) return issues;
+    for (const [index, item] of (plan.joins as unknown[]).entries()) {
+      const path = `productPlan.joins[${index}]`;
+      if (!check(record(item, ['id', 'partIds', 'method', 'rationale', 'validation']), path, 'invalid-object')) continue;
+      const join = item as Record<string, unknown>;
+      check(id(join.id), `${path}.id`, 'invalid-id');
+      check(ids(join.partIds, 2, 2, partIds), `${path}.partIds`, 'invalid-reference');
+      fields(join, path, { method: 120, rationale: 240 });
+      checkValidation(join.validation, `${path}.validation`);
+    }
+    if (issues.length) return issues;
+    const joins = plan.joins as ProductPlan['joins'];
+    check(new Set(joins.map(join => join.id)).size === joins.length, 'productPlan.joins', 'duplicate-id');
+    check(connected(allIds, joins), 'productPlan.joins', 'disconnected-parts');
+    if (!check(array(plan.assembly, 1, 32), 'productPlan.assembly', 'invalid-array')) return issues;
+    for (const [index, item] of (plan.assembly as unknown[]).entries()) {
+      const path = `productPlan.assembly[${index}]`;
+      if (!check(record(item, ['step', 'partIds', 'instruction']), path, 'invalid-object')) continue;
+      const step = item as Record<string, unknown>;
+      check(step.step === index + 1, `${path}.step`, 'invalid-value');
+      if (check(ids(step.partIds, 1, 24, partIds), `${path}.partIds`, 'invalid-reference')) {
+        check(connected(step.partIds as string[], joins), `${path}.partIds`, 'disconnected-assembly');
+      }
+      check(text(step.instruction, 320), `${path}.instruction`, 'invalid-text');
+    }
+    if (issues.length) return issues;
+    const assembly = plan.assembly as ProductPlan['assembly'];
+    const assembled = new Set(assembly.flatMap(step => step.partIds));
+    check(assembled.size === partIds.size && joins.every(join => assembly.some(step => join.partIds.every(item => step.partIds.includes(item)))), 'productPlan.assembly', 'incomplete-assembly');
+    if (!check(array(plan.actions, 0, 2), 'productPlan.actions', 'invalid-array')) return issues;
+    const actions = plan.actions as unknown[];
+    check(!requirements.displayOnly || actions.length === 0, 'productPlan.actions', 'display-only-action');
+    for (const [index, item] of actions.entries()) {
+      const path = `productPlan.actions[${index}]`;
+      if (!check(record(item, ['action', 'response', 'partIds', 'validation']), path, 'invalid-object')) continue;
+      const action = item as Record<string, unknown>;
+      fields(action, path, { action: 160, response: 240 });
+      check(ids(action.partIds, 1, 24, partIds), `${path}.partIds`, 'invalid-reference');
+      checkValidation(action.validation, `${path}.validation`);
+    }
+    for (const [key, max] of [['risks', 280], ['manufacturingUnknowns', 240]] as const) {
+      if (check(array(plan[key], 2, 8), `productPlan.${key}`, 'invalid-array')) {
+        (plan[key] as unknown[]).forEach((item, index) => check(text(item, max), `productPlan.${key}[${index}]`, 'invalid-text'));
+      }
+    }
+    const gates = actions.length ? [...requiredGates, 'interaction-test'] : requiredGates;
+    if (check(array(plan.verificationGates, gates.length, gates.length), 'productPlan.verificationGates', 'invalid-gates')) {
+      const gateValues = plan.verificationGates as unknown[];
+      let validGates = true;
+      for (const [index, item] of gateValues.entries()) {
+        const path = `productPlan.verificationGates[${index}]`;
+        if (!check(record(item, ['id', 'status']), path, 'invalid-object')) { validGates = false; continue; }
+        const gate = item as Record<string, unknown>;
+        if (!check(typeof gate.id === 'string' && gates.includes(gate.id as ProductVerificationGate), `${path}.id`, 'invalid-gates')) validGates = false;
+        check(gate.status === 'unverified', `${path}.status`, 'invalid-value');
+      }
+      if (validGates) check(new Set((gateValues as ProductPlan['verificationGates']).map(gate => gate.id)).size === gates.length, 'productPlan.verificationGates', 'invalid-gates');
+    }
+    if (!issues.length) check(JSON.stringify(value).length <= PRODUCT_PLAN_MAX_CHARS, 'productPlan', 'plan-too-large');
+  } catch {
+    check(false, 'productPlan', 'invalid-object');
   }
-  const allIds = [...parts, ...purchasedParts].map(part => part.id);
-  const partIds = new Set(allIds);
-  if (partIds.size !== allIds.length) return false;
-
-  if (!array(value.joins, 1, 32) || !value.joins.every(join =>
-    record(join, ['id', 'partIds', 'method', 'rationale', 'validation']) && id(join.id) && ids(join.partIds, 2, 2, partIds) &&
-    text(join.method, 120) && text(join.rationale, 240) && validation(join.validation))) return false;
-  const joins = value.joins as ProductPlan['joins'];
-  if (new Set(joins.map(join => join.id)).size !== joins.length || !connected(allIds, joins)) return false;
-
-  if (!array(value.assembly, 1, 32) || !value.assembly.every((step, index) =>
-    record(step, ['step', 'partIds', 'instruction']) && step.step === index + 1 && ids(step.partIds, 1, 24, partIds) &&
-    text(step.instruction, 320) && connected(step.partIds, joins))) return false;
-  const assembly = value.assembly as ProductPlan['assembly'];
-  // Separate subassemblies are allowed. The final sequence must cover every part and proposed join.
-  const assembled = new Set(assembly.flatMap(step => step.partIds));
-  if (assembled.size !== partIds.size || joins.some(join => !assembly.some(step => join.partIds.every(item => step.partIds.includes(item))))) return false;
-
-  if (!array(value.actions, 0, 2) || !value.actions.every(action =>
-    record(action, ['action', 'response', 'partIds', 'validation']) && text(action.action, 160) && text(action.response, 240) &&
-    ids(action.partIds, 1, 24, partIds) && validation(action.validation))) return false;
-  if (!array(value.risks, 2, 8) || !value.risks.every(risk => text(risk, 280)) ||
-    !array(value.manufacturingUnknowns, 2, 8) || !value.manufacturingUnknowns.every(unknown => text(unknown, 240))) return false;
-
-  const gates = value.actions.length ? [...requiredGates, 'interaction-test'] : requiredGates;
-  if (!array(value.verificationGates, gates.length, gates.length) || !value.verificationGates.every(gate =>
-    record(gate, ['id', 'status']) && typeof gate.id === 'string' && gates.includes(gate.id as ProductVerificationGate) && gate.status === 'unverified') ||
-    new Set(value.verificationGates.map(gate => (gate as ProductPlan['verificationGates'][number]).id)).size !== gates.length) return false;
-  return JSON.stringify(value).length <= PRODUCT_PLAN_MAX_CHARS;
+  return issues;
 }
 
-/** Pass the authoritative selected story IDs before generating any image. Never repairs or truncates. */
-export function isProductPlan(value: unknown, storyElementIds?: readonly string[]): value is ProductPlan {
-  try { return validPlan(value, storyElementIds); } catch { return false; }
+/** Pass authoritative selected story IDs before images. Never repairs, strips or truncates. */
+export function isProductPlan(value: unknown, storyElementIds?: readonly string[], requirements: ProductPlanRequirements = {}): value is ProductPlan {
+  return productPlanIssues(value, storyElementIds, requirements).length === 0;
 }
 
 /** Fail closed with a safe provider error before spending on an image for an invalid plan. */
-export function parseProductPlan(value: unknown, storyElementIds?: readonly string[]): ProductPlan {
-  if (!isProductPlan(value, storyElementIds)) throw new CanvasFailure(502, failureMessage);
-  return value;
+export function parseProductPlan(value: unknown, storyElementIds?: readonly string[], requirements: ProductPlanRequirements = {}): ProductPlan {
+  const issues = productPlanIssues(value, storyElementIds, requirements);
+  if (issues.length) throw new ProductPlanFailure(failureMessage, issues);
+  return value as ProductPlan;
+}
+
+/** Safe user-facing reason; never include a model value, selected ID or private reference. */
+export function productPlanRepairFailure(issues: readonly ProductPlanIssue[]): ProductPlanFailure {
+  const codes = new Set(issues.map(issue => issue.code));
+  const reason = codes.has('display-only-action') ? 'The construction plan still adds movement to your display-only idea.'
+    : codes.has('missing-story-mapping') || codes.has('hero-story-mismatch') ? 'The construction plan could not keep all your selected story elements and hero together.'
+    : codes.has('disconnected-parts') || codes.has('disconnected-assembly') || codes.has('incomplete-assembly') ? 'The proposed parts could not be arranged into a complete connected assembly.'
+    : codes.has('plan-too-large') || codes.has('invalid-text') ? 'The construction plan could not fit the required detail into a concise proposal.'
+    : "We couldn't finish a complete construction plan for this idea.";
+  return new ProductPlanFailure(`${reason} Please try Generate again; your brief and existing images are unchanged. No image was generated.`, issues);
 }
 
 /** Complete, lossless planning brief. Text fields are proposals, never manufacturing evidence. */

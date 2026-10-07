@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CanvasFailure } from '../../supabase/functions/generate-concept/canvas';
 import {
   isProductPlan, parseProductPlan, productPlanText, PRODUCT_PLAN_MAX_CHARS,
-  PRODUCT_PLAN_PROMPT, type ProductPlan,
+  PRODUCT_PLAN_PROMPT, PRODUCT_PLAN_MAX_ISSUES, ProductPlanFailure, productPlanIssues, type ProductPlan,
 } from '../../supabase/functions/generate-concept/product-plan';
 import { makeProductPlan } from './product-plan-fixture';
 
@@ -22,6 +22,48 @@ function withAction(): ProductPlan {
 }
 
 describe('ProductPlan physical proposal contract', () => {
+  it.each([
+    ['overlong intent', (plan: ProductPlan) => { plan.productIntent = 'x'.repeat(481); }, 'productPlan.productIntent', 'invalid-text'],
+    ['blank silhouette', (plan: ProductPlan) => { plan.silhouette = '  '; }, 'productPlan.silhouette', 'invalid-text'],
+    ['capitalized process', (plan: ProductPlan) => { Object.assign(plan.parts[0], { process: 'FDM' }); }, 'productPlan.parts[0].process', 'invalid-value'],
+    ['array instead of print strategy', (plan: ProductPlan) => { Object.assign(plan.parts[0], { printStrategy: ['Upright'] }); }, 'productPlan.parts[0].printStrategy', 'invalid-text'],
+    ['missing mapping', (plan: ProductPlan) => { plan.parts[0].storyElementIds = []; }, 'productPlan.parts', 'missing-story-mapping'],
+    ['unknown join reference', (plan: ProductPlan) => { plan.joins[0].partIds[0] = 'absent'; }, 'productPlan.joins[0].partIds', 'invalid-reference'],
+    ['disconnected part', (plan: ProductPlan) => { plan.parts.push({ ...plan.parts[1], id: 'loose-piece' }); }, 'productPlan.joins', 'disconnected-parts'],
+    ['missing assembly join', (plan: ProductPlan) => { plan.assembly = plan.parts.map((part, i) => ({ step: i + 1, partIds: [part.id], instruction: 'Inspect' })); }, 'productPlan.assembly', 'incomplete-assembly'],
+    ['numbered step as text', (plan: ProductPlan) => { Object.assign(plan.assembly[0], { step: '1' }); }, 'productPlan.assembly[0].step', 'invalid-value'],
+    ['claimed fit check', (plan: ProductPlan) => { Object.assign(plan.joins[0].validation, { status: 'passed' }); }, 'productPlan.joins[0].validation.status', 'invalid-value'],
+    ['missing gate', (plan: ProductPlan) => { plan.verificationGates.pop(); }, 'productPlan.verificationGates', 'invalid-gates'],
+  ] as const)('diagnoses %s without including customer values', (_name, change, path, code) => {
+    const plan = makeProductPlan(); change(plan);
+    expect(productPlanIssues(plan, ['brand-story'])).toContainEqual({ path, code });
+    expect(isProductPlan(plan, ['brand-story'])).toBe(false);
+    expect(() => parseProductPlan(plan, ['brand-story'])).toThrow(ProductPlanFailure);
+  });
+
+  it('diagnoses disconnected assembly subsets and explicit hero/display constraints', () => {
+    const plan = withPurchasedPart();
+    plan.assembly.push({ step: 2, partIds: ['story-hero', 'alignment-rod'], instruction: 'Join' });
+    expect(productPlanIssues(plan)).toContainEqual({ path: 'productPlan.assembly[1].partIds', code: 'disconnected-assembly' });
+    expect(productPlanIssues(makeProductPlan(), ['brand-story'], { heroElementId: 'missing-hero' })).toContainEqual({ path: 'productPlan.heroPartId', code: 'hero-story-mismatch' });
+    expect(productPlanIssues(withAction(), ['brand-story'], { displayOnly: true })).toContainEqual({ path: 'productPlan.actions', code: 'display-only-action' });
+  });
+
+  it('caps diagnostics and never includes field values or unexpected property names', () => {
+    const plan = makeProductPlan();
+    plan.parts = Array.from({ length: 16 }, (_, index) => ({ ...plan.parts[0], id: `part-${index}`, process: 'PRIVATE customer text' as ProductPlan['process'], name: '' }));
+    const issues = productPlanIssues(plan);
+    expect(issues).toHaveLength(PRODUCT_PLAN_MAX_ISSUES);
+    expect(JSON.stringify(issues)).not.toContain('PRIVATE');
+    const leakedKey = 'secret-customer-6d2d385a-f509-41b4-bef7-ce09c60054ed';
+    const unknownKey = { ...makeProductPlan(), [leakedKey]: 'private source text' };
+    expect(productPlanIssues(unknownKey)).toEqual([{ path: 'productPlan', code: 'invalid-object' }]);
+    try { parseProductPlan(unknownKey); } catch (error) {
+      expect(error).toBeInstanceOf(ProductPlanFailure);
+      expect((error as ProductPlanFailure).issues).toEqual([{ path: 'productPlan', code: 'invalid-object' }]);
+      expect(JSON.stringify(error)).not.toContain(leakedKey);
+    }
+  });
   it('accepts the fixture, preserving all selected story IDs and the original complete object', () => {
     const plan = makeProductPlan(['brand-story', 'brand-mark', 'origin-']);
     expect(isProductPlan(plan, ['brand-story', 'brand-mark', 'origin-'])).toBe(true);
@@ -209,6 +251,7 @@ describe('ProductPlan physical proposal contract', () => {
     plan.assembly[0].partIds = plan.parts.map(part => part.id);
     expect(JSON.stringify(plan).length).toBeGreaterThan(PRODUCT_PLAN_MAX_CHARS);
     expect(isProductPlan(plan)).toBe(false);
+    expect(productPlanIssues(plan)).toEqual([{ path: 'productPlan', code: 'plan-too-large' }]);
     plan.parts.forEach(part => { part.form = 'Shape'; part.printStrategy = 'Review'; part.finish = 'Sample'; });
     expect(JSON.stringify(plan).length).toBeLessThan(PRODUCT_PLAN_MAX_CHARS);
     expect(isProductPlan(plan)).toBe(true);
