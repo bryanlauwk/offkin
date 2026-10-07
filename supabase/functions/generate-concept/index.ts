@@ -6,6 +6,7 @@ import { CANVAS_WORLD_PROMPT, CANVAS_PHYSICAL_PROMPT, canvasImagePrompt, BRAND_P
 import { CANVAS_CONTRACT_VERSION, CANVAS_CAPABILITIES, CanvasFailure, validateCanvasRequest, canvasCacheInput, parseCanvasManifest, serializeCanvasManifest, restoreCanvasRow, selectWorldElements, parseCanvasDesign, isCanvasContext, type CanvasManifest, type CanvasStoredRow } from './canvas.ts';
 import { PROPOSAL_CONTRACT_VERSION, PROPOSAL_CAPABILITIES, restoreProposalRow } from './proposal.ts';
 import { handleProposal, supportsProposalModel } from './proposal-handler.ts';
+import { providerCallTimeout } from './proposal-budget.ts';
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Cache-Control':'no-store'}});
 const hash = async (s:string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');
 // Temporary owner-requested test waiver. Set BRICK_ENFORCE_DAILY_LIMITS=true to restore caps.
@@ -70,13 +71,15 @@ export async function handleRequest(req: Request) {
    return data?await deliver(data):json({error:'This concept could not be found.'},404);
   }
   const key=Deno.env.get('LOVABLE_API_KEY');const enabled=Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
-  async function ai(path:string,body:unknown){
+  async function ai(path:string,body:unknown,timeoutMs?:number){
    if(req.signal.aborted)throw new Failure(499,'The request was cancelled.');
+   const timeout=providerCallTimeout(timeoutMs);
+   if(!timeout)throw new Failure(504,'The generation request ran out of time. Your brief and existing images are unchanged.');
    const multipart=body instanceof FormData;
    const headers:Record<string,string>={'Authorization':`Bearer ${key}`,'Lovable-API-Key':key!};
    // Fetch supplies the multipart boundary. A manually set Content-Type would corrupt it.
    if(!multipart)headers['Content-Type']='application/json';
-   const response=await fetch('https://ai.gateway.lovable.dev/v1/'+path,{method:'POST',headers,body:multipart?body:JSON.stringify(body),signal:AbortSignal.any([req.signal,AbortSignal.timeout(100000)])});
+   const response=await fetch('https://ai.gateway.lovable.dev/v1/'+path,{method:'POST',headers,body:multipart?body:JSON.stringify(body),signal:AbortSignal.any([req.signal,AbortSignal.timeout(timeout)])});
    if(!response.ok)throw new Failure(response.status===429?429:503,response.status===429?'The generator is busy. Please try again shortly.':'The generator is unavailable right now. Please try again later.');
    return await response.json();
   }

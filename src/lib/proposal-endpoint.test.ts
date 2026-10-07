@@ -12,7 +12,7 @@ import { serializeCanvasManifest } from '../../supabase/functions/generate-conce
 const state = vi.hoisted(() => ({
   env: {} as Record<string, string | undefined>, rows: [] as Record<string, unknown>[],
   blobs: new Map<string, Uint8Array>(), allowed: true, dbError: false, uploadError: false, saveError: false,
-  downloadError: false, fakeDownloadSize: 0, output: null as unknown, imageOutput: null as unknown,
+  downloadError: false, fakeDownloadSize: 0, output: null as unknown, repairOutput: undefined as unknown, imageOutput: null as unknown,
   promptRevision: 'test-prompt-v1',
   textCalls: 0, imageCalls: 0, rpc: vi.fn(), upload: vi.fn(), download: vi.fn(), remove: vi.fn(), sign: vi.fn(), readWebsite: vi.fn(),
 }));
@@ -69,12 +69,20 @@ beforeEach(() => {
   globals();
   state.env = { SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'test-server-only', LOVABLE_API_KEY: 'test-not-real', BRICK_GENERATION_ENABLED: 'true', BRICK_PROPOSAL_ENABLED: 'true' };
   state.rows = []; state.blobs.clear(); state.allowed = true; state.dbError = false; state.uploadError = false; state.saveError = false;
-  state.downloadError = false; state.fakeDownloadSize = 0; state.output = null; state.imageOutput = null; state.textCalls = 0; state.imageCalls = 0;
+  state.downloadError = false; state.fakeDownloadSize = 0; state.output = null; state.repairOutput = undefined; state.imageOutput = null; state.textCalls = 0; state.imageCalls = 0;
   state.promptRevision = 'test-prompt-v1';
   for (const fn of [state.rpc, state.upload, state.download, state.remove, state.sign, state.readWebsite]) fn.mockReset();
   state.readWebsite.mockResolvedValue({ url: 'https://studio.example/', title: 'Paper Studio', excerpt: 'We make stationery.' });
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-    if (url.endsWith('/chat/completions')) { state.textCalls++; const sent = JSON.parse(String(init?.body)); const direction = JSON.parse(sent.messages[1].content); const plan = direction.sourcePhysical ? {} : { productPlan: makeProductPlan((direction.selectedElements || elements).map((e: {id:string}) => e.id)) }; return response({ choices: [{ message: { content: JSON.stringify(state.output || { ...design, ...plan }) } }] }); }
+    if (url.endsWith('/chat/completions')) {
+      state.textCalls++;
+      const sent = JSON.parse(String(init?.body)); const direction = JSON.parse(sent.messages[1].content);
+      const plan = direction.sourcePhysical ? {} : { productPlan: makeProductPlan((direction.selectedElements || elements).map((e: {id:string}) => e.id)) };
+      const output = Object.prototype.hasOwnProperty.call(direction, 'invalidProductPlan')
+        ? state.repairOutput !== undefined ? state.repairOutput : { productPlan: direction.invalidProductPlan }
+        : state.output || { ...design, ...plan };
+      return response({ choices: [{ message: { content: JSON.stringify(output) } }] });
+    }
     if (url.endsWith('/images/generations') || url.endsWith('/images/edits')) { state.imageCalls++; return response(state.imageOutput || { data: [{ b64_json: png }] }); }
     throw new Error(`Unexpected network target: ${url}`);
   }));
@@ -167,7 +175,7 @@ describe('complete proposal backend with mocked providers only', () => {
     }
     state.output={...design,...(problem==='missing'?{}:{productPlan:plan})};
     expect((await post(worldRequest)).status).toBe(502);
-    expect(state.textCalls).toBe(1);expect(state.imageCalls).toBe(0);expect(state.rows).toHaveLength(0);
+    expect(state.textCalls).toBe(2);expect(state.imageCalls).toBe(0);expect(state.rows).toHaveLength(0);
   });
   it('uses the product plan action authority despite a stray visual interaction',async()=>{
     const {world,physical}=await pair();state.output={...design,interaction:'Turn a motorized lever and flash every light.'};
@@ -393,6 +401,309 @@ describe('complete proposal backend with mocked providers only', () => {
     state.blobs.set(`${worldId}.png`, Buffer.from(png, 'base64')); state.blobs.set(`${physicalId}.png`, Buffer.from(png, 'base64'));
     const result = await generate({ ...worldRequest, stage: 'packaging', sourceWorldId: worldId, sourcePhysicalId: physicalId });
     expect(result.sourceImageIds).toEqual([physicalId, worldId]); expect(state.rows[0].prompt_version).toBe('offkin-canvas-v9');
+  });
+});
+
+describe('bounded product-plan correction with mocked providers only', () => {
+  const selectedIds = elements.map(element => element.id);
+  const validPlan = () => makeProductPlan(selectedIds);
+  const textPayloads = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/chat/completions')).map(([, init]) => JSON.parse(String(init?.body)));
+  let warnings: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => { warnings = vi.spyOn(console, 'warn').mockImplementation(() => {}); });
+  afterEach(() => warnings.mockRestore());
+
+  it('makes one correction before one image and preserves every authoritative selection and exact wording', async () => {
+    const invalid = validPlan(); invalid.productIntent = 'Detailed proposed construction '.repeat(25);
+    const corrected = validPlan();
+    state.output = { ...design, productPlan: invalid };
+    state.repairOutput = { productPlan: corrected };
+    const result = await generate(worldRequest);
+    expect(result.productPlan).toEqual(corrected);
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(1);
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => String(url).split('/').at(-1))).toEqual(['completions', 'completions', 'generations']);
+    const correction = textPayloads()[1];
+    expect(correction.max_tokens).toBe(5000);
+    const payload = JSON.parse(correction.messages[1].content);
+    expect(payload.invalidProductPlan).toEqual(invalid);
+    expect(payload.issues).toEqual([{ path: 'productPlan.productIntent', code: 'invalid-text' }]);
+    expect(payload.authoritative).toMatchObject({ selectedElementIds: selectedIds, selectedElements: elements, heroElementId: elements[0].id, displayOnly: true, context: worldRequest.context });
+    expect(payload.authoritative.context.exactWording).toBe(worldRequest.context.exactWording);
+    expect(JSON.parse(String(imageCalls()[0][1]?.body)).prompt).toContain(JSON.stringify(corrected));
+    expect(JSON.parse(String(imageCalls()[0][1]?.body)).prompt).not.toContain(invalid.productIntent);
+    expect(warnings).toHaveBeenCalledWith('ProductPlan validation failed', { stage: 'world', attempt: 1, issues: payload.issues });
+    expect(JSON.stringify(warnings.mock.calls)).not.toContain(invalid.productIntent);
+  });
+
+  it('does not make a correction call for an already valid plan', async () => {
+    const result = await generate(worldRequest);
+    expect(result.productPlan).toEqual(validPlan());
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1);
+    expect(textPayloads()[0].messages[0].content).not.toContain('only correction attempt');
+    expect(warnings).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing-plan', 'missing-mapping', 'wrong-hero', 'disconnected-assembly', 'display-only-action', 'supplier-claim'] as const)('can correct %s without weakening the final contract', async problem => {
+    const plan = validPlan();
+    if (problem === 'missing-mapping') plan.parts[0].storyElementIds.pop();
+    if (problem === 'wrong-hero') plan.heroPartId = 'display-base';
+    if (problem === 'disconnected-assembly') plan.assembly = plan.parts.map((part, index) => ({ step: index + 1, partIds: [part.id], instruction: 'Inspect' }));
+    if (problem === 'display-only-action') {
+      plan.actions = [{ action: 'Turn', response: 'Reveal', partIds: ['story-hero'], validation: { status: 'unverified', check: 'Prototype' } }];
+      plan.verificationGates.push({ id: 'interaction-test', status: 'unverified' });
+    }
+    if (problem === 'supplier-claim') Object.assign(plan.joins[0].validation, { status: 'supplier-certified' });
+    state.output = { ...design, ...(problem === 'missing-plan' ? {} : { productPlan: plan }) };
+    state.repairOutput = { productPlan: validPlan() };
+    const result = await generate(worldRequest);
+    expect(result.productPlan).toEqual(validPlan());
+    expect(result.productPlan!.actions).toEqual([]);
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(1);
+  });
+
+  it('corrects a coherent but oversized plan without losing selections or raising the accepted bound', async () => {
+    const invalid = validPlan();
+    invalid.parts = Array.from({ length: 10 }, (_, index) => ({ ...invalid.parts[0], id: index === 0 ? 'story-hero' : `piece-${index}`, storyElementIds: index === 0 ? selectedIds : [], form: 'f'.repeat(320), printStrategy: 'p'.repeat(320), finish: 'c'.repeat(240) }));
+    invalid.joins = invalid.parts.slice(1).map((part, index) => ({ ...invalid.joins[0], id: `join-${index}`, partIds: ['story-hero', part.id] }));
+    invalid.assembly[0].partIds = invalid.parts.map(part => part.id);
+    expect(JSON.stringify(invalid).length).toBeGreaterThan(10000);
+    state.output = { ...design, productPlan: invalid };
+    state.repairOutput = { productPlan: validPlan() };
+    await generate(worldRequest);
+    const payload = JSON.parse(textPayloads()[1].messages[1].content);
+    expect(payload.issues).toEqual([{ path: 'productPlan', code: 'plan-too-large' }]);
+    expect(payload.invalidProductPlan).toEqual(invalid);
+    expect(payload.authoritative.selectedElementIds).toEqual(selectedIds);
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(1);
+  });
+
+  it('keeps a failed revision out of storage and stops after one still-invalid correction', async () => {
+    const { world, physical } = await pair();
+    const accepted = structuredClone(state.rows);
+    state.textCalls = 0; state.imageCalls = 0;
+    const invalid = validPlan(); invalid.parts[0].storyElementIds = [];
+    state.output = { ...design, productPlan: invalid };
+    state.repairOutput = { productPlan: invalid };
+    const result = await post({ ...physicalRequest(world), previousAssetId: physical.id, context: { ...worldRequest.context, revisionNotes: 'Keep every story meaning; refine the crest shape.' } });
+    const body = await result.json();
+    expect(result.status).toBe(502);
+    expect(body.error).toContain('selected story elements and hero');
+    expect(body.error).toContain('No image was generated');
+    expect(body).not.toHaveProperty('issues');
+    expect(body.error).not.toContain('productPlan');
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(0);
+    expect(state.rows).toEqual(accepted);
+    expect(warnings).toHaveBeenLastCalledWith('ProductPlan validation failed', { stage: 'physical', attempt: 2, issues: expect.any(Array) });
+  });
+
+  it.each([null, [], {}, { productPlan: null }, { productPlan: validPlan(), extra: 'unrequested output' }])('rejects invalid correction envelopes without another provider call', async repaired => {
+    state.output = design; state.repairOutput = repaired;
+    expect((await post(worldRequest)).status).toBe(502);
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(0);
+    expect(state.rows).toHaveLength(0);
+  });
+
+  it('stops before correction if cancellation arrives with the first text response', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal('fetch', vi.fn(async () => { state.textCalls++; controller.abort(); return response({ choices: [{ message: { content: JSON.stringify(design) } }] }); }));
+    expect((await post(worldRequest, controller.signal)).status).toBe(499);
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(0);
+    expect(state.upload).not.toHaveBeenCalled();
+  });
+
+  it('stops before images if cancellation arrives during the correction', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      expect(url).toContain('/chat/completions'); state.textCalls++;
+      if (state.textCalls === 2) controller.abort();
+      return response({ choices: [{ message: { content: JSON.stringify(state.textCalls === 1 ? design : { productPlan: validPlan() }) } }] });
+    }));
+    expect((await post(worldRequest, controller.signal)).status).toBe(499);
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(0);
+    expect(state.upload).not.toHaveBeenCalled(); expect(state.rows).toHaveLength(0);
+  });
+
+  it.each(['saved-source', 'invented'] as const)('rejects a %s UUID echo in corrected plan before images', async kind => {
+    const world = await generate(worldRequest); state.textCalls = 0; state.imageCalls = 0; vi.mocked(fetch).mockClear();
+    const leaked = kind === 'saved-source' ? world.id : 'b3a06249-4f68-496c-8d8b-cec758811f11';
+    state.output = design;
+    const repaired = validPlan(); repaired.productIntent = `Preserve reference ${leaked}`;
+    state.repairOutput = { productPlan: repaired };
+    const result = await post(physicalRequest(world));
+    expect(result.status).toBe(502);
+    expect((await result.json()).error).toContain('unexpected saved reference');
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(0);
+    expect(state.rows).toHaveLength(1);
+    for (const payload of textPayloads()) expect(JSON.stringify(payload)).not.toContain(world.id);
+    expect(JSON.stringify(warnings.mock.calls)).not.toContain(leaked);
+  });
+
+  it('rejects privacy leakage in the invalid original response before any correction transmission', async () => {
+    const invalid = validPlan(); invalid.productIntent = 'Unknown reference b3a06249-4f68-496c-8d8b-cec758811f11';
+    state.output = { ...design, productPlan: invalid };
+    expect((await post(worldRequest)).status).toBe(502);
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(0); expect(warnings).not.toHaveBeenCalled();
+  });
+
+  it('does not truncate or transmit an invalid plan beyond the correction input ceiling', async () => {
+    const invalid = validPlan(); invalid.productIntent = 'x'.repeat(33000);
+    state.output = { ...design, productPlan: invalid };
+    const result = await post(worldRequest);
+    expect(result.status).toBe(502);
+    expect((await result.json()).error).toContain('concise proposal');
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(0);
+    expect(invalid.productIntent).toHaveLength(33000);
+  });
+
+  it('preserves the exact approved QA context and its requested mechanical action through correction', async () => {
+    // Transport/validation fixture only; this does not assert real fabrication or live model success.
+    const context: ProposalRequest['context'] = {
+      "business": "Tesla develops electric vehicles, charging, solar power and battery energy storage. Create a compact physical desk collectible as a corporate gift for clients and partners. Its story is sunlight to home to storage to driving. Use one tapering three-tier silhouette, an oversized sun at upper left, one supported looping red road, one fixed red car, a solar-roof home, a battery-storage block and two small white companion figures. Keep generous gaps and a few bold, charming, deliberately disproportionate forms. Propose separate parts and an assembly sequence for later print and prototype review. Specifications are prototype proposals; exact scale is unresolved. Do not claim CAD readiness, verified printability or working hardware.",
+      "audience": "Clients & partners",
+      "angle": "Sunlight, home, storage and driving become one compact, playful gift. A simple mechanical sun press makes the clean-energy connection tangible.",
+      "style": "Compact sculptural desk collectible; tapering three tiers, chunky separable forms, few parts, soft radii, supported red loop, oversized sun. Product photography with tactile matte surfaces.",
+      "interaction": "Press the sun plunger; a proposed lever lifts an energy marker beside storage, then a return spring resets it. Keep the red car fixed. Mechanical only: no lights, electronics or working solar power.",
+      "brandIdentifiers": "Recognizable TESLA wordmark and T on the base; red-and-white identity with cream body, red road and fixed car, charcoal solar panels, yellow sun and muted green trees. EV, solar, storage and charging motifs only. No slogans, rockets, SpaceX or Mars.",
+      "exactWording": "TESLA",
+      "mode": "mechanical"
+};
+    const corrected = validPlan();
+    corrected.actions = [{ action: 'Press the sun plunger', response: 'A proposed lever lifts the energy marker; a return spring resets it.', partIds: ['story-hero', 'display-base'], validation: { status: 'unverified', check: 'Review the proposed linkage in CAD and test force, travel, retention and reset with a physical prototype.' } }];
+    corrected.verificationGates.push({ id: 'interaction-test', status: 'unverified' });
+    const invalid = structuredClone(corrected); invalid.assembly[0].step = 0;
+    state.output = { ...design, productPlan: invalid };
+    state.repairOutput = { productPlan: corrected };
+    const result = await generate({ ...worldRequest, context });
+    expect(result.productPlan).toEqual(corrected);
+    const payload = JSON.parse(textPayloads()[1].messages[1].content);
+    expect(payload.authoritative.context).toEqual(context);
+    expect(payload.authoritative.displayOnly).toBe(false);
+    expect(result.productPlan!.actions).toHaveLength(1);
+    expect(result.productPlan!.verificationGates).toContainEqual({ id: 'interaction-test', status: 'unverified' });
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(1);
+  });
+
+  it('does not retry a provider failure during correction', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      state.textCalls++;
+      return state.textCalls === 1 ? response({ choices: [{ message: { content: JSON.stringify(design) } }] }) : new Response('Unavailable', { status: 503 });
+    }));
+    expect((await post(worldRequest)).status).toBe(503);
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(0);
+    expect(state.rows).toHaveLength(0);
+  });
+
+  it('fails safely after malformed correction JSON without a third text call', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      state.textCalls++;
+      return response({ choices: [{ message: { content: state.textCalls === 1 ? JSON.stringify(design) : '{"productPlan":' } }] });
+    }));
+    const result = await post(worldRequest);
+    expect(result.status).toBe(502);
+    expect((await result.json()).error).toContain('No image was generated');
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(0);
+    expect(warnings).toHaveBeenLastCalledWith('ProductPlan validation failed', { stage: 'world', attempt: 2, issues: [{ path: 'productPlan', code: 'invalid-object' }] });
+  });
+});
+
+describe('proposal deadline integration without real waits', () => {
+  let elapsed: number;
+  let clock: ReturnType<typeof vi.spyOn>;
+  let timeouts: ReturnType<typeof vi.spyOn>;
+  let warnings: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    elapsed = 0;
+    clock = vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+    timeouts = vi.spyOn(AbortSignal, 'timeout');
+    warnings = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+  afterEach(() => { clock.mockRestore(); timeouts.mockRestore(); warnings.mockRestore(); });
+  const correctedPlan = () => ({ productPlan: makeProductPlan(elements.map(element => element.id)) });
+  const timedProvider = (designMs: number, correctionMs: number, imageMs: number) => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const result = await original(url, init);
+      elapsed += url.endsWith('/chat/completions') ? state.textCalls === 1 ? designMs : correctionMs : imageMs;
+      return result;
+    }));
+  };
+
+  it('keeps a slow valid design, correction and image within the shared stage window', async () => {
+    state.output = design; state.repairOutput = correctedPlan();
+    timedProvider(39_000, 24_000, 99_000);
+    await generate(worldRequest);
+    expect(timeouts.mock.calls.map(([ms]) => ms)).toEqual([40_000, 25_000, 100_000]);
+    expect(elapsed).toBe(162_000);
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(1);
+    expect(state.rows).toHaveLength(1);
+  });
+
+  it('clips both text budgets after source preparation without borrowing the image or save reserve', async () => {
+    state.readWebsite.mockImplementation(async () => { elapsed += 50_000; return { url: 'https://studio-example.com/', title: 'Paper Studio', excerpt: 'Stationery' }; });
+    state.output = design; state.repairOutput = correctedPlan();
+    timedProvider(15_000, 4_000, 99_000);
+    await generate({ ...worldRequest, brand: 'https://studio-example.com/' });
+    expect(timeouts.mock.calls.map(([ms]) => ms)).toEqual([20_000, 5_000, 100_000]);
+    expect(elapsed).toBe(168_000);
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(1);
+  });
+
+  it('refuses even the first text call when preparation leaves no full image/save window', async () => {
+    state.readWebsite.mockImplementation(async () => { elapsed += 71_000; return { url: 'https://studio-example.com/', title: 'Paper Studio', excerpt: 'Stationery' }; });
+    const result = await post({ ...worldRequest, brand: 'https://studio-example.com/' });
+    expect(result.status).toBe(504);
+    expect((await result.json()).error).toContain('No image was generated');
+    expect(state.textCalls).toBe(0); expect(state.imageCalls).toBe(0);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('stops the old 80-second design/80-second correction/80-second image scenario before correction', async () => {
+    state.output = design; state.repairOutput = correctedPlan();
+    // Simulate a runtime returning after its allotted timeout to verify the elapsed-time guard too.
+    timedProvider(80_000, 80_000, 80_000);
+    const result = await post(worldRequest);
+    expect(result.status).toBe(504);
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(0);
+    expect(timeouts.mock.calls.map(([ms]) => ms)).toEqual([40_000]);
+    expect(state.upload).not.toHaveBeenCalled();
+  });
+
+  it('refuses a paid image if a late correction consumes its full remaining window', async () => {
+    state.output = design; state.repairOutput = correctedPlan();
+    timedProvider(40_000, 31_000, 0);
+    const result = await post(worldRequest);
+    expect(result.status).toBe(504);
+    expect((await result.json()).error).toContain('existing images are unchanged');
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(0);
+    expect(timeouts.mock.calls.map(([ms]) => ms)).toEqual([40_000, 25_000]);
+    expect(state.rows).toHaveLength(0);
+  });
+
+  it('keeps request cancellation authoritative during a bounded correction', async () => {
+    const controller = new AbortController();
+    state.output = design; state.repairOutput = correctedPlan();
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      const result = await original(url, init);
+      if (state.textCalls === 2) { controller.abort(); expect(init?.signal?.aborted).toBe(true); }
+      return result;
+    }));
+    expect((await post(worldRequest, controller.signal)).status).toBe(499);
+    expect(timeouts.mock.calls.map(([ms]) => ms)).toEqual([40_000, 25_000]);
+    expect(state.textCalls).toBe(2); expect(state.imageCalls).toBe(0);
+  });
+
+  it('does not accept a client-supplied timeout override', async () => {
+    expect((await post({ ...worldRequest, timeoutMs: 900_000 })).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('preserves the v9 provider default for both text and image calls', async () => {
+    state.output = design;
+    const result = await post({ ...worldRequest, contractVersion: 'offkin-canvas-v9' });
+    expect(result.status).toBe(200);
+    expect(timeouts.mock.calls.map(([ms]) => ms)).toEqual([100_000, 100_000]);
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1);
   });
 });
 
