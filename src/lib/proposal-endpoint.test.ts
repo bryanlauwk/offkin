@@ -442,6 +442,51 @@ describe('bounded product-plan correction with mocked providers only', () => {
     expect(warnings).not.toHaveBeenCalled();
   });
 
+  it.each([false, true])('sends coverage feedback with connectivity failures and keeps one correction: complete=%s', async complete => {
+    const invalid = validPlan();
+    invalid.parts.push({ ...invalid.parts[1], id: 'connector' }, { ...invalid.parts[1], id: 'end-piece' });
+    invalid.joins.push({ ...invalid.joins[0], id: 'second-subassembly', partIds: ['connector', 'end-piece'] });
+    invalid.assembly = [
+      { step: 1, partIds: ['story-hero', 'connector'], instruction: 'Trial-fit the proposed subassembly.' },
+      { step: 2, partIds: ['display-base'], instruction: 'Inspect this component.' },
+    ];
+    const corrected = structuredClone(invalid);
+    corrected.joins.push({ ...corrected.joins[0], id: 'subassembly-link', partIds: ['display-base', 'connector'] });
+    corrected.assembly = [
+      { step: 1, partIds: ['story-hero', 'display-base'], instruction: 'Trial-fit the first declared join.' },
+      { step: 2, partIds: ['connector', 'end-piece'], instruction: 'Trial-fit the second declared join.' },
+      ...(complete ? [{ step: 3, partIds: ['display-base', 'connector'], instruction: 'Trial-fit the declared connection between subassemblies.' }] : []),
+    ];
+    const before = structuredClone({ invalid, corrected });
+    state.output = { ...design, productPlan: invalid };
+    state.repairOutput = { productPlan: corrected };
+    const response = await post(worldRequest);
+    expect(response.status).toBe(complete ? 200 : 502);
+    const body = await response.json();
+    expect(state.textCalls).toBe(2);
+    expect(state.imageCalls).toBe(complete ? 1 : 0);
+    expect(state.rows).toHaveLength(complete ? 1 : 0);
+    const correction = JSON.parse(textPayloads()[1].messages[1].content);
+    expect(correction.invalidProductPlan).toEqual(invalid);
+    expect(correction.issues).toContainEqual({ path: 'productPlan.joins', code: 'disconnected-parts' });
+    expect(correction.issues).toContainEqual({ path: 'productPlan.assembly[0].partIds', code: 'disconnected-assembly' });
+    expect(correction.issues).toContainEqual({ path: 'productPlan.assembly', code: 'incomplete-assembly' });
+    expect(correction.issues).toContainEqual({ path: 'productPlan.parts[3]', code: 'incomplete-assembly' });
+    expect(correction.issues).toContainEqual({ path: 'productPlan.joins[0].partIds', code: 'incomplete-assembly' });
+    expect(correction.issues).toContainEqual({ path: 'productPlan.joins[1].partIds', code: 'incomplete-assembly' });
+    expect({ invalid, corrected }).toEqual(before);
+    if (complete) expect(body.concept.productPlan).toEqual(corrected);
+    else {
+      expect(body.error).toContain('complete connected assembly');
+      expect(body.error).toContain('No image was generated');
+      expect(body).not.toHaveProperty('issues');
+      expect(warnings).toHaveBeenLastCalledWith('ProductPlan validation failed', { stage: 'world', attempt: 2, issues: [
+        { path: 'productPlan.assembly', code: 'incomplete-assembly' },
+        { path: 'productPlan.joins[2].partIds', code: 'incomplete-assembly' },
+      ] });
+    }
+  });
+
   it.each(['missing-plan', 'missing-mapping', 'wrong-hero', 'disconnected-assembly', 'display-only-action', 'supplier-claim'] as const)('can correct %s without weakening the final contract', async problem => {
     const plan = validPlan();
     if (problem === 'missing-mapping') plan.parts[0].storyElementIds.pop();
