@@ -5,7 +5,14 @@ const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "Page not found — OFFKIN｜异趣伙伴";
+    const robots = document.createElement("meta");
+    robots.name = "robots";
+    robots.content = "noindex";
+    document.head.appendChild(robots);
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);
+    return () => { document.title = prevTitle; robots.remove(); };
   }, [location.pathname]);
 
   return (
