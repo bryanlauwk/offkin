@@ -56,7 +56,7 @@ function ProposalArtwork({ stage, concept, imageErrors, onImageError, onRetryIma
     const failed = Boolean(concept?.image && imageErrors[concept.image]);
     const alt = concept ? `${concept.brand}: ${concept.title}, generated ${panel.label.toLowerCase()} study` : '';
     return <figure className={`pb-artwork pb-artwork--${stage}`}>
-      <div className="pb-panel-heading"><div><span className="pb-section-number">{String(panels.findIndex(item => item.stage === stage) + 1).padStart(2, '0')}</span><h3>{panel.label}</h3></div>{available && onEnlarge && <button type="button" className="pb-enlarge" onClick={() => onEnlarge(concept!)} aria-label={`Enlarge ${panel.label.toLowerCase()}`}><Expand size={13} aria-hidden="true"/><span>View</span></button>}</div>
+      <div className="pb-panel-heading"><div><span className="pb-section-number">{({world:'01',physical:'02',details:'03',packaging:'04'})[stage]}</span><h3>{panel.label}</h3></div>{available && onEnlarge && <button type="button" className="pb-enlarge" onClick={() => onEnlarge(concept!)} aria-label={`Enlarge ${panel.label.toLowerCase()}`}><Expand size={13} aria-hidden="true"/><span>View</span></button>}</div>
       {available
         ? onEnlarge
           ? <button className="pb-image-button" type="button" aria-label={`Open ${panel.label.toLowerCase()} image`} onClick={() => onEnlarge(concept!)}><img key={concept!.image} src={concept!.image} alt={alt} onError={() => onImageError(concept!.image)} decoding="async"/></button>

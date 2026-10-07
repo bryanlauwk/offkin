@@ -11,7 +11,9 @@ export type ProposalScope = 'world' | 'physical' | 'packaging';
 export type ProposalVersion = { id: string; context: ProposalConcept['context']; website: string; assets: AssetIds; selected: string[]; hero: string; replacements: NonNullable<ProposalRequest['replacements']> };
 export type PendingProposal = ProposalVersion & { scope: ProposalScope; previous: AssetIds; instruction: string };
 export type ProposalSession = { schema: 10; id: string; website: string; context: ProposalConcept['context']; accepted: ProposalVersion | null; pending: PendingProposal | null; turns: { role:'user'|'assistant'; text:string }[] };
-export const emptyProposalSession = (): ProposalSession => ({schema:10,id:newVersion(),website:'',context:{business:'',angle:'The world we bring together',audience:'Clients & partners',exactWording:'',brandIdentifiers:'',style:'Characterful collectible with a distinctive silhouette and coherent printable parts',interaction:'Display only',mode:'mechanical',scale:'Let the story decide'},accepted:null,pending:null,turns:[]});
+// Unspecified interaction must not contradict a physical action in the business story.
+// Explicit user choices, including Display only, remain in the saved context.
+export const emptyProposalSession = (): ProposalSession => ({schema:10,id:newVersion(),website:'',context:{business:'',angle:'The world we bring together',audience:'Clients & partners',exactWording:'',brandIdentifiers:'',style:'Characterful collectible with a distinctive silhouette and coherent printable parts',interaction:'',mode:'mechanical',scale:'Let the story decide'},accepted:null,pending:null,turns:[]});
 const record = (v:unknown):v is Record<string,unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const keys = (v:Record<string,unknown>,allowed:string[]) => Object.keys(v).every(k=>allowed.includes(k));
 const text = (v:unknown,max:number):v is string => typeof v==='string' && v.length<=max;
