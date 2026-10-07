@@ -139,8 +139,8 @@ describe('ProposalBoard',()=>{
   it('opens the matching complete source image from each panel and supports static presentation',()=>{
     const input=props();const {rerender}=render(<ProposalBoard {...input}/>);
     for(const [label,stage] of [['brand world','world'],['collectible','physical'],['components & interaction','details'],['packaging concept','packaging']] as const){
-      fireEvent.click(screen.getByRole('button',{name:`Enlarge ${label}`}));expect(input.onEnlarge).toHaveBeenLastCalledWith(input.assets[stage]);
-      fireEvent.click(screen.getByRole('button',{name:`Open ${label} image`}));expect(input.onEnlarge).toHaveBeenLastCalledWith(input.assets[stage]);
+      fireEvent.click(screen.getByRole('button',{name:`Enlarge ${label}`}));expect(input.onEnlarge).toHaveBeenLastCalledWith(input.assets[stage],screen.getByRole('button',{name:`Enlarge ${label}`}));
+      fireEvent.click(screen.getByRole('button',{name:`Open ${label} image`}));expect(input.onEnlarge).toHaveBeenLastCalledWith(input.assets[stage],screen.getByRole('button',{name:`Open ${label} image`}));
     }
     rerender(<ProposalBoard {...input} onEnlarge={undefined}/>);
     expect(screen.queryByRole('button',{name:/Enlarge/})).not.toBeInTheDocument();expect(screen.getAllByRole('img')).toHaveLength(4);

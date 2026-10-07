@@ -37,3 +37,7 @@
 .pb-progress{background:#fff0bb;border-color:#bfa65e;color:#514b40;font-size:13px}.pb-progress-count,.pb-progress>ol,.pb-progress>p{font-size:11px;color:#655e52}.pb-progress .pb-progress-done{color:#345328}
 .pb-lineage-warning{background:#fff0bb;border-color:#bfa65e;color:#514b40;font-size:13px}
 @media(max-width:640px){.pb-board{padding:18px 14px}.pb-brand{font-size:43px}.pb-story h2{font-size:32px}.pb-panel-heading h3{font-size:22px}.pb-artwork figcaption{font-size:10px}.pb-footer>p{font-size:11px}}
+
+/* Anton is a regular-only face: preserve its designed spacing and stroke weight. */
+.pb-board{font-synthesis:none}
+.pb-board h2,.pb-board h3,.pb-board h4,.pb-brand{font-weight:400;letter-spacing:0;line-height:1.15}
