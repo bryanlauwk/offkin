@@ -1,3 +1,4 @@
+import { CONSTRUCTION_INTENT_VERSION, constructionInteraction, type ConstructionIntent } from '../../supabase/functions/generate-concept/construction-intent';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { addProposalAsset, assetsForVersion, confirmedPackagingChange, decodeProposalShare, emptyProposalSession, encodeProposalShare, isComplete, loadProposalSession, loadProposalSnapshot, parseProposalSession, pendingProposal, proposalBrief, requestForStage, saveProposalSession, saveProposalSnapshot, type ProposalSession } from './proposal-session';
 import { makeProductPlan } from '../test/product-plan-fixture';
@@ -7,6 +8,34 @@ function session():ProposalSession{const s=emptyProposalSession();s.context.busi
 function asset(stage:ProposalStage):ProposalConcept {const s=session();return {contractVersion:'offkin-proposal-v10',stageVersion:'proposal-assets-v1',stage,id:ids[stage],brand:'Paper',title:stage,story:'Paper world story',design:'One rich world',interaction:'Turn to reveal',context:s.context,worldElements:[{id:'house',label:'House',description:'Proposed paper house',kind:'proposal'}],sourceImageIds:stage==='world'?[]:stage==='physical'?[ids.world]:stage==='details'?[ids.physical]:[ids.physical,ids.world],image:`https://images.example/${stage}.png?signed=secret`,sourceUrl:'',sourceTitle:'',...(stage!=='world'?{sourceWorldId:ids.world,selectedElementIds:['house'],heroElementId:'house',replacements:[]}:{}),...(['details','packaging'].includes(stage)?{sourcePhysicalId:ids.physical}:{})};}
 afterEach(()=>{localStorage.clear();vi.restoreAllMocks();});
 describe('Proposal sessions and immutable versions',()=>{
+ it.each(['static','press-reveal-manual-reset'] as const)('persists optional %s intent in schema 10 without marking it reviewed',action=>{
+   const s=emptyProposalSession();const intent:ConstructionIntent={version:CONSTRUCTION_INTENT_VERSION,action};s.constructionIntent=intent;s.context={...s.context,mode:'mechanical',interaction:constructionInteraction(intent)};
+   s.pending=pendingProposal(s,'world',s.context);expect(s.pending.constructionIntent).toEqual(intent);expect(saveProposalSession(s)).toBe(true);expect(loadProposalSession()).toEqual(s);expect(JSON.stringify(s)).not.toContain('reviewed');
+   for(const stage of ['world','physical'] as const)expect(requestForStage(s.pending,stage).constructionIntent).toEqual(intent);
+   for(const stage of ['details','packaging'] as const)expect(requestForStage(s.pending,stage)).not.toHaveProperty('constructionIntent');
+ });
+ it('requires a new explicit action for world and physical revisions while packaging inherits',()=>{
+   const s=session();const intent:ConstructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};s.constructionIntent=intent;s.accepted!.constructionIntent=intent;s.accepted!.context={...s.context,mode:'mechanical',interaction:'Display only'};
+   for(const scope of ['world','physical'] as const){const p=pendingProposal(s,scope,s.context);expect(p.constructionIntent).toBeUndefined();expect(()=>requestForStage(p,scope)).toThrow(/Choose the construction action/);}
+   expect(confirmedPackagingChange(s,'Blue packaging only').constructionIntent).toEqual(intent);expect(s.accepted!.constructionIntent).toEqual(intent);
+ });
+ it('does not carry a draft action into a different initial context',()=>{const s=emptyProposalSession();s.constructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};s.context.interaction='Display only';expect(pendingProposal(s,'world',{...s.context,business:'A changed business'}).constructionIntent).toBeUndefined();});
+ it('rejects stale canonical interaction before forming a new product request',()=>{
+   const s=emptyProposalSession();s.constructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};s.context.interaction='Press a panel';
+   expect(()=>requestForStage(pendingProposal(s,'world',s.context),'world')).toThrow(/Choose the construction action/);
+ });
+ it('rejects unknown actions, versions and reviewed flags without rejecting old schema 10 state',()=>{
+   const old=session();expect(parseProposalSession(old)).toEqual(old);
+   for(const intent of [{version:'construction-intent-v2',action:'static'},{version:CONSTRUCTION_INTENT_VERSION,action:'automatic-reset'},{version:CONSTRUCTION_INTENT_VERSION,action:'static',reviewed:true}])expect(parseProposalSession({...session(),constructionIntent:intent})).toBeNull();
+ });
+ it('omits active intent from ordinary shares and never imports pending confirmation',()=>{
+   const s=session();s.constructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};s.accepted!.constructionIntent=s.constructionIntent;
+   expect(decodeProposalShare(encodeProposalShare(s))?.constructionIntent).toBeUndefined();expect(decodeProposalShare(encodeProposalShare(s,true))?.accepted?.constructionIntent).toEqual(s.constructionIntent);
+   s.pending={...pendingProposal(s,'physical',s.context),constructionIntent:s.constructionIntent};
+   const raw='#proposal='+btoa(JSON.stringify(s)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');const imported=decodeProposalShare(raw)!;
+   expect(imported.constructionIntent).toBeUndefined();expect(imported.pending?.constructionIntent).toBeUndefined();expect(imported.accepted?.constructionIntent).toEqual(s.constructionIntent);
+ });
+
  it('starts with no example story, IDs, elements or hero',()=>{const s=emptyProposalSession();expect(s.accepted).toBeNull();expect(s.pending).toBeNull();expect(s.context.interaction).toBe('');expect(JSON.stringify(s)).not.toMatch(/airbnb|tesla|a24/i);expect(parseProposalSession(s)).toEqual(s);});
  it('persists and reloads exact Unicode wording',()=>{const s=emptyProposalSession();s.context.exactWording='  纸世界\nCafé 🪁 EXACT!\t ';expect(saveProposalSession(s)).toBe(true);expect(loadProposalSession()).toEqual(s);});
  it.each([['schema',9],['website',3],['context',{business:'x',unauthorized:'secret'}],['turns',[{role:'system',text:'x'}]],['accepted',{...session().accepted,assets:{world:ids.world}}]])('rejects malformed %s', (key,value)=>{expect(parseProposalSession({...emptyProposalSession(),[key]:value})).toBeNull();});

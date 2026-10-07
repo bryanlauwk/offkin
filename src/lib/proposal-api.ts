@@ -1,3 +1,4 @@
+import { constructionInteraction, isConstructionIntent } from '../../supabase/functions/generate-concept/construction-intent';
 import { PROPOSAL_GENERATION_PAUSED, PROPOSAL_PAUSE_MESSAGE } from './proposal-availability';
 import {
   PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGES, hasProposalCapabilities, isProposalConcept,
@@ -6,6 +7,7 @@ import {
 export { PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGES };
 export type { ProposalRequest, ProposalConcept, ProposalStage, RevisionPlanRequest, RevisionPlanResponse } from '../../supabase/functions/generate-concept/proposal';
 export class ProposalContextNeededError extends Error {}
+export class ProposalConstructionNeededError extends Error {}
 export class ProposalUnavailableError extends Error {
   constructor() { super(PROPOSAL_GENERATION_PAUSED ? PROPOSAL_PAUSE_MESSAGE : 'Complete proposal generation is not available on this backend yet. Your direction is saved on this device.'); }
 }
@@ -31,12 +33,15 @@ const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof
 function equalContext(a: ProposalConcept['context'], b: ProposalConcept['context']) { return Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([key,value])=>b[key] === value); }
 export async function requestProposalAsset(body: ProposalRequest, signal: AbortSignal): Promise<ProposalConcept> {
   active(signal); validateProposalRequest(body);
+  if ((body.stage==='world'||body.stage==='physical') && (!isConstructionIntent(body.constructionIntent)||body.context.mode!=='mechanical'||body.context.interaction!==constructionInteraction(body.constructionIntent))) throw new ProposalConstructionNeededError('Choose a construction action before generating this direction.');
   if (!await supportsProposalGeneration(signal)) { active(signal); throw new ProposalUnavailableError(); }
   const data = await post(body, signal);
+  if (record(data) && data.needsConstruction === true) throw new ProposalConstructionNeededError(typeof data.clarification === 'string' && data.clarification.trim() && data.clarification.length <= 600 ? data.clarification : 'The physical construction needs a little more detail.');
   if (record(data) && data.needsContext === true) throw new ProposalContextNeededError(typeof data.message === 'string' && data.message.length <= 1000 ? data.message : 'Tell us a little more about what this business does.');
   if (!record(data) || !isProposalConcept(data.concept)) throw new Error(record(data) && typeof data.message === 'string' ? data.message : 'The backend returned an incomplete proposal section.');
   const c = data.concept;
   if ((body.stage === 'world' || body.stage === 'physical') && !c.productPlan) throw new Error('The new product response has no construction plan. Your accepted version is unchanged.');
+  if ((body.stage==='world'||body.stage==='physical') && (c.constructionIntent?.version!==body.constructionIntent?.version||c.constructionIntent?.action!==body.constructionIntent?.action)) throw new Error('The response does not match your construction choice. Your accepted version is unchanged.');
   if (c.stage !== body.stage || !equalContext(c.context, body.context) || c.sourceWorldId !== body.sourceWorldId || c.sourcePhysicalId !== body.sourcePhysicalId) throw new Error('The response does not match the current proposal. Your accepted version is unchanged.');
   if (body.stage === 'physical' && (JSON.stringify(c.selectedElementIds) !== JSON.stringify(body.selectedElementIds) || c.heroElementId !== body.heroElementId || JSON.stringify(c.replacements || []) !== JSON.stringify(body.replacements || []))) throw new Error('The response does not match your selected story elements.');
   return c;
