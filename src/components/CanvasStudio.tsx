@@ -72,7 +72,7 @@ export default function CanvasStudio() {
       if(s.key==='logo_url'&&/^https?:\/\//i.test(s.value||''))next.logo=s.value;
       if(s.key==='logo_link'&&s.value&&s.value!=='https://example.com')next.link=safeLink(s.value); }); setSettings(next);
   });return()=>{live=false;};},[]);
-  useEffect(()=>{document.title=`${settings.title}｜异趣伙伴 — ${studioBrand.headline}`;},[settings.title]);
+  useEffect(()=>{document.title=`${settings.title}｜异趣伙伴 — ${studioBrand.pageTitleSuffix}`;},[settings.title]);
   useEffect(()=>{const abort=new AbortController();setReady(null);supportsCanvasGeneration(abort.signal).then(value=>{if(!abort.signal.aborted)setReady(value);});return()=>abort.abort();},[readinessAttempt]);
   useEffect(()=>{if(hasStarted)setSaveProblem(!saveCanvasSession(session));},[session,hasStarted]);
   useEffect(()=>()=>{run.current++;controller.current?.abort();inFlight.current=false;afterNavigation.current=null;},[]);
