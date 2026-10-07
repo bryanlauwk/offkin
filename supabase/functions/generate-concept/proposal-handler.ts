@@ -1,3 +1,4 @@
+import { parseProductPlan, productPlanInteraction } from './product-plan.ts';
 import {
   CANVAS_CONTRACT_VERSION, CanvasFailure, parseCanvasDesign, parseCanvasManifest,
   selectWorldElements, type CanvasContext, type CanvasManifest, type CanvasStoredRow,
@@ -69,6 +70,7 @@ function modelBoundary(sources: (Source | null)[], customerText: unknown) {
     design: item.manifest.design, context: item.manifest.context, worldElements: item.manifest.worldElements,
     selectedElementIds: item.manifest.selectedElementIds, heroElementId: item.manifest.heroElementId,
     replacements: item.manifest.replacements, interaction: item.row.interaction || '',
+    ...('productPlan' in item.manifest && item.manifest.productPlan ? { productPlan: item.manifest.productPlan } : {}),
   }) : null;
   const inspect = (value: unknown): unknown => {
     if ([...identifiers(value)].some(id => privateIds.has(id) || !allowed.has(id))) throw new CanvasFailure(502, 'The generator included an unexpected saved reference. Your proposal is unchanged.');
@@ -224,7 +226,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     references: sourceImageIds.map((id, index) => ({ index: index + 1, role: id === previous?.row.id ? 'previous-same-role-image' : id === physical?.row.id ? 'approved-physical-identity' : 'approved-world-artwork' })) };
   const text = await runtime.ai('chat/completions', { model: runtime.textModel,
     messages: [{ role: 'system', content: proposalDesignPrompt(generation.stage) }, { role: 'user', content: JSON.stringify(boundary.sanitize(direction)) }],
-    response_format: { type: 'json_object' }, max_tokens: 6500 });
+    response_format: { type: 'json_object' }, max_tokens: 9500 });
   active();
   const output = boundary.inspect(textResult(text));
   if (record(output) && output.needsContext === true) return respond({ needsContext: true, message: 'Add a little more factual business detail before generating the proposal.' });
@@ -233,9 +235,36 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   if (world) design.brand = world.row.brand;
   boundary.inspect(design);
   const inherited = physical?.manifest;
+  // Product logic precedes every new world/hero image. It is a proposed construction
+  // brief, never CAD or proof of manufacturability. Supplements cannot mutate it.
+  const inheritedPlan = inherited && 'productPlan' in inherited ? inherited.productPlan : undefined;
+  const productPlan = generation.stage === 'world' || generation.stage === 'physical'
+    ? parseProductPlan(record(output) ? output.productPlan : undefined, design.worldElements.map(e => e.id))
+    : inheritedPlan;
+  if (productPlan) {
+    const hero = generation.stage === 'world' ? design.worldElements[0]?.id : generation.heroElementId || inherited?.heroElementId;
+    if (!productPlan.parts.find(part => part.id === productPlan.heroPartId)?.storyElementIds.includes(hero || '')) {
+      throw new CanvasFailure(502, 'The proposed product does not preserve the selected hero. No image was generated.');
+    }
+    if (/^display only[.!]?$/i.test(generation.context.interaction?.trim() || '') && productPlan.actions.length) {
+      throw new CanvasFailure(502, 'The proposed product added an unrequested action. No image was generated.');
+    }
+    if (generation.stage !== 'world' && generation.stage !== 'physical' && record(output) && output.productPlan !== undefined &&
+      canonicalProposal(output.productPlan) !== canonicalProposal(productPlan)) {
+      throw new CanvasFailure(502, 'The visual follow-up changed the saved product construction plan. Your accepted product is unchanged.');
+    }
+    boundary.inspect(productPlan);
+    design.interaction = productPlanInteraction(productPlan);
+  } else if (record(output) && output.productPlan !== undefined) {
+    throw new CanvasFailure(502, 'This legacy image has no saved product plan. Update the physical concept before adding a construction plan.');
+  }
+  // parseCanvasDesign accepts extra keys for legacy compatibility. Never let an
+  // unvalidated model-only productPlan reach the image provider through that path.
+  const { productPlan: _modelPlan, ...visualDesign } = design as typeof design & { productPlan?: unknown };
   const manifest: ProposalManifest = {
     contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION, stage: generation.stage,
     context: generation.context, story: design.story, design: design.design, worldElements: design.worldElements, sourceImageIds,
+    ...(productPlan ? { productPlan } : {}),
     ...(generation.sourceWorldId ? { sourceWorldId: generation.sourceWorldId } : {}),
     ...(generation.sourcePhysicalId ? { sourcePhysicalId: generation.sourcePhysicalId } : {}),
     ...(generation.previousAssetId ? { previousAssetId: generation.previousAssetId } : {}),
@@ -245,8 +274,10 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   const serialized = serializeProposalManifest(manifest);
   // Avoid repeating whole source manifests: their actual images are attached, while all current
   // customer fields and every selected element remain in this bounded, untruncated prompt.
-  const imageDirection = { context: generation.context, heroElementId: direction.heroElementId, references: direction.references };
-  const prompt = proposalImagePrompt(generation.stage, generation.context.mode || 'mechanical') + '\nApproved design JSON:\n' + JSON.stringify(design) + '\nAuthoritative current direction and ordered image references:\n' + JSON.stringify(imageDirection);
+  const imageDirection = { context: generation.context, heroElementId: direction.heroElementId, references: direction.references,
+    productPlan: productPlan || null, constructionStatus: productPlan ? 'unverified-prototype-plan' : 'legacy-visual-only-no-construction-plan' };
+  const legacyImageDirection = !productPlan ? '\nLEGACY VISUAL-ONLY OVERRIDE: No saved productPlan exists for this source. Any general instruction referring to printable parts, planned joins or a construction plan does not apply. Preserve the source identity as a conceptual visual study only. Show isolated conceptual forms, not claimed printable parts, fabricated joints, engineered assembly, CAD or manufacturing evidence. Do not invent a product plan.\n' : '';
+  const prompt = proposalImagePrompt(generation.stage, generation.context.mode || 'mechanical') + legacyImageDirection + '\nApproved design JSON:\n' + JSON.stringify(visualDesign) + '\nAuthoritative current direction and ordered image references:\n' + JSON.stringify(imageDirection);
   if (prompt.length > 32000) throw new CanvasFailure(400, 'This proposal direction is too long for the image model. Please shorten it; no wording was truncated.');
   let body: Record<string, string | number> | FormData = { model: runtime.imageModel, prompt, n: 1, size: '1536x1024', quality: 'medium' };
   if (images.length) {
@@ -258,7 +289,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     images.forEach((image, index) => form.append('image[]', image, `reference-${index + 1}.${image.type.split('/')[1]}`));
     body = form;
   }
-  // The gateway rejected JSON edits. Keep enablement off until this multipart route is verified.
+  // Reference bytes remain multipart; do not downgrade to text-only generation.
   const result = await runtime.ai(images.length ? 'images/edits' : 'images/generations', body);
   active();
   const { bytes, mime } = imageResult(result);

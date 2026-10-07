@@ -34,6 +34,7 @@ export async function requestProposalAsset(body: ProposalRequest, signal: AbortS
   if (record(data) && data.needsContext === true) throw new ProposalContextNeededError(typeof data.message === 'string' && data.message.length <= 1000 ? data.message : 'Tell us a little more about what this business does.');
   if (!record(data) || !isProposalConcept(data.concept)) throw new Error(record(data) && typeof data.message === 'string' ? data.message : 'The backend returned an incomplete proposal section.');
   const c = data.concept;
+  if ((body.stage === 'world' || body.stage === 'physical') && !c.productPlan) throw new Error('The new product response has no construction plan. Your accepted version is unchanged.');
   if (c.stage !== body.stage || !equalContext(c.context, body.context) || c.sourceWorldId !== body.sourceWorldId || c.sourcePhysicalId !== body.sourcePhysicalId) throw new Error('The response does not match the current proposal. Your accepted version is unchanged.');
   if (body.stage === 'physical' && (JSON.stringify(c.selectedElementIds) !== JSON.stringify(body.selectedElementIds) || c.heroElementId !== body.heroElementId || JSON.stringify(c.replacements || []) !== JSON.stringify(body.replacements || []))) throw new Error('The response does not match your selected story elements.');
   return c;

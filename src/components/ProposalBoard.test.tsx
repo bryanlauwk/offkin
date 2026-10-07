@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import ProposalBoard, { type ProposalAssets, type ProposalBoardProps } from './ProposalBoard';
+import { makeProductPlan } from '../test/product-plan-fixture';
 import type { ProposalConcept, ProposalStage } from '@/lib/proposal-api';
 
 const ids = {
@@ -32,7 +33,7 @@ afterEach(cleanup);
 describe('ProposalBoard',()=>{
   it('shows four distinct complete generated visuals with real component and packaging sections',()=>{
     const input=props();const {container}=render(<ProposalBoard {...input}/>);
-    expect(screen.getAllByRole('img').map(img=>img.getAttribute('src'))).toEqual(['world','physical','details','packaging'].map(stage=>`https://images.example/${stage}.png`));
+    expect(screen.getAllByRole('img').map(img=>img.getAttribute('src'))).toEqual(['physical','world','details','packaging'].map(stage=>`https://images.example/${stage}.png`));
     expect(screen.getByRole('heading',{name:'Components & interaction'})).toBeInTheDocument();
     expect(screen.getByRole('heading',{name:'Packaging concept'})).toBeInTheDocument();
     expect(screen.getByRole('heading',{name:'A box that opens into a story'})).toBeInTheDocument();
@@ -41,6 +42,14 @@ describe('ProposalBoard',()=>{
     expect(container.querySelectorAll('[style*="background-image"], [style*="object-position"]')).toHaveLength(0);
     expect(container.querySelector('img[src*="canvas-worlds"]')).toBeNull();
   });
+  it('shows unverified parts and prototype gates only when a valid saved physical plan exists',()=>{
+    const assets=fullAssets();assets.physical!.productPlan=makeProductPlan(['fold','ribbon']);
+    render(<ProposalBoard {...props({assets})}/>);
+    expect(screen.getByRole('region',{name:'Proposed construction plan'})).toHaveTextContent('2 proposed printed parts');
+    expect(screen.getByText(/No CAD, sliced file or physical sample has been validated/)).toBeInTheDocument();
+    expect(screen.getByText(/Parts, joins, assembly and checks before production/)).toBeInTheDocument();
+  });
+  it('labels old visual-only proposals without inventing construction evidence',()=>{render(<ProposalBoard {...props()}/>);expect(screen.getByText(/no construction plan was generated/)).toBeInTheDocument();});
   it('renders exact wording unchanged and keeps element descriptions independently readable',()=>{
     const input=props();const {container}=render(<ProposalBoard {...input}/>);
     expect(container.querySelector('.pb-exact-wording')?.textContent).toBe(input.assets.world!.context.exactWording);
@@ -68,7 +77,7 @@ describe('ProposalBoard',()=>{
     expect(screen.queryByText('Next private direction')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('1 / 4 visuals');
     expect(screen.getByRole('status')).toHaveTextContent('Your current version stays here');
-    expect(screen.getByRole('heading',{name:'A world of paper'})).toBeInTheDocument();
+    expect(screen.getByRole('heading',{name:'Paper town, made tangible'})).toBeInTheDocument();
   });
   it('shows progress but no pending imagery during first generation',()=>{
     const input=props({assets:{},pendingAssets:fullAssets(),updating:true});render(<ProposalBoard {...input}/>);
@@ -137,11 +146,11 @@ describe('ProposalBoard',()=>{
     expect(screen.queryByRole('button',{name:/Enlarge/})).not.toBeInTheDocument();expect(screen.getAllByRole('img')).toHaveLength(4);
   });
   it('keeps long narratives fully available but off the visual hierarchy until opened',()=>{
-    const assets=fullAssets();assets.world=asset('world',{story:'A paper world brings the neighbourhood together. '+ 'A detailed account of its people, places and rituals. '.repeat(15)});
+    const assets=fullAssets();assets.physical=asset('physical',{story:'A paper world brings the neighbourhood together. '+ 'A detailed account of its people, places and rituals. '.repeat(15)});
     const {container}=render(<ProposalBoard {...props({assets})}/>);
     expect(container.querySelector('.pb-story .pb-summary')).toHaveTextContent('A paper world brings the neighbourhood together.');
     const narrative=container.querySelector('.pb-story .pb-narrative')!;
-    expect(narrative).not.toHaveAttribute('open');expect(narrative.querySelector('p')?.textContent).toBe(assets.world.story);
+    expect(narrative).not.toHaveAttribute('open');expect(narrative.querySelector('p')?.textContent).toBe(assets.physical.story);
   });
   it('renders untrusted metadata as text without introducing executable markup',()=>{
     const assets=fullAssets();assets.packaging=asset('packaging',{story:'<img src="https://evil.example/a" onerror="alert(1)">',title:'<script>alert(1)</script>'});

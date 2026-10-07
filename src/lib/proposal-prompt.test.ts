@@ -15,7 +15,7 @@ const request: RevisionPlanRequest = {
 
 describe('proposal prompt corrections from live output review', () => {
   it('versions prompt cache identity separately from saved manifest compatibility', () => {
-    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v3-dimensional-identity-sparse-plans');
+    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v4-printable-product-plan');
     expect(PROPOSAL_STAGE_VERSION).toBe('proposal-assets-v1');
   });
   it.each(['world', 'physical', 'details', 'packaging'] as const)('preserves grounded brand identity and exact wording while excluding invented microcopy for %s', stage => {
@@ -31,6 +31,16 @@ describe('proposal prompt corrections from live output review', () => {
     expect(image).toContain('No invented slogans');
     expect(image).toContain('Do not invent a logo design or verified colour specification from a name alone');
   });
+  it('requires product logic before art and never treats generated plans as production proof',()=>{
+    for(const stage of ['world','physical','details','packaging'] as const){
+      expect(proposalDesignPrompt(stage)).toContain('PRODUCT FIRST');
+      expect(proposalDesignPrompt(stage)).toContain('Generated verification gates remain unverified');
+      expect(proposalImagePrompt(stage,'mechanical')).toContain('common source of truth');
+      expect(proposalImagePrompt(stage,'mechanical')).not.toContain('Do not simplify the creative world for manufacturing');
+    }
+    expect(proposalDesignPrompt('details')).toContain('proposed printable parts or planned subassemblies');
+    expect(proposalDesignPrompt('packaging')).toContain('avoids loading fragile protrusions');
+  });
   it('requires concrete story elements rather than style or palette cards', () => {
     const prompt = proposalDesignPrompt('world');
     expect(prompt).toContain('worldElements must describe concrete meaningful story forms or scenes');
@@ -41,6 +51,7 @@ describe('proposal prompt corrections from live output review', () => {
     const prompt = proposalDesignPrompt('physical');
     expect(prompt).toContain('freestanding, fully dimensional collectible by default');
     expect(prompt).toContain('NOT a tracing template');
+    expect(prompt).toContain('Resolve and return the complete current productPlan before the image');
     expect(prompt).toContain('do NOT preserve the illustration’s rectangular outline');
     expect(prompt).toContain('prohibited unless the customer explicitly requested that form');
     expect(prompt).toContain('retain every selected meaning');
@@ -59,7 +70,7 @@ describe('proposal prompt corrections from live output review', () => {
   it('requests full isolated component forms rather than another hero or crop panels', () => {
     const prompt = proposalDesignPrompt('details');
     expect(prompt).toContain('dedicated landscape component sheet');
-    expect(prompt).toContain('Independently render 4–6');
+    expect(prompt).toContain('4–6 complete planned parts or subassemblies');
     expect(prompt).toContain('entire silhouette');
     expect(prompt).toContain('generous negative space on every side');
     expect(prompt).toContain('Do not repeat a large full hero');
