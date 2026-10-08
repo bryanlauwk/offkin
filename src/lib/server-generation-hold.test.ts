@@ -174,10 +174,12 @@ describe('real public hold and private pilot endpoint boundary', () => {
     expect(JSON.stringify(vi.mocked(fetch).mock.calls)).not.toContain(token);
     expect(state.fallbackWebsite).not.toHaveBeenCalled();
   });
-  it('uses only the native direct reader for a pilot world, never Firecrawl', async () => {
+  it('requires budgeted saved research instead of an unmetered pilot website read', async () => {
     state.access = true;
     const response = await post({ ...world, brand: 'https://example.com' }, { 'x-offkin-invite': token });
-    expect(response.status).toBe(200); expect(state.directWebsite).toHaveBeenCalledOnce(); expect(state.fallbackWebsite).not.toHaveBeenCalled();
+    expect(response.status).toBe(403); expect(state.directWebsite).not.toHaveBeenCalled(); expect(state.fallbackWebsite).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled(); expect(state.query).not.toHaveBeenCalled();
+    expect(state.rpc.mock.calls.map(call=>call[0])).toEqual(['get_pilot_invite_access']);
   });
   it('restores a same-invite completed cache entry without another reservation or provider call', async () => {
     state.access = true;
@@ -283,4 +285,14 @@ describe('real public hold and private pilot endpoint boundary', () => {
     expect(response.status).toBe(403);expect((await response.json()).error).toContain('no revision image');
     expect(fetch).toHaveBeenCalledTimes(9);expect(state.rows).toHaveLength(4);
   });
+});
+
+// A valid invitation cannot bypass the two-read discovery ledger by calling world generation directly.
+it('rejects repeated website-only pilot worlds before cache, reads, reservations or provider dispatch', async () => {
+  state.access = true;
+  for (const body of [{...world,brand:'https://fixture.com/'}, {...world,brand:'https://fixture.com/',context:{}}, {...world,brand:'https://another.com/'}]) {
+    expect((await post(body,{'x-offkin-invite':token})).status).toBe(403);
+  }
+  expect(state.rpc.mock.calls.map(call=>call[0])).toEqual(['get_pilot_invite_access','get_pilot_invite_access','get_pilot_invite_access']);
+  noExternalWork();
 });

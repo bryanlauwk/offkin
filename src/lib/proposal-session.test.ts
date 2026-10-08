@@ -105,3 +105,11 @@ describe('Proposal sessions and immutable versions',()=>{
  });
 
 });
+
+
+it('preserves researched sources locally and in the brief while omitting the private lookup handle from shares',()=>{
+  const s=emptyProposalSession();s.customerIdentity={version:'customer-brand-v1',name:'Fable Finch'};s.context.business='Thoughtful paper gifts';s.brandResearchId='00000000-0000-4000-8000-000000000091';s.brandEvidence=[{url:'https://fable.example/',title:'Fable Finch',excerpt:'Thoughtful paper gifts for celebrations.'}];
+  expect(saveProposalSession(s)).toBe(true);expect(loadProposalSession()?.brandEvidence).toEqual(s.brandEvidence);
+  const share=decodeProposalShare(encodeProposalShare(s));expect(share?.brandEvidence).toEqual(s.brandEvidence);expect(share).not.toHaveProperty('brandResearchId');
+  expect(proposalBrief(s,{})).toContain('Brand research source: Fable Finch');expect(proposalBrief(s,{})).not.toContain(s.brandResearchId);
+});

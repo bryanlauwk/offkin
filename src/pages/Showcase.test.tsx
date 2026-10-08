@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Showcase from './Showcase';
 import { showcaseWorlds, SHOWCASE_IMAGE_NOTE, SHOWCASE_PREVIEW_NOTE } from '@/lib/showcase-worlds';
@@ -7,7 +7,11 @@ import { showcaseWorlds, SHOWCASE_IMAGE_NOTE, SHOWCASE_PREVIEW_NOTE } from '@/li
 const settings = vi.hoisted(() => ({ values: [] as { key: string; value: string }[] }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { from: () => ({ select: async () => ({ data: settings.values }) }) } }));
 
-const renderShowcase = () => render(<MemoryRouter><Showcase /></MemoryRouter>);
+function HistoryControls() {
+  const navigate = useNavigate();
+  return <><button onClick={() => navigate(-1)}>Go back</button><button onClick={() => navigate(1)}>Go forward</button></>;
+}
+const renderShowcase = (entry = '/showcase') => render(<MemoryRouter initialEntries={[entry]}><Showcase /><HistoryControls /></MemoryRouter>);
 beforeEach(() => {
   settings.values = [];
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('A showcase must not generate concepts or submit an inquiry')));
@@ -15,17 +19,47 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Showcase concept previews', () => {
-  it('keeps the approved language and a preview-first journey without inventing a submission', async () => {
+  it('uses concise concept language and a preview-first journey without inventing a submission', async () => {
     renderShowcase();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('From IP to “I Want That”');
-    expect(screen.getByText(/Your business DNA\. Made collectible\./)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Give People Something To Talk About' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Make It LIVE.' })).toBeInTheDocument();
-    expect(screen.getByText('Request a Quote & Build Proposal')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Brand stories.Made collectible.');
+    expect(screen.getByRole('link', { name: /See my concept/ })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('heading', { name: 'What could yours become?' })).toBeInTheDocument();
+    for (const name of ['Preview', 'Proposal', 'Prototype']) expect(screen.getByRole('heading', { name })).toBeInTheDocument();
+    expect(screen.queryByText(/From IP to|Make It LIVE|Give People Something/)).not.toBeInTheDocument();
     expect(screen.getAllByText(SHOWCASE_PREVIEW_NOTE)).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Plan my project' })).toBeEnabled();
     expect(screen.queryByText(/inquiry sent|request submitted|production.ready/i)).not.toBeInTheDocument();
     await waitFor(() => expect(document.title).toBe('Example worlds · OFFKIN'));
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['airbnb', 'a24', 'tesla'])('opens a validated %s inspiration deep link', id => {
+    renderShowcase(`/showcase?brand=${id}`);
+    const world = showcaseWorlds.find(item => item.id === id)!;
+    expect(screen.getByRole('tab', { name: new RegExp(`^${world.brand}`) })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', `sc-${id}`);
+    expect(screen.getByRole('img', { name: world.boardAlt })).toHaveAttribute('src', world.board);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['/showcase', '/showcase?brand=unknown', '/showcase?brand=%3Cscript%3E', '/showcase?brand=TESLA'])('falls back safely for %s', entry => {
+    renderShowcase(entry);
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'sc-airbnb');
+    expect(screen.getByRole('tab', { name: /^Airbnb/ })).toHaveAttribute('tabindex', '0');
+  });
+
+  it('restores selected studies on Back and Forward without duplicate history for repeated clicks', () => {
+    renderShowcase('/showcase?brand=airbnb');
+    fireEvent.click(screen.getByRole('tab', { name: /^A24/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Tesla/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /^Tesla/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'sc-a24');
+    fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'sc-airbnb');
+    fireEvent.click(screen.getByRole('button', { name: 'Go forward' }));
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'sc-a24');
+    expect(screen.getAllByRole('tab').filter(tab => tab.tabIndex === 0)).toHaveLength(1);
     expect(fetch).not.toHaveBeenCalled();
   });
 

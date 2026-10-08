@@ -38,6 +38,8 @@ export type ProposalRequest = {
   stage: ProposalStage;
   brand: string;
   customerIdentity?: CustomerIdentity;
+  /** Owned server research for the initial world only; never public manifest data. */
+  brandResearchId?: string;
   context: CanvasContext;
   constructionIntent?: ConstructionIntent;
   sourceWorldId?: string;
@@ -48,7 +50,7 @@ export type ProposalRequest = {
   heroElementId?: string;
   replacements?: CanvasReplacement[];
 };
-export type ProposalManifest = Omit<ProposalRequest, 'brand'> & {
+export type ProposalManifest = Omit<ProposalRequest, 'brand' | 'brandResearchId'> & {
   stageVersion: typeof PROPOSAL_STAGE_VERSION;
   story: string;
   design: string;
@@ -96,13 +98,14 @@ export const PROPOSAL_CAPABILITIES = {
 const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const text = (v: unknown, max: number, empty = false): v is string => typeof v === 'string' && v.length <= max && (empty || Boolean(v.trim()));
 const onlyKeys = (v: Record<string, unknown>, keys: readonly string[]) => Object.keys(v).every(k => keys.includes(k));
-const requestKeys = ['contractVersion', 'stage', 'brand', 'customerIdentity', 'context', 'constructionIntent', 'sourceWorldId', 'sourcePhysicalId', 'previousAssetId', 'detailsRefinement', 'selectedElementIds', 'heroElementId', 'replacements'];
+const requestKeys = ['contractVersion', 'stage', 'brand', 'customerIdentity', 'brandResearchId', 'context', 'constructionIntent', 'sourceWorldId', 'sourcePhysicalId', 'previousAssetId', 'detailsRefinement', 'selectedElementIds', 'heroElementId', 'replacements'];
 const selectionKeys = ['selectedElementIds', 'heroElementId', 'replacements'];
 export function validateProposalRequest(value: unknown): ProposalRequest {
   if (!record(value) || !onlyKeys(value, requestKeys) || value.contractVersion !== PROPOSAL_CONTRACT_VERSION ||
     !PROPOSAL_STAGES.includes(value.stage as ProposalStage) || !text(value.brand, 300) || value.brand.trim().length < 2 || !isCanvasContext(value.context)) {
     throw new CanvasFailure(400, 'Use a complete, supported proposal brief. Your wording has not been shortened.');
   }
+  if (value.brandResearchId !== undefined && (value.stage !== 'world' || !isConceptId(value.brandResearchId) || !isCustomerIdentity(value.customerIdentity))) throw new CanvasFailure(400, 'Use owned brand research only for its exact initial brand world.');
   if (value.customerIdentity !== undefined && !isCustomerIdentity(value.customerIdentity)) throw new CanvasFailure(400, 'Supply an exact customer brand name of 1–120 characters.');
   if (value.constructionIntent !== undefined && (!isConstructionIntent(value.constructionIntent) || (value.stage !== 'world' && value.stage !== 'physical'))) throw new CanvasFailure(400, 'Choose a supported construction action for the new world or physical concept.');
   if (value.previousAssetId !== undefined && !isConceptId(value.previousAssetId)) throw new CanvasFailure(400, 'Choose a valid previous proposal image.');
@@ -131,7 +134,7 @@ export function validateRevisionPlanRequest(value: unknown): RevisionPlanRequest
   }
   return value as RevisionPlanRequest;
 }
-const manifestKeys = [...requestKeys.filter(k => k !== 'brand'), 'stageVersion', 'story', 'design', 'worldElements', 'sourceImageIds', 'conceptPreview', 'productPlan', 'constructionOrigin'];
+const manifestKeys = [...requestKeys.filter(k => k !== 'brand' && k !== 'brandResearchId'), 'stageVersion', 'story', 'design', 'worldElements', 'sourceImageIds', 'conceptPreview', 'productPlan', 'constructionOrigin'];
 const prefix = 'OFFKIN_PROPOSAL_V10\n';
 export function isProposalManifest(value: unknown): value is ProposalManifest {
   if (!record(value) || !onlyKeys(value, manifestKeys) || value.stageVersion !== PROPOSAL_STAGE_VERSION ||

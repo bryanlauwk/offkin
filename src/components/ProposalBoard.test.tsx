@@ -83,7 +83,7 @@ describe('ProposalBoard',()=>{
     const input=props({assets:{},pendingAssets:fullAssets(),updating:true});render(<ProposalBoard {...input}/>);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('4 / 4 visuals');
-    expect(screen.getByText('Packaging concept is not ready yet')).toBeInTheDocument();
+    expect(screen.queryByText('Packaging concept is not ready yet')).not.toBeInTheDocument();expect(screen.getByText(/Its dimensional concept is next/)).toBeInTheDocument();
     expect(screen.queryByText('A box that opens into a story')).not.toBeInTheDocument();
   });
   it('does not count empty-image metadata as a completed pending visual',()=>{

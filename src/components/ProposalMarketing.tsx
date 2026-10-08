@@ -1,3 +1,5 @@
+import './brand-example-strip.css';
+
 type Artwork = 'hero' | 'stories' | 'editions' | 'experiences' | 'world' | 'collectible' | 'components' | 'packaging' | 'footer';
 
 // Standalone generated marketing assets. Atlas viewports never contain website UI.
@@ -22,19 +24,18 @@ export function MarketingArtwork({ kind, className = '' }: { kind: Artwork; clas
 }
 
 const applications = [
-  { art: 'stories', title: 'From IP to “I Want That”', copy: 'Turn your identity into a richly layered, tangible showcase with a silhouette people remember.', note: 'Our focus' },
-  { art: 'editions', title: 'Give People Something To Talk About', copy: 'Give a launch, campaign or collaboration a story people can discover, discuss and keep.', note: 'An application to explore' },
-  { art: 'experiences', title: 'Make It LIVE', copy: 'Imagine playful discoveries and proposed interactions, then shape a realistic build proposal around the idea.', note: 'An application to explore' },
+  { art: 'stories', title: 'Gifts worth keeping', copy: 'Give clients and teams a personal piece of your brand story.' },
+  { art: 'editions', title: 'Launches with a keepsake', copy: 'Turn a campaign or milestone into something people can take home.' },
+  { art: 'experiences', title: 'Display with a story', copy: 'Give a desk, shelf or shared space a reason to look closer.' },
 ] as const;
 
 export default function ProposalMarketing() {
-  return <section id="proposal-collectibles" className="op-applications" tabIndex={-1} aria-labelledby="op-applications-title">
-    <h2 id="op-applications-title">Small objects. Bigger possibilities.</h2>
-    <p className="op-applications-intro">One brand story can take different forms.</p>
-    <div className="op-application-grid">{applications.map(({ art, title, copy, note }, index) => <article key={art}>
+  return <section id="proposal-collectibles" className="op-applications op-benefits" tabIndex={-1} aria-labelledby="op-applications-title">
+    <h2 id="op-applications-title">Made for moments that matter.</h2>
+    <div className="op-application-grid">{applications.map(({ art, title, copy }) => <article key={art}>
       <MarketingArtwork kind={art}/>
-      <div className="op-application-copy"><span className="op-application-number" aria-hidden="true">0{index + 1}</span><div><h3>{title}</h3><p>{copy}</p><small>{note}</small></div></div>
+      <div className="op-application-copy"><div><h3>{title}</h3><p>{copy}</p></div></div>
     </article>)}</div>
-    <p className="op-art-disclaimer">Illustrative concepts from our visual direction. Your proposal starts with your own story.</p>
+    <p className="op-art-disclaimer">Illustrative concept artwork.</p>
   </section>;
 }

@@ -52,6 +52,9 @@ export type ProposalRuntime = {
   pilotInviteId?: string;
   assertSourceAccess?(row: StoredRow): void;
   readWebsite?(url: string): Promise<{url:string;title:string;excerpt:string}>;
+  /** Private website worlds must use their budgeted owned discovery; no unmetered read path. */
+  requireBrandResearch?: boolean;
+  resolveBrandResearch?(id: string, brandName: string, website: string): Promise<{evidence:{url:string;title:string;excerpt:string};digest:string}>;
   recoveryOnly?: boolean;
   beforeAssetSave?():void;
   completeAsset?(id:string):Promise<void>;
@@ -157,6 +160,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   const isPlan = record(input) && input.action === 'plan-revision';
   const request = isPlan ? validateRevisionPlanRequest(input) : validateProposalRequest(input);
   active();
+  if (runtime.requireBrandResearch && !isPlan && 'stage' in request && request.stage === 'world' && request.brand !== 'no-website' && !request.brandResearchId) throw new CanvasFailure(403, 'Use this invitation’s saved brand research for a website-backed world, or continue with a factual story without a website.');
   if (!runtime.enabled || !supportsProposalModel(runtime.imageModel)) throw new CanvasFailure(503, 'Complete proposal generation is not enabled yet. Your brief is saved; no AI request was sent.');
   const load = async (id: string, stage: ProposalStage): Promise<Source> => {
     const { data: row, error } = await db.from('brick_concepts').select(columns).eq('id', id).maybeSingle();
@@ -301,7 +305,12 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     catch (error) { throw new CanvasFailure(400, error instanceof Error ? error.message : 'Enter a public company website.'); }
   }
   if (generation.stage === 'world' && !websiteUrl && !generation.context.business?.trim()) return respond({ needsContext: true, message: 'Tell us what the business does so this proposal starts with real facts.' });
-  const cacheKey = await runtime.hash(canonicalProposal({ ...(runtime.cacheScope?{pilotScope:runtime.cacheScope}:{}),contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION, promptRevision: PROPOSAL_PROMPT_REVISION,
+  let research: {evidence:{url:string;title:string;excerpt:string};digest:string} | undefined;
+  if (generation.brandResearchId) {
+    if (!runtime.resolveBrandResearch || !customerIdentity || generation.stage !== 'world') throw new CanvasFailure(403, 'Brand research requires its active private invitation.');
+    research = await runtime.resolveBrandResearch(generation.brandResearchId, customerIdentity.name, websiteUrl);
+  }
+  const cacheKey = await runtime.hash(canonicalProposal({ ...(research ? {brandResearchDigest:research.digest} : {}), ...(runtime.cacheScope?{pilotScope:runtime.cacheScope}:{}),contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION, promptRevision: PROPOSAL_PROMPT_REVISION,
     request: generation, generationMode: previewFirst ? 'creative-preview' : 'legacy-engineering', conceptPreviewVersion: previewFirst ? CONCEPT_PREVIEW_VERSION : undefined, customerIdentity, customerIdentityVersion:CUSTOMER_IDENTITY_VERSION, websiteUrl, sourceManifests: Array.from(sources.values()).map(s => ({ id: s.row.id, brand:s.row.brand, manifest: s.manifest })),
     ...(briefIntent || inheritedCompiled?.version==='construction-origin-v2' ? { briefConstructionIdentity:{semantics:BRIEF_CONSTRUCTION_SEMANTICS,promptRevision:BRIEF_PROMPT_REVISION,intent:briefIntent||(inheritedCompiled?.version==='construction-origin-v2'?inheritedCompiled.intent:undefined)} } : {}),
     ...(binding || inheritedCompiled?.version==='construction-origin-v1' ? { constructionIdentity: { semantics:CONSTRUCTION_SEMANTICS, promptRevision:CONSTRUCTION_PROMPT_REVISION, ...(binding ? {binding} : {}) } } : {}),
@@ -314,8 +323,8 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     const recovered=await runtime.reserve(generation);if(recovered)return recovered;
     throw new CanvasFailure(409,'No saved result is available for this exact attempt. No generation was started.');
   }
-  let website: { url: string; title: string; excerpt: string } | null = null;
-  if (generation.stage === 'world' && websiteUrl) {
+  let website: { url: string; title: string; excerpt: string } | null = research?.evidence ?? null;
+  if (!research && generation.stage === 'world' && websiteUrl) {
     try { website = await (runtime.readWebsite||readCompanyWebsite)(websiteUrl); }
     catch (error) {
       if (error instanceof WebsiteReadError && error.status === 400) throw new CanvasFailure(400, error.message);

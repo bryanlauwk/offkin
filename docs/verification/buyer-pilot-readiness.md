@@ -1,11 +1,13 @@
 # OFFKIN five-buyer pilot readiness
 
-Scope: preserve the existing rich editorial design while turning interest into a reviewable project brief and a WhatsApp conversation. The source begins at verified GitHub main `89f22a946c6b076d7b65e5fbdb3800f8a5e2db38`; the local synthetic history is not a remote ancestor.
+Scope: one brand-name or website input, evidence-based discovery, a rich collectible-led preview, then a design-proposal request and WhatsApp conversation. Preserve the existing editorial visual language and privacy protections. The source begins at verified GitHub main `89f22a946c6b076d7b65e5fbdb3800f8a5e2db38`; the local synthetic history is not a remote ancestor.
 
 ## Buyer journey
 
-- Home explains collectible gifting for clients, teams and events. The approved headline and campaign phrases remain intact.
-- While public AI access is paused, “Plan my project” opens a usable brief immediately. Showcase browsing and the optional saved brand-story composer remain available.
+- Home uses “Your brand. Made collectible.” with one concrete explanation of gifting, launches and display. Three example studies sit immediately beside the entry, separate from customer work. Repeated campaign slogans and duplicate process sections are removed.
+- An invited buyer enters a brand name or URL and explicitly chooses “See my concept”. Online discovery uses source evidence, with a small follow-up only for ambiguous or insufficient identity. A factual manual-story fallback is clearly distinguished from research. Audience, quantity, budget and date do not block the preview.
+- Public visitors can explore the studies, open their invitation, or prepare a design enquiry. Online search and paid generation remain server-gated.
+- The illustrated world appears while its dependent collectible is made. The actual collectible becomes the main result immediately, with an adjacent proposal request; details and packaging follow automatically. No additional image is invented or inferred from a crop.
 - Showcase enquiries carry the chosen study as inspiration only. They never copy its identity, images or story into a buyer's generated proposal.
 - Corporate and personal paths share the initial idea step. One-off availability is explicitly unconfirmed.
 - Quantity, ideal in-hands date, total/per-piece budget with currency, size/display setting and contact are progressive, optional inputs. They do not constrain the creative preview.
@@ -30,7 +32,15 @@ Read-only access checks do not generate images. Quotas and expiry come from the 
 
 The current ledger grants one attempt per initial stage (world, hero, details, packaging) and one narrow revision. It is not a flexible five-attempt retry pool: a consumed failed stage can block later slots. The UI identifies blocked attempts and provides saved-output recovery or an owner-help route. Adding a new counted retry would require a separately reviewed change; no quota refund or ambiguous redispatch is implemented.
 
-The intended five-invite package and protected backend setup require owner approval and independent security review before activation. Failed/disconnected provider attempts may count. A single-image revision is details-only or packaging-only; a broader redesign cannot be promised within that allowance. Existing legacy capability-link restore behavior is retained, not upgraded into authenticated private viewing.
+The five-invite package remains subject to the database/security release gates. The added research and separate QA allocation require their specifically approved scope before activation. Failed/disconnected provider attempts may count. A single-image revision is details-only or packaging-only; a broader redesign cannot be promised within that allowance. Existing legacy capability-link restore behavior is retained, not upgraded into authenticated private viewing.
+
+## Online discovery and separate QA
+
+The source adapter supports an existing direct Firecrawl connection or an explicitly approved managed gateway mapping. Search transport is not yet live-verified. All activation flags default off. Name discovery allows one search per allocation, up to five results, with no paid scraping, automatic retry, search refinement or extra research-model call. At most two bounded native website reads supply factual evidence. Website-backed private generation requires the owned ready research record and reuses it; omission cannot bypass the read ledger. Only no-website manual stories can generate without research.
+
+The five buyers retain their 25-image/30-text total. The separately bounded QA allocation allows one “Stive Asia” lookup, up to five image attempts and six supporting text calls, expires within 24 hours and must be revoked after verification. Total discovery ceilings are six searches and twelve native page reads across buyer and QA allocations. Failure and uncertain dispatches count. Search billing is provider-dependent; request caps are not a fixed currency bill. Source contracts and exact provider limitations are documented in `BRAND_DISCOVERY_BACKEND.md`.
+
+Sources persist with the local preview and detailed brief, while the private research lookup handle is excluded from ordinary sharing and exports. Recovery of a saved lookup never starts a new search or automatically starts image generation. A buyer explicitly continues from recovered research.
 
 ## Verification and release gates
 
@@ -50,10 +60,10 @@ Interactive unpublished QA is not established. The permitted cloud browser canno
 
 Before buyer invitations are sent:
 1. Review the exact source and security migration, approve activation scope and bounded spending.
-2. Apply only the approved private schema/privileges with the campaign disabled. Run the isolated PostgreSQL verification pack for migration validity, role/grant denial, transaction rollback, replay, quota boundaries and genuine two-connection reservation/dispatch races. Structural or mocked tests are not a substitute. No real token issuance or activation is allowed until these results pass and are reviewed.
-3. Only after that database gate, issue exactly five revocable invitations through the approved administrative route.
-4. Merge/publish/deploy only with approval; inspect the exact resulting source for drift.
-5. Verify public anonymous and legacy paid paths are blocked, restores still work, valid invite checks match quotas, and no unauthorized paid acceptance call is made.
+2. After explicit approval for the connected-database test target, run the independently reviewed isolated-schema fixture packet. It must cover both migrations, actual roles/grants, rollback, buyer/QA separation, search/read caps, replay and observed overlapping-session reservation/dispatch races. Use only synthetic fixtures and enumerated RESTRICT cleanup; never apply the destructive disposable-database reset to an existing database. Structural or mocked tests are not a substitute.
+3. Apply the reviewed protected production schema with buyer access inactive only after the database gate passes. Issue the separately authorized QA allocation, and merge/publish/deploy within the approved single deployment request. Inspect exact deployed source for drift.
+4. Perform the explicitly authorized real “Stive Asia” lookup and full four-image generation, one narrow revision if allowed, pixel/lineage review, restore/recovery and enquiry/download/handoff checks. Report actual request usage and any provider billing evidence. Revoke QA immediately afterwards.
+5. Verify anonymous and legacy paid paths remain blocked and old saved restores work. Only after all gates pass, create and activate exactly five buyer allocations and privately deliver their links to the owner. Do not spend their allowance on QA.
 6. Test actual phone browser, keyboard/focus, long fields, clear/revisit, WhatsApp opening and manual file attachment. Sending a real message still requires the tester's explicit action.
 7. Review one real prototype before making physical-quality or delivery claims.
 
@@ -61,22 +71,16 @@ Before buyer invitations are sent:
 
 Use five relevant buyers with real gifting responsibility or a plausible near-term brief. A 20-minute session:
 - Ask what they think OFFKIN offers after ten seconds, and whether the examples look like real products.
-- Let them find a relevant study and plan their own project without explanation.
+- Let them find a relevant study, enter their own brand, inspect its evidence and generated collectible, then request a proposal without explanation.
 - Observe saving/downloading and the reviewed WhatsApp handoff.
 - Ask what they expect next, then capture actual purpose/recipients, quantity, budget, date, decision-maker involvement and consent to a concrete next discussion.
 
 Record comprehension, unassisted completion, wrong expectations, blockers, confidence and qualified next steps. The first two sessions diagnose blockers; remaining sessions verify corrections. Visual compliments alone are not commercial validation. Do not treat passing source tests as production or buyer-validation proof.
 
-## Source verification recorded 2026-10-08
+## Verification status
 
-- Full Vitest suite: 1,499 tests passed across 54 files.
-- TypeScript application and Node configs: passed.
-- Production Vite build: passed; existing large-chunk advisory remains.
-- ESLint: zero errors, eight pre-existing warnings in game/UI components.
-- Mocked generation-contract CLI and git whitespace checks: passed.
-- Independent source re-review: no remaining source-level paid-route, quota-bypass, cross-invite access/cache or credential-export blocker found after recovery fixes.
-- Disposable database runner: Python syntax and help checks passed. No SQL or fixture was executed; PostgreSQL migration/role/concurrency verification remains required.
-- No generated image requests, WhatsApp messages, database mutations, invite issuance, merge, publication or deployment occurred in this source pass.
-- The chosen-hero image save is the simple phone handoff; HTML remains the accessible complete export. A raster PDF was assessed and deferred to avoid a multi-hour exporter/font/QA expansion. Real phone download, Files/gallery selection and manual WhatsApp attachment remain a post-publication test gate; a programmatic download click is not proof of saving or sending.
+The streamlined revision passed 1,592 tests across 61 files. Application/Node TypeScript checks, production build, mocked generation-contract CLI and whitespace checks passed; ESLint has zero errors and eight pre-existing warnings. Independent source reviews covered the new backend boundary and the frontend recovery, provenance and progressive hero-handoff paths. The final remote head is recorded in the pull request. These are source/mocked checks, not live-provider or database verification.
 
-Phone-handoff size check: the existing selected 1536×1024 PNG hero is 2.60 MiB versus 15.23 MiB for its complete HTML brief. The ordinary-image export preserves the source bytes and has been inspected locally; no new concept image or provider call was made. Mobile browser download/attachment behavior is still not verified.
+The original and expanded migrations have not been executed against PostgreSQL. A supported isolated runtime could not create its Unix socket, and no security workaround was attempted. The changed existing-database fixture target requires its own approval and reviewed packet. No real token, provider call, migration, merge or deployment is implied by passing local tests.
+
+The chosen-hero image save remains the simple phone handoff; HTML is the complete detailed export. A PDF was assessed and deferred. An existing inspected 1536×1024 PNG hero is 2.60 MiB versus 15.23 MiB for its complete HTML brief. The ordinary-image export preserves the source bytes. Actual phone download, gallery/Files selection and manual WhatsApp attachment remain production acceptance gates.

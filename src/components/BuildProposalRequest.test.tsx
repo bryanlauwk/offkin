@@ -170,3 +170,13 @@ it('explains a failed image save and leaves the reviewed text handoff available'
   vi.spyOn(exporter,'prepareCollectibleImage').mockRejectedValue(new Error('private image URL must not leak'));URL.createObjectURL=vi.fn();const f=exportFixture();render(<BuildProposalRequest brief="Current" snapshot={proposalExportSnapshot(f.session,f.all)}/>);fireEvent.click(screen.getByRole('button',{name:'Request a Quote & Build Proposal'}));fireEvent.click(screen.getByRole('button',{name:'Save collectible image'}));
   await screen.findByRole('alert');expect(screen.getByRole('alert')).toHaveTextContent('knowing no image is attached');expect(screen.getByRole('alert')).not.toHaveTextContent('private image URL');fireEvent.click(screen.getByRole('button',{name:'Review WhatsApp enquiry'}));expect(screen.getByRole('link',{name:'Open WhatsApp with this message'})).toBeEnabled();expect(URL.createObjectURL).not.toHaveBeenCalled();
 });
+
+it('keeps a hero download and reviewed WhatsApp handoff stable while additive panels finish',async()=>{
+  const f=exportFixture();const full=proposalExportSnapshot(f.session,f.all);const partial={...full,key:'partial-key',state:'Partial concept',stages:full.stages.map(item=>['world','physical'].includes(item.stage)?item:{...item,asset:undefined,unavailable:'Not generated'})};
+  let resolve!:(v:Awaited<ReturnType<typeof exporter.prepareCollectibleImage>>)=>void;const prepare=vi.spyOn(exporter,'prepareCollectibleImage').mockImplementation(()=>new Promise(done=>{resolve=done;}));URL.createObjectURL=vi.fn(()=> 'blob:hero');URL.revokeObjectURL=vi.fn();vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});
+  const view=render(<BuildProposalRequest compact brief="Partial" snapshot={partial} hasPending/>);fireEvent.click(screen.getByRole('button',{name:'Request a Quote & Build Proposal'}));fireEvent.click(screen.getByRole('button',{name:'Save collectible image'}));const signal=prepare.mock.calls[0][1];
+  view.rerender(<BuildProposalRequest compact brief="Complete" snapshot={full}/>);expect(signal.aborted).toBe(false);expect(screen.getByText(/This brief keeps the version you opened/)).toBeInTheDocument();
+  await act(async()=>resolve({bytes:new Uint8Array([137,80,78,71]),mime:'image/png',filename:'hero.png',sourceHash:'a'.repeat(64)}));expect(URL.createObjectURL).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button',{name:'Review WhatsApp enquiry'}));expect(screen.getByRole('link',{name:/Open WhatsApp/})).toBeInTheDocument();
+  view.rerender(<BuildProposalRequest compact brief="Complete refresh" snapshot={{...full,key:'refreshed'}}/>);expect(screen.getByRole('link',{name:/Open WhatsApp/})).toBeInTheDocument();
+});

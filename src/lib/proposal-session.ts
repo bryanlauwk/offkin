@@ -3,24 +3,34 @@ import { productPlanText, productPlanInteraction } from '../../supabase/function
 import { isCanvasContext, isConceptId } from '../../supabase/functions/generate-concept/canvas';
 import { isCustomerIdentity, isProposalConcept, isDetailsRefinement, DETAILS_REFINEMENT_VERSION, type DetailsRefinement, type CustomerIdentity } from '../../supabase/functions/generate-concept/proposal';
 import { PROPOSAL_STAGES, type ProposalConcept, type ProposalStage, type ProposalRequest } from './proposal-api';
+import type { BrandEvidence } from '../../supabase/functions/generate-concept/brand-discovery-contract';
 import { normalizeCompanyWebsite } from './company-website';
 import { newVersion } from './canvas-session';
 export const PROPOSAL_SESSION_KEY = 'offkin:proposal:v10';
 export type ProposalAssets = Partial<Record<ProposalStage, ProposalConcept>>;
 export type AssetIds = Partial<Record<ProposalStage, string>>;
 export type ProposalScope = 'world' | 'physical' | 'details' | 'packaging';
-export type ProposalVersion = { detailsRefinement?: DetailsRefinement; customerIdentity?: CustomerIdentity; constructionIntent?: ConstructionIntent; id: string; context: ProposalConcept['context']; website: string; assets: AssetIds; selected: string[]; hero: string; replacements: NonNullable<ProposalRequest['replacements']> };
+export type ProposalVersion = { brandResearchId?: string; brandEvidence?: BrandEvidence[]; detailsRefinement?: DetailsRefinement; customerIdentity?: CustomerIdentity; constructionIntent?: ConstructionIntent; id: string; context: ProposalConcept['context']; website: string; assets: AssetIds; selected: string[]; hero: string; replacements: NonNullable<ProposalRequest['replacements']> };
 export type PendingProposal = ProposalVersion & { scope: ProposalScope; previous: AssetIds; instruction: string };
-export type ProposalSession = { customerIdentity?: CustomerIdentity; constructionIntent?: ConstructionIntent; schema: 10; id: string; website: string; context: ProposalConcept['context']; accepted: ProposalVersion | null; pending: PendingProposal | null; turns: { role:'user'|'assistant'; text:string }[] };
+export type ProposalSession = { brandResearchId?: string; brandEvidence?: BrandEvidence[]; customerIdentity?: CustomerIdentity; constructionIntent?: ConstructionIntent; schema: 10; id: string; website: string; context: ProposalConcept['context']; accepted: ProposalVersion | null; pending: PendingProposal | null; turns: { role:'user'|'assistant'; text:string }[] };
 // Unspecified interaction must not contradict a physical action in the business story.
 // Explicit user choices, including Display only, remain in the saved context.
 export const emptyProposalSession = (): ProposalSession => ({schema:10,id:newVersion(),website:'',context:{business:'',angle:'The world we bring together',audience:'Clients & partners',exactWording:'',brandIdentifiers:'',style:'Rich layered collectible world with a distinctive silhouette, expressive details and connected brand storytelling',interaction:'',scale:'Let the story decide'},accepted:null,pending:null,turns:[]});
 const record = (v:unknown):v is Record<string,unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const keys = (v:Record<string,unknown>,allowed:string[]) => Object.keys(v).every(k=>allowed.includes(k));
 const text = (v:unknown,max:number):v is string => typeof v==='string' && v.length<=max;
+function validResearch(v:Record<string,unknown>):boolean {
+  if(v.brandResearchId!==undefined&&!isConceptId(v.brandResearchId))return false;
+  if(v.brandEvidence===undefined)return true;
+  return Array.isArray(v.brandEvidence)&&v.brandEvidence.length<=2&&v.brandEvidence.every(e=>{
+    if(!record(e)||!keys(e,['url','title','excerpt'])||!text(e.url,300)||!text(e.title,160)||!text(e.excerpt,1200))return false;
+    try{const u=new URL(e.url);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&!u.search&&!u.hash&&u.hostname.includes('.');}catch{return false;}
+  });
+}
 function validIds(v:unknown):v is AssetIds { return record(v) && keys(v,[...PROPOSAL_STAGES]) && Object.values(v).every(isConceptId) && new Set(Object.values(v)).size===Object.values(v).length; }
 function validVersion(v:unknown,pending=false): boolean {
-  if (!record(v) || !keys(v,['id','context','website','assets','selected','hero','replacements','constructionIntent','customerIdentity','detailsRefinement',...(pending?['scope','previous','instruction']:[])]) || !text(v.id,80) || !v.id || !isCanvasContext(v.context) || !text(v.website,300) || !validIds(v.assets)) return false;
+  if (!record(v) || !keys(v,['id','context','website','assets','selected','hero','replacements','constructionIntent','customerIdentity','detailsRefinement','brandResearchId','brandEvidence',...(pending?['scope','previous','instruction']:[])]) || !text(v.id,80) || !v.id || !isCanvasContext(v.context) || !text(v.website,300) || !validIds(v.assets)) return false;
+  if (!validResearch(v)) return false;
   if (v.customerIdentity !== undefined && !isCustomerIdentity(v.customerIdentity)) return false;
   if (v.detailsRefinement !== undefined && !isDetailsRefinement(v.detailsRefinement)) return false;
   if (v.constructionIntent !== undefined && !isConstructionIntent(v.constructionIntent)) return false;
@@ -30,7 +40,8 @@ function validVersion(v:unknown,pending=false): boolean {
   return !pending || ['world','physical','details','packaging'].includes(String(v.scope)) && validIds(v.previous) && text(v.instruction,2000);
 }
 export function parseProposalSession(v:unknown):ProposalSession|null {
-  if (!record(v)||!keys(v,['schema','id','website','context','accepted','pending','turns','constructionIntent','customerIdentity'])||v.schema!==10||!text(v.id,80)||!v.id||!text(v.website,300)||!isCanvasContext(v.context)||!(v.accepted===null||validVersion(v.accepted))||!(v.pending===null||validVersion(v.pending,true))) return null;
+  if (!record(v)||!keys(v,['schema','id','website','context','accepted','pending','turns','constructionIntent','customerIdentity','brandResearchId','brandEvidence'])||v.schema!==10||!text(v.id,80)||!v.id||!text(v.website,300)||!isCanvasContext(v.context)||!(v.accepted===null||validVersion(v.accepted))||!(v.pending===null||validVersion(v.pending,true))) return null;
+  if (!validResearch(v)) return null;
   if (v.customerIdentity !== undefined && !isCustomerIdentity(v.customerIdentity)) return null;
   if (v.constructionIntent !== undefined && !isConstructionIntent(v.constructionIntent)) return null;
   if (!Array.isArray(v.turns)||v.turns.length>30||!v.turns.every(t=>record(t)&&keys(t,['role','text'])&&['user','assistant'].includes(String(t.role))&&text(t.text,2000)))return null;
@@ -49,7 +60,8 @@ export function pendingProposal(session:ProposalSession,scope:ProposalScope,cont
   const customerIdentity = session.accepted ? session.accepted.customerIdentity : session.customerIdentity;
   const detailsRefinement: DetailsRefinement | undefined = scope==='details'?{version:DETAILS_REFINEMENT_VERSION,instruction}:scope==='packaging'?session.accepted?.detailsRefinement:undefined;
   if(scope==='details'&&(!session.accepted||!isDetailsRefinement(detailsRefinement)))throw new Error('Open a saved proposal and describe the details change in under 2,000 characters.');
-  return {...(detailsRefinement?{detailsRefinement}:{}),...(customerIdentity ? {customerIdentity:{...customerIdentity}} : {}),...(constructionIntent ? {constructionIntent} : {}),id:newVersion(),context:{...context},website:session.website,assets,scope,previous:{...previous},instruction,selected:scope==='world'?[]:[...(session.accepted?.selected||[])],hero:scope==='world'?'':session.accepted?.hero||'',replacements:scope==='world'?[]:[...(session.accepted?.replacements||[])]};
+  const research=session.accepted||session;
+  return {...(research.brandResearchId?{brandResearchId:research.brandResearchId}:{}),...(research.brandEvidence?{brandEvidence:structuredClone(research.brandEvidence)}:{}),...(detailsRefinement?{detailsRefinement}:{}),...(customerIdentity ? {customerIdentity:{...customerIdentity}} : {}),...(constructionIntent ? {constructionIntent} : {}),id:newVersion(),context:{...context},website:session.website,assets,scope,previous:{...previous},instruction,selected:scope==='world'?[]:[...(session.accepted?.selected||[])],hero:scope==='world'?'':session.accepted?.hero||'',replacements:scope==='world'?[]:[...(session.accepted?.replacements||[])]};
 }
 /** A user-confirmed packaging-only recovery, never an automatic scope reinterpretation. */
 export function confirmedPackagingChange(session:ProposalSession,instruction:string):PendingProposal {
@@ -76,7 +88,7 @@ export function assetsForVersion(version:ProposalVersion|null,all:Record<string,
 }
 export function proposalBrand(website:string):string {if(!website.trim())return 'no-website';const url=normalizeCompanyWebsite(website);if(!url)throw new Error('Check the public website address or leave it empty.');return url;}
 export function requestForStage(version:PendingProposal,stage:ProposalStage,physicalContext?:ProposalConcept['context']):ProposalRequest {
-  const body:ProposalRequest={...(version.customerIdentity?{customerIdentity:{...version.customerIdentity}}:{}),contractVersion:'offkin-proposal-v10',stage,brand:proposalBrand(version.website),context:version.context,...(version.previous[stage]?{previousAssetId:version.previous[stage]}:{})};
+  const body:ProposalRequest={...(stage==='world'&&version.brandResearchId?{brandResearchId:version.brandResearchId}:{}),...(version.customerIdentity?{customerIdentity:{...version.customerIdentity}}:{}),contractVersion:'offkin-proposal-v10',stage,brand:proposalBrand(version.website),context:version.context,...(version.previous[stage]?{previousAssetId:version.previous[stage]}:{})};
   if (stage==='world'&&!isCustomerIdentity(version.customerIdentity)) throw new Error('Enter the exact brand name before generating your proposal.');
   if(stage!=='world')body.sourceWorldId=version.assets.world;
   if(stage==='physical'){body.selectedElementIds=version.selected;body.heroElementId=version.hero;body.replacements=version.replacements;}
@@ -94,18 +106,19 @@ const SHARE_LIMIT=28000;
 /** A bounded current-text snapshot, with image capability IDs only after separate opt-in. */
 export function encodeProposalShare(s:ProposalSession,includeImages=false):string {
   const customerIdentity=s.customerIdentity||s.accepted?.customerIdentity||s.pending?.customerIdentity;
-  const copy:ProposalSession={...(customerIdentity?{customerIdentity:{...customerIdentity}}:{}),schema:10,id:newVersion(),website:s.website,context:s.context,accepted:includeImages?s.accepted:null,pending:null,turns:[]};
+  const publicVersion=(v:ProposalVersion|null)=>{if(!v)return null;const {brandResearchId:_research,...rest}=v;return rest;};
+  const copy:ProposalSession={...(s.brandEvidence?{brandEvidence:s.brandEvidence}:{}),...(customerIdentity?{customerIdentity:{...customerIdentity}}:{}),schema:10,id:newVersion(),website:s.website,context:s.context,accepted:includeImages?publicVersion(s.accepted):null,pending:null,turns:[]};
   if(includeImages&&!isComplete(s.accepted))throw new Error('Complete the proposal before sharing its images.');
   if(!parseProposalSession(copy))throw new Error('This proposal cannot be shared safely.');
   const bytes=new TextEncoder().encode(JSON.stringify(copy));const hash='#proposal='+btoa(Array.from(bytes,b=>String.fromCharCode(b)).join('')).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   if(hash.length>SHARE_LIMIT)throw new Error('This proposal is too long for a reliable link. Download the brief instead.');return hash;
 }
-export function decodeProposalShare(hash:string):ProposalSession|null {try{if(!hash.startsWith('#proposal=')||hash.length>SHARE_LIMIT)return null;const raw=hash.slice(10);if(!/^[A-Za-z0-9_-]+$/.test(raw))return null;const parsed=parseProposalSession(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(atob(raw.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)))));if(!parsed)return null;const {constructionIntent:_choice,...branch}=parsed;if(branch.pending){const {constructionIntent:_pendingChoice,...pending}=branch.pending;branch.pending=pending;}return branch;}catch{return null;}}
+export function decodeProposalShare(hash:string):ProposalSession|null {try{if(!hash.startsWith('#proposal=')||hash.length>SHARE_LIMIT)return null;const raw=hash.slice(10);if(!/^[A-Za-z0-9_-]+$/.test(raw))return null;const parsed=parseProposalSession(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(atob(raw.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0)))));if(!parsed)return null;const {constructionIntent:_choice,brandResearchId:_research,...branch}=parsed;if(branch.pending){const {constructionIntent:_pendingChoice,brandResearchId:_pendingResearch,...pending}=branch.pending;branch.pending=pending;}if(branch.accepted){const {brandResearchId:_acceptedResearch,...accepted}=branch.accepted;branch.accepted=accepted;}return branch;}catch{return null;}}
 export function proposalBrief(s:ProposalSession,all:Record<string,ProposalConcept>,includeVersion=true):string {
   const v=s.accepted||s.pending; const assets=assetsForVersion(v,all); const planSource=assets.physical||assets.world;
   const context=v?.context||s.context; const elements=assets.physical?.worldElements||assets.world?.worldElements||[];
   const selection=(v?.selected||[]).map(id=>{const element=elements.find(e=>e.id===id);return `${id}${id===v?.hero?' (HERO)':''}: ${element?`${element.label} — ${element.description}`:'Saved selection; element description unavailable'}`;});
-  return ['OFFKIN｜异趣伙伴 — Concept preview / build proposal draft',includeVersion?`Version: ${v?.id||s.id}`:'',`Exact brand name: ${JSON.stringify(v?.customerIdentity?.name||(!v?s.customerIdentity?.name:undefined)||assets.world?.brand||'Not supplied')}`,`Website: ${v?.website||(!v?s.website:'')||'Not supplied'}`,...Object.entries(context).map(([k,value])=>`${k}: ${k==='exactWording'?JSON.stringify(value):value}`),
+  return ['OFFKIN｜异趣伙伴 — Concept preview / build proposal draft',includeVersion?`Version: ${v?.id||s.id}`:'',`Exact brand name: ${JSON.stringify(v?.customerIdentity?.name||(!v?s.customerIdentity?.name:undefined)||assets.world?.brand||'Not supplied')}`,`Website: ${v?.website||(!v?s.website:'')||'Not supplied'}`, ...(v?.brandEvidence||s.brandEvidence||[]).map(e=>`Brand research source: ${e.title}\n${e.url}\n${e.excerpt}`),...Object.entries(context).map(([k,value])=>`${k}: ${k==='exactWording'?JSON.stringify(value):value}`),
     `Selected story elements:\n${selection.join('\n')||'Not selected'}`,`Hero element: ${v?.hero||'Not selected'}`,v?.detailsRefinement?`Details refinement: ${v.detailsRefinement.instruction}`:'',`Requested replacements:\n${v?.replacements.length?v.replacements.map(r=>`${r.id}: ${r.label} — ${r.description}`).join('\n'):'None recorded'}`,
     s.pending&&s.accepted?'A revised proposal is unfinished. Assets below are the previous accepted version.':'',...PROPOSAL_STAGES.map(stage=>{const asset=assets[stage];return `${stage.toUpperCase()}: ${asset?`${asset.title}\n${asset.story}\n${asset.productPlan ? productPlanInteraction(asset.productPlan) : asset.interaction}`:v?.assets[stage]?'Saved section; restore its narrative':'Not generated'}`;}),planSource?.productPlan ? (planSource.stage==='world'?'Preliminary product plan; the physical hero is not available here yet.\n\n':'')+productPlanText(planSource.productPlan) : 'Creative concept preview. Construction has not been assessed; no part-count limit or engineered mechanism is implied by the imagery.', 'Concept preview. Final design, functionality and pricing confirmed during the build proposal. Any saved legacy construction plan remains unverified; images are not CAD, validated fits or working prototypes.','Build proposal: assess scope, part counts, materials, scale, tolerances, mechanisms, cost and a realistic production route. Engineering, prototypes and production follow a separately agreed proposal.','Recipient / submission destination: not set. This brief has not been sent. No purchase or manufacturing order has been placed.'].filter(Boolean).join('\n\n');
 }

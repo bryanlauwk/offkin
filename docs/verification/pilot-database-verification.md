@@ -4,14 +4,17 @@ Status: prepared source only. No migration, isolated database fixture, PostgreSQ
 
 ## Scope and required evidence
 
-Before activation, verify the exact migration revision on a disposable PostgreSQL runtime matching the target Supabase PostgreSQL major version. Record the migration SHA-256, server version, test transcript, actual backend IDs, observed lock contention, and cleanup result. A source review, mocked Supabase client, or sequential RPC loop cannot substitute for this evidence.
+Before activation, verify the exact revisions of both ordered migrations on a disposable PostgreSQL runtime matching the target Supabase PostgreSQL major version. Record each migration SHA-256, server version, test transcript, actual backend IDs, observed lock contention, and cleanup result. A source review, mocked Supabase client, or sequential RPC loop cannot substitute for this evidence.
 
 Prepared files:
 
-- `supabase/migrations/20261008070000_pilot_invite_budget.sql`: migration under test
+- `supabase/migrations/20261008070000_pilot_invite_budget.sql`: original generation/invitation migration, applied first
+- `supabase/migrations/20261008133000_pilot_brand_discovery.sql`: additive brand-discovery and separate QA allocation migration, applied second
 - `tests/pilot-db-sequential.sql`: real role and functional assertions within one transaction, followed by rollback
 - `tests/pilot-db-verify.py`: isolated local PostgreSQL harness, including eight genuine two-connection contention cases
-- `src/lib/pilot-invite-migration.test.ts`: fast source-policy regression checks only
+- `src/lib/pilot-invite-migration.test.ts` and `src/lib/brand-discovery-migration.test.ts`: fast source-policy regression checks only
+
+The current harness requires both migrations. Original-only execution is no longer supported by these fixtures. Its functional and contention cases remain buyer-generation regressions: all campaign mutations and scalar budget reads explicitly select `campaign_kind='buyer'`. The separate QA allocation must remain disabled, unissued and unused throughout. This harness does not yet provide database execution coverage for discovery RPCs, QA issuance/expiry/caps, or discovery contention; those remain separate mandatory acceptance gaps before their activation.
 
 The Python harness uses standard-library Python and the official `psql` client. It makes no HTTP/provider calls and reads no application configuration or application secrets. Synthetic ledger digests have no known corresponding bearer token. Mock asset rows use a nonexistent `never-uploaded/fixture.png` path; no images or storage uploads are created.
 
@@ -46,18 +49,18 @@ python3 tests/pilot-db-verify.py \
 
 If the approved runtime uses an extracted official binary, add `--psql /ABSOLUTE/VERIFIED/PATH/psql`. The default does not search inherited PATH, and CLEAN_ENV remains unchanged.
 
-The placeholders must be replaced; this is not a preconfigured connection command. The runner intentionally refuses DSNs and unknown target identities. It verifies the database marker, empty initial schema, role attributes, and local connection route before creating fixtures. It then builds a minimal private `brick_concepts` prerequisite and applies the exact migration to the disposable database only. The initial committed migration must contain one disabled campaign, zero invites, zero operations, and zero consumed budget.
+The placeholders must be replaced; this is not a preconfigured connection command. The runner intentionally refuses DSNs and unknown target identities. It verifies the database marker, empty initial schema, role attributes, and local connection route before creating fixtures. It then builds a minimal private `brick_concepts` prerequisite and applies both exact migrations in order to the disposable database only. The initial committed state must contain two disabled campaign allocations (one buyer and one QA), zero invites, zero operations, zero research rows, and zero consumed budget.
 
-After that fail-closed check, the harness temporarily enables only the disposable fixture campaign and inserts synthetic invite rows. Those are database test fixtures, not bearer tokens or buyer invitations. The sequential fixture rolls back all such rows. Concurrency cases require committed disposable fixture setup so two independent connections can observe the same rows. Between cases and at the end, the runner drops and recreates only the already-verified disposable database's `public` schema. This is destructive to that fixture schema. It never disables audit protections to delete rows in an application database.
+After that fail-closed check, the harness temporarily enables only the disposable buyer fixture campaign and inserts synthetic invite rows. Those are database test fixtures, not bearer tokens or buyer invitations. The sequential fixture rolls back all such rows. Concurrency cases require committed disposable fixture setup so two independent connections can observe the same rows. Between cases and at the end, the runner drops and recreates only the already-verified disposable database's `public` schema. This is destructive to that fixture schema. It never disables audit protections to delete rows in an application database.
 
 ## Single-transaction coverage
 
 The SQL fixture must pass every assertion with `ON_ERROR_STOP=1`:
 
-- Migration remains fail closed: one disabled campaign, explicit activation expiry requirement, no invite/operation rows, RLS enabled.
-- Actual `SET ROLE anon` and `SET ROLE authenticated` reject SELECT, INSERT, UPDATE, DELETE, TRUNCATE, and every pilot RPC with SQLSTATE `42501`. A zero-row response is not accepted as an equivalent result.
+- Combined migrations remain fail closed: separate disabled buyer and QA campaigns, explicit activation expiry requirement, no invite/operation/research rows. Existing buyer-generation tables retain their RLS assertions; discovery RLS execution remains a separate acceptance gap.
+- Actual `SET ROLE anon` and `SET ROLE authenticated` reject SELECT, INSERT, UPDATE, DELETE, TRUNCATE, and every generation pilot RPC with SQLSTATE `42501`. A zero-row response is not accepted as an equivalent result.
 - Actual `service_role` successfully follows the permitted RPC path while lacking DELETE access.
-- The first five lifetime seats work; the sixth fails. Revoking an invite does not recycle a seat, remove audit history, or allow reactivation.
+- The first five lifetime buyer seats work; the sixth buyer seat fails. Revoking an invite does not recycle a seat, remove audit history, or allow reactivation.
 - Issuance stamps exactly 336 hours of invite validity. Expiry extension and revocation reversal fail. An owner-only past-timestamp fixture checks access, reserve, and dispatch denial after expiry.
 - Campaign-disabled, campaign-expired, and invite-revoked states stop both reservations and dispatch claims. They do not refund previously reserved liability.
 - Matching operation/content duplicates return existing state; conflicting payloads under one key fail; changing a client key cannot redispatch the same content. Read-only operation lookup returns `not_found` without allocating any budget, and can return pending, failed, or completed replay state.
@@ -68,7 +71,7 @@ The SQL fixture must pass every assertion with `ON_ERROR_STOP=1`:
 - Separate artificial high-water counter fixtures exercise explicit budget-denial branches. These simulate already-consumed liability; they are not represented as real provider work.
 - Planner dispatch is text-only. Empty, unexpected-field and oversized replay payloads fail. A bounded saved planner reply is returned by duplicate reservation and the read-only recovery RPC, with no additional claim. A matching finish is idempotent; a changed terminal payload is rejected.
 - Owned saved-asset reconciliation rejects foreign owners, recovers an unfinished reservation using an already-saved owned row, prevents terminal result replacement, and allocates no additional budget. Another invite cannot look up that operation.
-- Final transaction rollback restores zero invites, operations, and budget. The Python runner independently reads those post-rollback values.
+- Final transaction rollback restores zero invites, operations, and budget. The Python runner independently reads those post-rollback values and checks that QA stays disabled, unissued and unused.
 
 The expiry test temporarily disables only the invite-lifetime trigger, as the isolated fixture owner, to model fourteen days of elapsed time without waiting fourteen days. It re-enables the trigger before calling the service RPCs and rolls back the entire test. This is explicitly not an application-supported expiry mutation or a production remediation procedure.
 
@@ -93,22 +96,24 @@ These tests prove database atomicity and one-time dispatch permission in the exe
 
 A passing disposable harness is necessary, but its minimal `brick_concepts` prerequisite is not a full Supabase deployment. Before activation, also retain evidence for:
 
-- Applying the migration in an authorized clean full local Supabase schema, including existing migrations, production-equivalent roles/default grants, and the actual PostgREST RPC signatures. The new finish RPC has four arguments, including `response_payload jsonb`; the read-only recovery RPC is `get_pilot_operation(text,text)`.
+- Applying both ordered migrations in an authorized clean full local Supabase schema, including existing migrations, production-equivalent roles/default grants, and the actual PostgREST RPC signatures. The new finish RPC has four arguments, including `response_payload jsonb`; the read-only recovery RPC is `get_pilot_operation(text,text)`.
 - All existing application tests, endpoint mocks, type checks, build, and generation-contract checks on the same source revision.
 - Actual anon/authenticated PostgREST denials and service-role integration in that isolated local stack. No service key may be exposed to the browser. This harness does not bypass or emulate HTTP authentication.
 - Owned saved-asset reconciliation after response/save/finish uncertainty, recovery at zero remaining quota, and free saved-planner replay with provider calls asserted zero. An unresolved operation must never be redispatched.
 - Application validation of stored planner content and source manifests, canonical fingerprinting, invite-scoped cache keys, preserved legacy UUID restores, and malformed-recovery-header behavior. The SQL validates bounded planner envelope shape; it relies on the server to validate complete planner semantics.
-- An explicit final review that the real campaign remains disabled, no real bearer token has been created, no invite has been distributed, and no live paid generation occurred during database verification.
+- Separate discovery/QA database fixtures covering one research per invite, owned recovery, version conflicts, distinct read claims, search/read contention, nonrefundable liability, QA lifetime/caps, and real anon/authenticated denials for all new RPCs and the research table. These are not covered by the existing buyer-generation harness.
+- An explicit final review that both real campaign allocations remain disabled, no real bearer token has been created, no invite has been distributed, and no live paid generation occurred during database verification.
 
 Any failing assertion, missing lock-contention observation, unverified cleanup, missing runtime, or changed migration hash blocks activation. Do not work around a failure by weakening RLS, refunding counters, removing uniqueness constraints, reusing production credentials, or running a paid generation call. Diagnose and fix the source, then repeat the relevant isolated checks. Deployment, activation, real invite creation/distribution, and bounded paid acceptance each still require their own authorization.
 
 ## Evidence record to complete after a real run
 
-- Source commit / migration SHA-256: pending
+- Source commit / both ordered migration SHA-256 values: pending
 - PostgreSQL version / authorized disposable environment: pending
 - Single-transaction role and functional assertions: NOT RUN
 - Eight two-connection races and observed blocker PIDs: NOT RUN
 - Post-rollback zero-state assertions: NOT RUN
 - Final fixture cleanup: NOT RUN
+- Discovery/QA-specific database behavior, RLS and contention: NOT IMPLEMENTED in this harness / NOT RUN
 - Full local Supabase/PostgREST parity checks: NOT RUN
 - Production campaign activation / real invite issuance: NOT AUTHORIZED by this verification pack

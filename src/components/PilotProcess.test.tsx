@@ -1,17 +1,21 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import PilotProcess from './PilotProcess';
+import { SHOWCASE_PREVIEW_NOTE } from '@/lib/showcase-worlds';
+
 afterEach(cleanup);
+
 describe('Buyer-facing commercial process', () => {
-  it('explains the four conditional buying steps with scope, prototype approval and separate costs', () => {
+  it('explains the three conditional steps with scope, real sample approval and separate costs', () => {
     render(<PilotProcess />);
-    for (const name of ['Explore your concept', 'Agree a build proposal', 'Review a real prototype', 'Plan production together']) expect(screen.getByRole('heading', { name })).toBeInTheDocument();
-    expect(screen.getByText(/Design and prototype fees are separate/)).toBeInTheDocument();
-    expect(screen.getByText(/Approve the prototype and any changes before production/)).toBeInTheDocument();
-    expect(screen.getByText(/An enquiry or preview does not place an order/)).toBeInTheDocument();
-    for (const summary of screen.getAllByText(/\?$/)) if (summary.tagName === 'SUMMARY') fireEvent.click(summary);
-    expect(screen.getByText(/Pricing and minimum quantities are not fixed yet/)).toBeInTheDocument();
-    expect(screen.getByText(/No physical prototypes are shown/)).toBeInTheDocument();
-    expect(screen.getByText(/one-off feasibility and availability need to be confirmed/)).toBeInTheDocument();
+    const process = screen.getByRole('region', { name: 'From concept to something real.' });
+    expect(within(process).getAllByRole('listitem')).toHaveLength(3);
+    for (const name of ['Preview', 'Proposal', 'Prototype']) expect(within(process).getByRole('heading', { name })).toBeInTheDocument();
+    expect(screen.getByText(/Design and prototype costs are separate from production/)).toBeInTheDocument();
+    expect(screen.getByText(/Approve its finish and functionality before agreeing production/)).toBeInTheDocument();
+    expect(screen.getByText(SHOWCASE_PREVIEW_NOTE)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('What about price, quantity and timing?'));
+    expect(screen.getByText(/A preview or enquiry does not place an order/)).toBeInTheDocument();
+    expect(screen.queryByText(/\$|RM\s*\d|minimum order of|ships in|guaranteed/i)).not.toBeInTheDocument();
   });
 });

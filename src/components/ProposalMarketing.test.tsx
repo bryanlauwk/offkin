@@ -8,12 +8,13 @@ afterEach(cleanup);
 describe('Illustrative marketing artwork', () => {
   it('keeps all application copy in accessible HTML', () => {
     render(<ProposalMarketing/>);
-    expect(screen.getByRole('heading', { name: 'Small objects. Bigger possibilities.' })).toBeInTheDocument();
-    for (const name of ['From IP to “I Want That”', 'Give People Something To Talk About', 'Make It LIVE']) {
+    expect(screen.getByRole('heading', { name: 'Made for moments that matter.' })).toBeInTheDocument();
+    for (const name of ['Gifts worth keeping', 'Launches with a keepsake', 'Display with a story']) {
       expect(screen.getByRole('heading', { name })).toBeInTheDocument();
     }
-    expect(screen.getByText(/Illustrative concepts from our visual direction/)).toBeInTheDocument();
+    expect(screen.getByText(/Illustrative concept artwork/)).toBeInTheDocument();
     expect(screen.queryAllByRole('img')).toHaveLength(0);
+    expect(screen.queryByText(/From IP to|Make It LIVE|Give People Something/)).not.toBeInTheDocument();
   });
 
   it('uses only the four standalone marketing files with bounded native atlas viewports', () => {

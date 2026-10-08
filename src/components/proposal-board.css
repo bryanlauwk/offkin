@@ -44,3 +44,5 @@
 
 /* Keep a CJK brand name together when it fits; still contain oversized names. */
 .pb-brand{word-break:keep-all;overflow-wrap:anywhere}
+
+.pb-hero-grid--world-first{display:block;max-width:1050px;margin-left:auto;margin-right:auto}.pb-collectible-next{font-size:14px;line-height:1.65;margin:12px 0 24px;color:#554d40}.pb-hero-action{padding:12px 0 20px}.pb-hero-action .op-primary{min-height:48px}.pb-hero-action .op-subtle{font-size:12px;line-height:1.6}.pb-hero-action .op-enquiry-entry{border-top:0}.pb-hero-action .op-primary{white-space:normal}

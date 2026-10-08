@@ -7,7 +7,7 @@ export const EXPORT_IMAGE_LIMIT = 8 * 1024 * 1024;
 export const EXPORT_TOTAL_LIMIT = 24 * 1024 * 1024;
 export const EXPORT_IMAGE_TIMEOUT = 15000;
 const labels: Record<ProposalStage, string> = { world: 'Brand world', physical: 'Collectible hero', details: 'Components & proposed interaction', packaging: 'Packaging concept' };
-export type ExportSnapshot = { key: string; referenceSeed: string; brief: string; state: string; stages: { stage: ProposalStage; asset?: ProposalConcept; unavailable: string }[] };
+export type ExportSnapshot = { key: string; versionKey?: string; referenceSeed: string; brief: string; state: string; stages: { stage: ProposalStage; asset?: ProposalConcept; unavailable: string }[] };
 export type RequestNotes = { quantity: string; timing: string; budget: string; notes: string; projectType?: string; company?: string; story?: string; name?: string; contact?: string; size?: string; destination?: string; inspiration?: string };
 export type PreparedRequest = { html: string; missing: string[]; embedded: number };
 const active = (signal: AbortSignal) => { if (signal.aborted) throw new DOMException('Cancelled', 'AbortError'); };
@@ -29,7 +29,7 @@ export function proposalExportSnapshot(session: ProposalSession, all: Record<str
   // The version UUID is used only for local change detection. It is never written into the file.
   const current = version ? { ...session, customerIdentity: version.customerIdentity, context: version.context, website: version.website } : session;
   const brief = proposalBrief(current, Object.fromEntries(stages.filter(s => s.asset).map(s => [s.asset!.id, s.asset!])), false);
-  return { key: JSON.stringify([version?.id || session.id, brief, stages]), referenceSeed: JSON.stringify([version?.id || session.id, version?.assets, brief]), brief, stages,
+  return { key: JSON.stringify([version?.id || session.id, brief, stages]), versionKey: version?.id || session.id, referenceSeed: JSON.stringify([version?.id || session.id, version?.assets, brief]), brief, stages,
     state: session.accepted ? session.pending ? 'Accepted version shown. An unfinished revision is excluded from this request.' : 'Current accepted concept revision.' : 'Partial concept direction. No complete proposal has been accepted.' };
 }
 

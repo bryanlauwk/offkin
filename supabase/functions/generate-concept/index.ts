@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseSelection, designDirection, type Edition, type GiftFormat } from './options.ts';
-import { readCompanyWebsite, readCompanyWebsiteDirect, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
+import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
 import { websiteReadMessage } from './website-contract.ts';
 import { CANVAS_WORLD_PROMPT, CANVAS_PHYSICAL_PROMPT, canvasImagePrompt, BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION, parseConceptMode, modeDesignDirection, CO_CREATION_CONTRACT_VERSION, MAX_CONTEXT_CHARS, LEGACY_MAX_CONTEXT_CHARS, MAX_REQUEST_BYTES, isCoCreationContext } from './prompt.ts';
 import { CANVAS_CONTRACT_VERSION, CANVAS_CAPABILITIES, CanvasFailure, validateCanvasRequest, canvasCacheInput, parseCanvasManifest, serializeCanvasManifest, restoreCanvasRow, selectWorldElements, parseCanvasDesign, isCanvasContext, type CanvasManifest, type CanvasStoredRow } from './canvas.ts';
@@ -8,6 +8,8 @@ import { PROPOSAL_CONTRACT_VERSION, PROPOSAL_CAPABILITIES, restoreProposalRow } 
 import { handleProposal, supportsProposalModel } from './proposal-handler.ts';
 import { providerCallTimeout } from './proposal-budget.ts';
 import { serverGenerationHeld, SERVER_GENERATION_HOLD_MESSAGE, isRestoreOnlyRequest } from './server-generation-hold.ts';
+import { BRAND_DISCOVERY_VERSION } from './brand-discovery-contract.ts';
+import { brandDiscoveryCapabilities, brandDiscoveryStatus, brandDiscoveryRuntimeFromEnv, handleBrandDiscovery, resolveBrandResearch } from './brand-discovery.ts';
 import { requestPilotDigest, loadPilotAccess, publicPilotAccess, pilotExecution, PILOT_ACCESS_VERSION } from './pilot-access.ts';
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info, x-offkin-invite, x-offkin-recovery','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Cache-Control':'no-store'}});
 const hash = async (s:string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -22,7 +24,7 @@ export async function handleRequest(req: Request) {
  if(req.method==='OPTIONS')return json({});
  if(req.method==='GET'){
   const held=serverGenerationHeld();
-  const sourceCapabilities={prompt_version:PROMPT_VERSION,capabilities:{...CANVAS_CAPABILITIES,...PROPOSAL_CAPABILITIES,proposal:!held&&proposalEnabled(),summary_only:true,electronic_story_scene:true,cocreation:true,context_max_chars:MAX_CONTEXT_CHARS}};
+  const sourceCapabilities={prompt_version:PROMPT_VERSION,brand_discovery:brandDiscoveryStatus(),capabilities:{...CANVAS_CAPABILITIES,...PROPOSAL_CAPABILITIES,...brandDiscoveryCapabilities(),proposal:!held&&proposalEnabled(),summary_only:true,electronic_story_scene:true,cocreation:true,context_max_chars:MAX_CONTEXT_CHARS}};
   const paused=()=>json({ready:false,generation_paused:true,invite_access_ready:false,pilot_access:{version:PILOT_ACCESS_VERSION,authorized:false},daily_limits_enforced:dailyLimitsEnforced(),...sourceCapabilities,reason:SERVER_GENERATION_HOLD_MESSAGE,verification:'Server-enforced hold. No website or AI provider was contacted; saved-link restoration remains a separate read-only request.'},503);
   const url=Deno.env.get('SUPABASE_URL'); const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if(held){
@@ -53,6 +55,16 @@ export async function handleRequest(req: Request) {
   const raw=new TextDecoder().decode(bytesIn);
   let input; try{input=JSON.parse(raw);}catch{return json({error:'Invalid request.'},400);}
   if(!input || typeof input!=='object' || Array.isArray(input))return json({error:'Invalid request.'},400);
+  if (input.contractVersion === BRAND_DISCOVERY_VERSION || ['discover-brand', 'select-brand', 'recover-brand'].includes(input.action)) {
+   if (req.headers.has('x-offkin-recovery')) return json({error:'Use the explicit recover-brand action for saved research.'},400);
+   const digest=await requestPilotDigest(req);
+   if(!digest)return json({error:'Brand discovery requires an active private invitation.'},403);
+   const dbUrl=Deno.env.get('SUPABASE_URL');const serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+   if(!dbUrl||!serviceKey)return json({error:'Brand discovery is unavailable.'},503);
+   const researchDb=createClient(dbUrl,serviceKey);const access=await loadPilotAccess(researchDb,digest);
+   if(!access)return json({error:'Brand discovery requires an active private invitation.'},403);
+   return json(await handleBrandDiscovery(input,req,brandDiscoveryRuntimeFromEnv(researchDb,access)));
+  }
   // This boundary precedes database/cache/source reads and every website/provider
   // route, including legacy generation, revision planning and Firecrawl fallback.
   // A UUID mixed with generation fields is not a read-only restore request.
@@ -123,7 +135,8 @@ export async function handleRequest(req: Request) {
   if(proposal){
    try{
    const result=await handleProposal(input,req,{db,generationMode:'creative-preview',requireCustomerIdentity:true,enabled:recoveryOnly||(Boolean(key)&&enabled&&proposalEnabled()),textModel:Deno.env.get('BRICK_TEXT_MODEL')||'google/gemini-3-flash-preview',imageModel:recoveryOnly&&!supportsProposalModel(proposalImageModel())?'openai/gpt-image-2':proposalImageModel(),ai,hash,respond:json,deliver,
-    ...(pilot?{cacheScope:pilot.inviteId,pilotInviteId:pilot.inviteId,assertSourceAccess:execution!.assertSource,readWebsite:readCompanyWebsiteDirect,recoveryOnly,
+    ...(pilot?{cacheScope:pilot.inviteId,pilotInviteId:pilot.inviteId,assertSourceAccess:execution!.assertSource,requireBrandResearch:true,recoveryOnly,
+      resolveBrandResearch:(id,brandName,website)=>resolveBrandResearch(brandDiscoveryRuntimeFromEnv(db,pilot),id,brandName,website),
       beforeAssetSave:execution!.beforeAssetSave,completeAsset:execution!.completeAsset,completePlanner:execution!.completePlanner,recoverAsset:execution!.recoverAsset}:{}),
     reserve:async(request)=>{
      if(execution){

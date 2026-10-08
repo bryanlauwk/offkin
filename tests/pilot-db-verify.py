@@ -3,6 +3,9 @@
 
 No service installation, TCP/URL connection, app environment loading, credentials,
 provider HTTP calls, real tokens, or production migration command is supported.
+Requires both ordered pilot migrations; original-only execution is no longer
+supported. Buyer generation regressions only: QA remains inactive and unissued;
+discovery/QA behavioral and contention acceptance needs separate future fixtures.
 """
 from __future__ import annotations
 
@@ -19,7 +22,10 @@ import time
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-MIGRATION = ROOT / "supabase/migrations/20261008070000_pilot_invite_budget.sql"
+MIGRATIONS = (
+    ROOT / "supabase/migrations/20261008070000_pilot_invite_budget.sql",
+    ROOT / "supabase/migrations/20261008133000_pilot_brand_discovery.sql",
+)
 SEQUENTIAL = ROOT / "tests/pilot-db-sequential.sql"
 MARKER = "OFFKIN_PILOT_ISOLATED_DISPOSABLE_V1"
 # Explicitly ignore ambient PG*, application secrets, .pgpass, and service files.
@@ -158,31 +164,34 @@ select json_build_object('database',current_database(),'version',current_setting
         if initial:
             require(result["public_objects"] == 0, "Initial database must have an empty public schema")
             print(json.dumps({"runtime": result["version"], "database": self.database,
-                              "migration_sha256": hashlib.sha256(MIGRATION.read_bytes()).hexdigest()}))
+                              "migration_sha256": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in MIGRATIONS}}))
 
     def reset(self) -> None:
         self.guard()
         # This destructive statement is reachable only after the marked, empty,
         # disposable database guard. No application database is a supported target.
         self.run("begin; drop schema public cascade; create schema public;\n" + BOOTSTRAP
-                 + MIGRATION.read_text() + "\ncommit;")
+                 + "\n".join(path.read_text() for path in MIGRATIONS) + "\ncommit;")
         self.dirty = True
         result = json_result(self.run("""
 select json_build_object('campaigns',(select count(*) from public.pilot_campaigns),
  'disabled',(select bool_and(not enabled) from public.pilot_campaigns),
  'invites',(select count(*) from public.pilot_invites),
- 'operations',(select count(*) from public.pilot_operations));
+ 'operations',(select count(*) from public.pilot_operations),
+ 'research',(select count(*) from public.pilot_brand_research));
 """))
-        require(result == {"campaigns": 1, "disabled": True, "invites": 0, "operations": 0},
-                "Migration did not fail closed")
+        require(result == {"campaigns": 2, "disabled": True, "invites": 0, "operations": 0, "research": 0},
+                "Combined migrations did not fail closed")
+        self.assert_qa_unused()
 
     def seed(self, count: int = 1, high_water: bool = False) -> None:
         # Isolated fixture state only; there is deliberately no bearer token.
         liability = ",image_attempts_reserved=24,text_dispatches_reserved=29" if high_water else ""
         self.run("begin; set local role service_role; "
                  "update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days'"
-                 + liability + "; insert into public.pilot_invites(campaign_id,token_digest) "
-                 f"select c.id,lpad(to_hex(n),64,'0') from public.pilot_campaigns c,generate_series(1,{count}) n; commit;")
+                 + liability + " where campaign_kind='buyer'; insert into public.pilot_invites(campaign_id,token_digest) "
+                 f"select c.id,lpad(to_hex(n),64,'0') from public.pilot_campaigns c,generate_series(1,{count}) n where c.campaign_kind='buyer'; commit;")
+        self.assert_qa_unused()
 
     def race(self, name: str, first_sql: str, second_sql: str, rollback_first: bool = False) -> tuple[dict, dict]:
         a = Session(self.command, "pilot_verify_" + name + "_a")
@@ -210,13 +219,24 @@ select json_build_object('campaigns',(select count(*) from public.pilot_campaign
             a.close()
 
     def counters(self) -> dict:
+        self.assert_qa_unused()
         return json_result(self.run("""
 select json_build_object('images',c.image_attempts_reserved,'texts',c.text_dispatches_reserved,
  'operations',(select count(*) from public.pilot_operations),
  'text_claims',(select count(*) from public.pilot_operations where text_dispatched_at is not null),
  'image_claims',(select count(*) from public.pilot_operations where image_dispatched_at is not null))
-from public.pilot_campaigns c;
+from public.pilot_campaigns c where c.campaign_kind='buyer';
 """))
+
+    def assert_qa_unused(self) -> None:
+        result = self.run("""
+select (select count(*)=1 and bool_and(not enabled and expires_at is null and seats_issued=0
+  and image_attempts_reserved=0 and text_dispatches_reserved=0 and brand_researches_reserved=0
+  and brand_searches_reserved=0 and brand_reads_reserved=0)
+  from public.pilot_campaigns where campaign_kind='qa')
+  and not exists(select 1 from public.pilot_invites where campaign_kind='qa');
+""")
+        require(result == ["t"], "Buyer fixtures touched the separate QA allocation")
 
     def cleanup(self) -> None:
         if self.dirty:
@@ -280,7 +300,7 @@ def run_cases(h: Harness) -> None:
             "Global atomic high-water counters incorrect")
 
     h.reset(); h.seed()
-    kill = "update public.pilot_campaigns set enabled=false; select json_build_object('killed',true);"
+    kill = "update public.pilot_campaigns set enabled=false where campaign_kind='buyer'; select json_build_object('killed',true);"
     _, denied = h.race("kill_before_waiter", kill, reserve(1))
     require(denied.get("reason") == "pilot_disabled", "Waiter ignored committed kill switch")
     require(h.counters()["operations"] == 0, "Killed waiter allocated budget")

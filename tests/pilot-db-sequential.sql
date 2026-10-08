@@ -1,4 +1,8 @@
 -- RUN ONLY through pilot-db-verify.py in its explicitly marked disposable DB.
+-- Requires BOTH ordered source migrations: 20261008070000_pilot_invite_budget.sql
+-- then 20261008133000_pilot_brand_discovery.sql. Original-only execution is no
+-- longer supported by this fixture. It exercises BUYER generation regression;
+-- QA issuance/activation and discovery RPC concurrency need separate fixtures.
 -- Single-transaction functional/role checks, NOT concurrency evidence.
 -- Synthetic digests have no known bearer preimage; no provider is ever contacted.
 -- Test activation, owner-only clock fixtures, invites and mock results all ROLLBACK.
@@ -30,7 +34,7 @@ language plpgsql security invoker set search_path = pg_catalog as $$
 declare result uuid;
 begin
   insert into public.pilot_invites(campaign_id, token_digest)
-    select id, lpad(to_hex(n), 64, '0') from public.pilot_campaigns returning id into result;
+    select id, lpad(to_hex(n), 64, '0') from public.pilot_campaigns where campaign_kind='buyer' returning id into result;
   return result;
 end;
 $$;
@@ -58,7 +62,8 @@ end;
 $$;
 
 -- Fresh migration must be disabled and empty before any fixture activation.
-select pilot_verify.assert_true((select count(*) = 1 and bool_and(not enabled) and sum(seats_issued) = 0
+select pilot_verify.assert_true((select count(*) = 2 and count(*) filter (where campaign_kind='buyer') = 1
+  and count(*) filter (where campaign_kind='qa') = 1 and bool_and(not enabled) and sum(seats_issued) = 0
   and sum(image_attempts_reserved) = 0 and sum(text_dispatches_reserved) = 0 from public.pilot_campaigns), 'inactive migration');
 select pilot_verify.assert_true((select count(*) = 0 from public.pilot_invites), 'no issued invites');
 select pilot_verify.assert_true((select count(*) = 3 and bool_and(relrowsecurity) from pg_class
@@ -119,7 +124,7 @@ declare n integer; invited uuid;
 begin
   perform pilot_verify.assert_true(current_user = 'service_role','actual service role');
   for n in 1..5 loop invited := pilot_verify.new_invite(n); end loop;
-  perform pilot_verify.assert_true((select seats_issued = 5 from public.pilot_campaigns),'fifth seat allowed');
+  perform pilot_verify.assert_true((select seats_issued = 5 from public.pilot_campaigns where campaign_kind='buyer'),'fifth seat allowed');
   perform pilot_verify.expect_state('select pilot_verify.new_invite(6)','23514','sixth seat denied');
   perform pilot_verify.assert_true((select bool_and(expires_at-created_at = interval '336 hours') from public.pilot_invites),'14 day issuance expiry');
   perform pilot_verify.expect_state('update public.pilot_invites set expires_at=expires_at+interval ''1 hour''','23514','cannot extend invite');
@@ -127,7 +132,7 @@ begin
   perform pilot_verify.expect_state('update public.pilot_invites set revoked_at=null where revoked_at is not null','23514','cannot un-revoke');
   perform pilot_verify.expect_state('delete from public.pilot_invites','42501','cannot delete issued seat');
   perform pilot_verify.expect_state('select pilot_verify.new_invite(6)','23514','revocation does not recycle seat');
-  perform pilot_verify.expect_state('update public.pilot_campaigns set enabled=true','23514','expiry required to activate');
+  perform pilot_verify.expect_state('update public.pilot_campaigns set enabled=true where campaign_kind=''buyer''','23514','expiry required to activate');
 end;
 $test$;
 rollback to seat_lifetime;
@@ -141,16 +146,16 @@ begin
   invite := pilot_verify.new_invite(1);
   perform pilot_verify.assert_true(public.get_pilot_invite_access(lpad('1',64,'0'))->>'reason'='pilot_disabled','inactive credential denied');
   perform pilot_verify.assert_true(pilot_verify.reserve(1,'gate_world','world')->>'reason'='pilot_disabled','disabled reserve');
-  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days';
+  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days' where campaign_kind='buyer';
   r := pilot_verify.reserve(1,'gate_world','world'); op := (r->>'operation_id')::uuid;
-  update public.pilot_campaigns set enabled=false;
+  update public.pilot_campaigns set enabled=false where campaign_kind='buyer';
   perform pilot_verify.assert_true(public.claim_pilot_dispatch(op,'text')->>'reason'='pilot_disabled','kill blocks dispatch');
   perform pilot_verify.assert_true(pilot_verify.reserve(1,'gate_again','world')->>'reason'='pilot_disabled','kill blocks reserve');
-  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()-interval '1 hour';
+  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()-interval '1 hour' where campaign_kind='buyer';
   perform pilot_verify.assert_true(public.get_pilot_invite_access(lpad('1',64,'0'))->>'reason'='pilot_expired','campaign expiry access');
   perform pilot_verify.assert_true(public.claim_pilot_dispatch(op,'text')->>'reason'='pilot_expired','campaign expiry dispatch');
   perform pilot_verify.assert_true(pilot_verify.reserve(1,'gate_again','world')->>'reason'='pilot_expired','campaign expiry reserve');
-  update public.pilot_campaigns set expires_at=clock_timestamp()+interval '30 days';
+  update public.pilot_campaigns set expires_at=clock_timestamp()+interval '30 days' where campaign_kind='buyer';
   update public.pilot_invites set revoked_at=clock_timestamp() where id=invite;
   perform pilot_verify.assert_true(public.get_pilot_invite_access(lpad('1',64,'0'))->>'reason'='invite_revoked','revoked access');
   perform pilot_verify.assert_true(public.claim_pilot_dispatch(op,'text')->>'reason'='invite_revoked','revoked dispatch');
@@ -164,7 +169,7 @@ rollback to gates;
 savepoint invite_expiry;
 set local role service_role;
 select pilot_verify.new_invite(1);
-update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days';
+update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days' where campaign_kind='buyer';
 select pilot_verify.reserve(1,'expiry_world','world');
 reset role;
 alter table public.pilot_invites disable trigger enforce_pilot_invite_lifetime;
@@ -182,7 +187,7 @@ do $test$
 declare r jsonb; op uuid;
 begin
   perform pilot_verify.new_invite(1);
-  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days';
+  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days' where campaign_kind='buyer';
   perform pilot_verify.assert_true(public.get_pilot_operation(lpad('1',64,'0'),repeat('f',64))->>'status'='not_found','read-only recovery miss');
   perform pilot_verify.assert_true((select count(*)=0 from public.pilot_operations),'lookup did not reserve');
   r:=pilot_verify.reserve(1,'unknown_world','world'); op:=(r->>'operation_id')::uuid;
@@ -199,10 +204,10 @@ begin
   perform pilot_verify.assert_true(public.get_pilot_operation(lpad('1',64,'0'),md5('unknown_world')||md5('unknown_world'))->>'status'='failed','lookup failed without refund');
   perform pilot_verify.assert_true(pilot_verify.reserve(1,'new_world_key','world')->>'reason'='stage_consumed','new content cannot buy a retry');
   perform pilot_verify.assert_true(public.claim_pilot_dispatch(op,'image')->>'reason'='operation_terminal','failed operation cannot continue');
-  perform pilot_verify.assert_true((select image_attempts_reserved=1 and text_dispatches_reserved=1 from public.pilot_campaigns),'unknown conservatively consumes full pipeline');
+  perform pilot_verify.assert_true((select image_attempts_reserved=1 and text_dispatches_reserved=1 from public.pilot_campaigns where campaign_kind='buyer'),'unknown conservatively consumes full pipeline');
   perform pilot_verify.expect_state('update public.pilot_operations set text_dispatched_at=null','23514','cannot rewind claim');
   perform pilot_verify.expect_state('update public.pilot_invites set image_attempts_reserved=0,text_dispatches_reserved=0','23514','cannot refund invite');
-  perform pilot_verify.expect_state('update public.pilot_campaigns set image_attempts_reserved=0,text_dispatches_reserved=0','23514','cannot refund campaign');
+  perform pilot_verify.expect_state('update public.pilot_campaigns set image_attempts_reserved=0,text_dispatches_reserved=0 where campaign_kind=''buyer''','23514','cannot refund campaign');
 end;
 $test$;
 rollback to uncertain;
@@ -215,7 +220,7 @@ declare owner1 uuid; owner2 uuid; foreign_result uuid:=gen_random_uuid(); saved_
   alternate_result uuid:=gen_random_uuid(); r jsonb; op uuid; fp text:=md5('recover_world')||md5('recover_world');
 begin
   owner1:=pilot_verify.new_invite(1); owner2:=pilot_verify.new_invite(2);
-  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days';
+  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days' where campaign_kind='buyer';
   r:=pilot_verify.reserve(1,'recover_world','world'); op:=(r->>'operation_id')::uuid;
   perform pilot_verify.assert_true((public.claim_pilot_dispatch(op,'text')->>'allowed')::boolean,'recovery original text claim');
   perform pilot_verify.assert_true((public.claim_pilot_dispatch(op,'image')->>'allowed')::boolean,'recovery original image claim');
@@ -233,7 +238,7 @@ begin
   perform pilot_verify.assert_true(r->>'status'='completed' and (r->>'result_id')::uuid=saved_result,'read-only saved asset replay');
   perform pilot_verify.assert_true(public.claim_pilot_dispatch(op,'image')->>'reason'='operation_terminal','recovery never grants another dispatch');
   perform pilot_verify.assert_true(not (public.get_pilot_invite_access(lpad('1',64,'0'))->>'blocked_attempt')::boolean,'reconciled operation clears blocked indicator');
-  perform pilot_verify.assert_true((select image_attempts_reserved=1 and text_dispatches_reserved=1 from public.pilot_campaigns),'reconciliation charges zero additional liability');
+  perform pilot_verify.assert_true((select image_attempts_reserved=1 and text_dispatches_reserved=1 from public.pilot_campaigns where campaign_kind='buyer'),'reconciliation charges zero additional liability');
 end;
 $test$;
 rollback to saved_asset_recovery;
@@ -243,7 +248,7 @@ set local role service_role;
 do $test$
 declare n integer; w uuid; p uuid; d uuid; pack uuid; foreign_w uuid; revised uuid; r jsonb; op uuid; payload jsonb;
 begin
-  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days';
+  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days' where campaign_kind='buyer';
   for n in 1..5 loop
     perform pilot_verify.new_invite(n);
     w:=pilot_verify.asset(n,'world_'||lpad(n::text,3,'0'),'world');
@@ -284,10 +289,10 @@ begin
     perform pilot_verify.assert_true((select image_attempts_reserved=5 and planner_attempts_reserved=1 and text_dispatches_reserved=6
       from public.pilot_invites where token_digest=lpad(to_hex(n),64,'0')),'per-invite 5 image / 6 text ceiling');
   end loop;
-  perform pilot_verify.assert_true((select image_attempts_reserved=25 and text_dispatches_reserved=30 from public.pilot_campaigns),'global exact 25 / 30 ceiling');
+  perform pilot_verify.assert_true((select image_attempts_reserved=25 and text_dispatches_reserved=30 from public.pilot_campaigns where campaign_kind='buyer'),'global exact 25 / 30 ceiling');
   perform pilot_verify.assert_true((select count(*)=30 from public.pilot_operations),'exact operation conservation');
-  perform pilot_verify.expect_state('update public.pilot_campaigns set image_attempts_reserved=26','23514','26th image constraint');
-  perform pilot_verify.expect_state('update public.pilot_campaigns set text_dispatches_reserved=31','23514','31st text constraint');
+  perform pilot_verify.expect_state('update public.pilot_campaigns set image_attempts_reserved=26 where campaign_kind=''buyer''','23514','26th image constraint');
+  perform pilot_verify.expect_state('update public.pilot_campaigns set text_dispatches_reserved=31 where campaign_kind=''buyer''','23514','31st text constraint');
   perform pilot_verify.expect_state('update public.pilot_invites set image_attempts_reserved=6,text_dispatches_reserved=7','23514','sixth image/seventh text constraint');
   perform pilot_verify.expect_state('update public.pilot_invites set planner_attempts_reserved=2','23514','second planner constraint');
 end;
@@ -302,7 +307,7 @@ do $test$
 declare w uuid;
 begin
   perform pilot_verify.new_invite(1); perform pilot_verify.new_invite(2);
-  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days',image_attempts_reserved=24,text_dispatches_reserved=29;
+  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days',image_attempts_reserved=24,text_dispatches_reserved=29 where campaign_kind='buyer';
   w:=pilot_verify.asset(1,'last_global_image','world');
   perform pilot_verify.assert_true(pilot_verify.reserve(2,'past_global_image','world')->>'reason'='campaign_budget_exhausted','global high water denial');
   perform pilot_verify.assert_true((select count(*)=1 from public.pilot_operations),'denied global request has no operation');
@@ -315,13 +320,19 @@ do $test$
 declare w uuid;
 begin
   perform pilot_verify.new_invite(1);
-  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days',image_attempts_reserved=4,text_dispatches_reserved=5;
+  update public.pilot_campaigns set enabled=true,expires_at=clock_timestamp()+interval '30 days',image_attempts_reserved=4,text_dispatches_reserved=5 where campaign_kind='buyer';
   update public.pilot_invites set image_attempts_reserved=4,planner_attempts_reserved=1,text_dispatches_reserved=5;
   w:=pilot_verify.asset(1,'last_invite_image','world');
   perform pilot_verify.assert_true(pilot_verify.reserve(1,'past_invite_image','physical',w)->>'reason'='invite_budget_exhausted','per-invite high water denial');
 end;
 $test$;
 rollback to per_invite_guard;
+
+select pilot_verify.assert_true((select count(*)=1 and bool_and(not enabled and expires_at is null
+  and seats_issued=0 and image_attempts_reserved=0 and text_dispatches_reserved=0
+  and brand_researches_reserved=0 and brand_searches_reserved=0 and brand_reads_reserved=0)
+  from public.pilot_campaigns where campaign_kind='qa'), 'QA allocation untouched');
+select pilot_verify.assert_true((select count(*)=0 from public.pilot_invites where campaign_kind='qa'), 'no QA fixtures issued');
 
 rollback;
 select 'PASS: sequential fixtures rolled back; this is not concurrency evidence';

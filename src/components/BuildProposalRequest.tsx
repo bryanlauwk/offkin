@@ -8,9 +8,19 @@ import { clearEnquiryDraft, emptyEnquiryDraft, ENQUIRY_LIMITS, readEnquiryDraft,
 type Props = { brief: string; snapshot?: ExportSnapshot; disabled?: boolean; hasPending?: boolean; draftKey?: string; compact?: boolean; projectEntry?: boolean; inspiration?: string; initialContext?: { company?: string; story?: string; projectType?: EnquiryDraft['projectType'] } };
 
 /** Local draft only. Adding a destination requires an explicitly approved sending flow. */
-export default function BuildProposalRequest({ brief, snapshot, disabled = false, hasPending = false, draftKey = 'project', compact = false, projectEntry = false, inspiration = '', initialContext }: Props) {
+export default function BuildProposalRequest({ brief: liveBrief, snapshot: liveSnapshot, disabled = false, hasPending = false, draftKey = 'project', compact = false, projectEntry = false, inspiration = '', initialContext }: Props) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  const [captured, setCaptured] = useState<{ brief: string; snapshot: ExportSnapshot; hasPending: boolean } | null>(null);
+  // Additive panels in this same preview must not interrupt a handoff already
+  // reviewed. A changed version or replaced image still invalidates it normally.
+  const frozen = Boolean(open && captured?.hasPending && captured.snapshot.versionKey &&
+    captured.snapshot.versionKey === liveSnapshot?.versionKey && captured.snapshot.stages.every(old =>
+      !old.asset || liveSnapshot.stages.find(next => next.stage === old.stage)?.asset?.id === old.asset.id));
+  const snapshot = frozen ? captured!.snapshot : liveSnapshot;
+  const brief = frozen ? captured!.brief : liveBrief;
+  const displayedPending = frozen ? captured!.hasPending : hasPending;
+  const additiveProgress = frozen && captured!.snapshot.key !== liveSnapshot?.key;
   const [step, setStep] = useState<'idea' | 'details'>(projectEntry ? 'idea' : 'details');
   const [loaded] = useState(() => readEnquiryDraft(draftKey));
   const [draft, setDraft] = useState<EnquiryDraft>(loaded.draft);
@@ -48,6 +58,7 @@ export default function BuildProposalRequest({ brief, snapshot, disabled = false
     setDraft(next); const stored = saveEnquiryDraft(draftKey, next); setSaved(stored); setStorageError(!stored); clearResult(); setClearConfirm(false);
   }
   function show() {
+    setCaptured(liveSnapshot ? { brief: liveBrief, snapshot: structuredClone(liveSnapshot), hasPending } : null);
     const current = readEnquiryDraft(draftKey);
     const base = storageError ? draft : current.draft;
     const next = { ...base, company: base.company || initialContext?.company || '', story: base.story || initialContext?.story || '', inspiration: inspiration || base.inspiration, projectType: !current.restored && !storageError ? initialContext?.projectType || base.projectType : base.projectType };
@@ -95,13 +106,14 @@ export default function BuildProposalRequest({ brief, snapshot, disabled = false
   const whatsappMessage = enquiryWhatsAppMessage(draft, Boolean(snapshot));
   const field = (key: keyof EnquiryDraft, label: string, placeholder: string, options: { multiline?: boolean; autoComplete?: string; hint?: string } = {}) => <label key={key} htmlFor={`${id}-${key}`}>{label} <span>(optional)</span>{options.multiline ? <textarea id={`${id}-${key}`} value={draft[key]} rows={3} maxLength={ENQUIRY_LIMITS[key]} onChange={event => update(key, event.target.value)} placeholder={placeholder} aria-describedby={options.hint ? `${id}-${key}-hint` : undefined} /> : <input id={`${id}-${key}`} value={draft[key]} maxLength={ENQUIRY_LIMITS[key]} onChange={event => update(key, event.target.value)} placeholder={placeholder} autoComplete={options.autoComplete} aria-describedby={options.hint ? `${id}-${key}-hint` : undefined} />}{options.hint && <small id={`${id}-${key}-hint`}>{options.hint}</small>}</label>;
   return <section className={compact ? 'op-enquiry-entry' : 'op-build-request'} aria-label={compact ? 'Plan your project' : undefined} aria-labelledby={compact ? undefined : `${id}-title`}>
-    {!compact && <div><p className="op-eyebrow">FROM PREVIEW TO POSSIBILITY</p><h2 id={`${id}-title`}>Make It LIVE</h2><p>Like the direction? Shape the realistic build around the idea.</p><p className="op-subtle">{CONCEPT_PREVIEW_NOTE}</p></div>}
+    {!compact && <div><p className="op-eyebrow">FROM PREVIEW TO POSSIBILITY</p><h2 id={`${id}-title`}>Make this your next project.</h2><p>Like the direction? Shape the realistic build around the idea.</p><p className="op-subtle">{CONCEPT_PREVIEW_NOTE}</p></div>}
     <button ref={trigger} className="op-primary" disabled={disabled} onClick={show}>{projectEntry ? 'Plan my project' : 'Request a Quote & Build Proposal'}<ArrowUpRight size={16} aria-hidden="true"/></button>
     <p className="op-subtle">{projectEntry ? 'Prepare a project brief. No preview required.' : 'Your chosen concept and notes come with you.'} Draft first, then discuss on WhatsApp.</p>
     <Dialog open={open} onOpenChange={value => { if (!value) { cancel(); clearResult(); setClearConfirm(false); } setOpen(value); }}><DialogContent className="op-dialog op-enquiry-dialog" onCloseAutoFocus={event => { event.preventDefault(); trigger.current?.focus(); }}>
       <DialogHeader><DialogTitle>{projectEntry ? 'Your project brief' : 'Your quote & build-proposal brief'}</DialogTitle><DialogDescription>Prepare your brief, then review a short enquiry for OFFKIN on WhatsApp. Download your brief to attach yourself. Nothing is sent automatically.</DialogDescription></DialogHeader>
       <p className="op-draft-state">Local draft · Not sent{saved && !storageError ? ' · Saved in this browser' : ''}</p>
-      {hasPending && <p className="op-warning">Your preview has unfinished sections. The draft identifies what is ready and what still needs work.</p>}
+      {displayedPending && <p className="op-warning">Your preview has unfinished sections. The draft identifies what is ready and what still needs work.</p>}
+      {additiveProgress && <p className="op-subtle">More of your preview is ready. This brief keeps the version you opened; close and reopen it to include the newly completed sections.</p>}
       {snapshot && <div className="op-request-context"><strong>Your displayed concept is included</strong><p>The chosen revision, original brief, story selections and available images will be in your download. No need to describe them again.</p></div>}
       {draft.inspiration && <p className="op-subtle">Inspiration: {draft.inspiration}. This unofficial study is a reference only, not your brand or a generated customer result.</p>}
       <h3 ref={stepHeading} tabIndex={-1} className="op-enquiry-step">{step === 'idea' ? '1 / What do you have in mind?' : projectEntry ? '2 / Shape the next conversation' : 'Shape the next conversation'}</h3>
