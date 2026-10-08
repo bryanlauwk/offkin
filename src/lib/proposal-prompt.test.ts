@@ -24,7 +24,7 @@ describe('proposal prompt corrections from live output review', () => {
     expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('Diagnostics are bounded');
   });
   it('versions prompt cache identity separately from saved manifest compatibility', () => {
-    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v8-creative-preview');
+    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v9-attached-details');
     expect(PROPOSAL_STAGE_VERSION).toBe('proposal-assets-v1');
   });
   it('keeps historical engineering plan validation isolated from public preview prompts', () => {
@@ -99,21 +99,36 @@ describe('proposal prompt corrections from live output review', () => {
     expect(proposalImagePrompt('world', 'mechanical')).not.toContain('Component forms must be complete, independently rendered');
     expect(proposalImagePrompt('world', 'mechanical')).not.toContain('Default packaging is ONE');
   });
-  it('requests full isolated component forms rather than another hero or crop panels', () => {
-    const prompt = proposalDesignPrompt('details');
-    expect(prompt).toContain('dedicated landscape component sheet');
-    expect(prompt).toContain('4–6 complete conceptual forms or visual groups');
-    expect(prompt).toContain('entire silhouette');
-    expect(prompt).toContain('generous negative space on every side');
-    expect(prompt).toContain('Do not repeat a large full hero');
-    expect(prompt).toContain('No zoom windows, close-up rectangles, cropped scene fragments');
-    expect(prompt).toContain('not proof of detachable manufactured parts');
+  it('uses bounded attached-context details instead of detached modules or another hero', () => {
+    for (const prompt of [proposalDesignPrompt('details'), proposalImagePrompt('details')]) {
+      expect(prompt).toContain('bounded close-up clusters of the same assembled collectible');
+      expect(prompt).toContain('not one group per metadata card');
+      expect(prompt).toContain('retain enough adjacent architecture');
+      expect(prompt).toContain('Attached-context closeups are allowed');
+      expect(prompt).toContain('Do not repeat a large full hero');
+      expect(prompt).toContain('new plinth');
+      expect(prompt).toContain('not proof of detachable manufactured parts');
+      expect(prompt).not.toContain('No zoom windows, close-up rectangles');
+      expect(prompt).not.toContain('complete, independently rendered');
+      expect(prompt).toContain('matched before/after pair');
+      expect(prompt).toContain('Lock camera, framing, scale, original mount');
+      expect(prompt).toContain('same object through the same existing opening');
+      expect(prompt).toContain('If a response cannot be shown faithfully');
+      expect(prompt).toContain('lower-priority layout reference only');
+      expect(prompt).toContain('cannot override the physical reference');
+    }
+  });
+  it('plans details without smuggling direction into physical context', () => {
+    expect(PROPOSAL_REVISION_PROMPT).toContain('For scope details, context MUST be exactly {}');
+    expect(PROPOSAL_REVISION_PROMPT).toContain('exact latest instruction');
+    expect(PROPOSAL_REVISION_PROMPT).toContain('new opening, change the action');
+    expect(PROPOSAL_REVISION_PROMPT).toContain('requires physical scope');
   });
   it('forbids a user-journey or implied response for Display only', () => {
     const prompt = proposalImagePrompt('details', 'mechanical');
     expect(prompt).toContain('Display only means static forms only');
     expect(prompt).toContain('no interaction strip, journey storyboard, numbered steps, motion arrows or implied response');
-    expect(proposalDesignPrompt('details')).toContain('ONLY static component forms');
+    expect(proposalDesignPrompt('details')).toContain('ONLY static attached-context details');
   });
   it('defaults packaging to one design and does not authorize inherited variants', () => {
     const design = proposalDesignPrompt('packaging');

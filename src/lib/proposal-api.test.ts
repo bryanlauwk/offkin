@@ -97,3 +97,42 @@ describe('Proposal API fail-closed negotiation',()=>{
  it('keeps cancellation effective before and after a provider response',async()=>{const abort=new AbortController();abort.abort();const fetch=vi.fn();vi.stubGlobal('fetch',fetch);await expect(requestProposalAsset(world,abort.signal)).rejects.toMatchObject({name:'AbortError'});expect(fetch).not.toHaveBeenCalled();});
  it('rejects revision output with invalid context keys',async()=>{vi.stubGlobal('fetch',vi.fn(async(_url,init)=>init.method==='POST'?reply({plan:{scope:'packaging',context:{business:'X',newCredential:'no'},summary:'Blue box'}}):readiness()));await expect(planProposalRevision({contractVersion:'offkin-proposal-v10',action:'plan-revision',instruction:'Blue package',brand:'no-website',context:world.context,sourceWorldId:id,sourcePhysicalId:'00000000-0000-4000-8000-000000000002'},new AbortController().signal)).rejects.toThrow();});
 });
+
+describe('details refinement API response validation', () => {
+  const physicalId = '00000000-0000-4000-8000-000000000002';
+  const detailsId = '00000000-0000-4000-8000-000000000003';
+  const refinement = { version: 'details-refinement-v1' as const, instruction: 'Keep the same slot and original surroundings in the action pair.' };
+  const request: ProposalRequest = { ...world, stage: 'details', sourceWorldId: id, sourcePhysicalId: physicalId, detailsRefinement: refinement };
+  const details = (patch: Partial<ProposalConcept> = {}) => concept({ id: detailsId, stage: 'details', sourceWorldId: id, sourcePhysicalId: physicalId, sourceImageIds: [physicalId], selectedElementIds: ['house'], heroElementId: 'house', replacements: [], detailsRefinement: refinement, ...patch });
+  const planRequest = { contractVersion: 'offkin-proposal-v10' as const, action: 'plan-revision' as const, brand: world.brand, context: world.context, sourceWorldId: id, sourcePhysicalId: physicalId, instruction: refinement.instruction };
+  it.each([undefined, 'details-refinement-v0', 'details-refinement-v2'])('requires exact details capability %j before sending paid work', async version => {
+    const fetch = vi.fn(async () => reply({ ready: true, capabilities: { ...PROPOSAL_CAPABILITIES, proposal_details_refinement_version: version } })); vi.stubGlobal('fetch', fetch);
+    await expect(requestProposalAsset(request, new AbortController().signal)).rejects.toThrow(/not available/);
+    expect(fetch).toHaveBeenCalledOnce(); expect(fetch.mock.calls[0]).toHaveLength(2);
+  });
+  it('sends and receives the exact separate instruction with original physical context', async () => {
+    const fetch = vi.fn(async (_url, init) => init.method === 'POST' ? reply({ concept: details() }) : readiness()); vi.stubGlobal('fetch', fetch);
+    const result = await requestProposalAsset(request, new AbortController().signal);
+    expect(result.detailsRefinement).toEqual(refinement); expect(result.context).toEqual(world.context);
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual(request);
+  });
+  it.each([undefined, { ...refinement, instruction: 'A changed instruction' }])('rejects an absent or changed instruction in a response: %j', detailsRefinement => {
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => init.method === 'POST' ? reply({ concept: details({ detailsRefinement }) }) : readiness()));
+    return expect(requestProposalAsset(request, new AbortController().signal)).rejects.toThrow(/does not match your details refinement/);
+  });
+  it('accepts a details plan without changing accepted packaging context', async () => {
+    const context = { ...world.context, revisionNotes: 'Keep the new navy package.' };
+    const plan = { scope: 'details', context, summary: 'Clarify the existing action.', detailsRefinement: refinement };
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => init.method === 'POST' ? reply({ plan }) : readiness()));
+    await expect(planProposalRevision({ ...planRequest, context }, new AbortController().signal)).resolves.toEqual({ plan });
+  });
+  it.each([
+    { detailsRefinement: undefined }, { detailsRefinement: { ...refinement, instruction: 'Model rewrite' } },
+    { context: { ...world.context, revisionNotes: 'New object' } }, { selectedElementIds: ['house'] },
+    { scope: 'packaging' },
+  ])('rejects modified details plan authority: %j', patch => {
+    const plan = { scope: 'details', context: world.context, summary: 'Clarify the existing action.', detailsRefinement: refinement, ...patch };
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => init.method === 'POST' ? reply({ plan }) : readiness()));
+    return expect(planProposalRevision(planRequest, new AbortController().signal)).rejects.toThrow();
+  });
+});

@@ -349,3 +349,94 @@ describe('customer-authoritative static preview', () => {
     expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1);
   });
 });
+
+describe('details refinement public endpoint with mocked providers only', () => {
+  const refinement = { version: 'details-refinement-v1' as const, instruction: 'Keep the rail, boat and cup in attached context. Show only the original moon turning and more of the same reply through the same slot.' };
+  async function fixture() {
+    const request = { ...worldRequest('static'), context: { ...worldRequest('static').context, interaction: 'Turn the moon to reveal the existing reply through its original slot.' } };
+    const world = await generate(request); const physical = await generate(physicalRequest(world, request));
+    const body: ProposalRequest = { ...request, stage: 'details', sourceWorldId: world.id, sourcePhysicalId: physical.id };
+    const details = await generate(body);
+    resetTransports();
+    return { world, physical, details, body };
+  }
+  it('refines one sheet with original physical context, unchanged source rows and private lower-priority previous details', async () => {
+    const { world, physical, details, body } = await fixture();
+    const accepted = structuredClone(state.rows);
+    const physicalBytes = Uint8Array.from([...Buffer.from(png, 'base64'), 1]);
+    const detailsBytes = Uint8Array.from([...Buffer.from(png, 'base64'), 2]);
+    state.blobs.set(`${physical.id}.png`, physicalBytes); state.blobs.set(`${details.id}.png`, detailsBytes);
+    const result = await generate({ ...body, previousAssetId: details.id, detailsRefinement: refinement });
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1);
+    expect(result.detailsRefinement).toEqual(refinement); expect(result.context).toEqual(physical.context);
+    expect(result.sourceWorldId).toBe(world.id); expect(result.sourcePhysicalId).toBe(physical.id);
+    expect(result.sourceImageIds).toEqual([physical.id]); expect(result).not.toHaveProperty('previousAssetId');
+    expect(result.worldElements).toEqual(physical.worldElements); expect(result.selectedElementIds).toEqual(physical.selectedElementIds);
+    expect(state.rows.slice(0, 3)).toEqual(accepted);
+    const saved = parseProposalManifest(String(state.rows.at(-1)!.story));
+    expect(saved?.sourceImageIds).toEqual([physical.id, details.id]); expect(saved?.previousAssetId).toBe(details.id);
+    const textBody = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    const direction = JSON.parse(textBody.messages[1].content);
+    expect(direction.context).toEqual(physical.context); expect(direction.detailsRefinement).toEqual(refinement);
+    expect(direction.references).toEqual([{ index: 1, role: 'approved-physical-identity' }, { index: 2, role: 'previous-details-layout-only-lower-priority' }]);
+    const form = imageCalls()[0][1]?.body as FormData;
+    const images = form.getAll('image[]') as File[];
+    expect(Array.from(new Uint8Array(await images[0].arrayBuffer()))).toEqual(Array.from(physicalBytes));
+    expect(Array.from(new Uint8Array(await images[1].arrayBuffer()))).toEqual(Array.from(detailsBytes));
+    expect(imagePrompt(0)).toContain(JSON.stringify(refinement));
+    for (const id of [world.id, physical.id, details.id]) {
+      expect(JSON.stringify(direction)).not.toContain(id); expect(imagePrompt(0)).not.toContain(id);
+    }
+    resetTransports();
+    const restored = await (await post({ id: result.id })).json();
+    expect(restored.concept.detailsRefinement).toEqual(refinement);
+    expect(restored.concept.sourceImageIds).toEqual([physical.id]); expect(restored.concept).not.toHaveProperty('previousAssetId');
+    expectNoGeneration();
+  });
+  it('allows no previous details, keys cache by exact instruction, and reuses the same completed refinement', async () => {
+    const { body } = await fixture();
+    const first = await generate({ ...body, detailsRefinement: refinement });
+    resetTransports();
+    expect((await generate({ ...body, detailsRefinement: refinement })).id).toBe(first.id);
+    expect(state.textCalls).toBe(0); expect(state.imageCalls).toBe(0); expect(state.rpc).not.toHaveBeenCalled();
+    const changed = await generate({ ...body, detailsRefinement: { ...refinement, instruction: refinement.instruction + ' Keep the camera lower.' } });
+    expect(changed.id).not.toBe(first.id); expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1);
+    expect(new Set(state.rows.map(row => row.cache_key)).size).toBe(state.rows.length);
+  });
+  it('retains the exact-context guard even when a refinement is supplied', async () => {
+    const { body } = await fixture();
+    const response = await post({ ...body, context: { ...body.context, revisionNotes: refinement.instruction }, detailsRefinement: refinement });
+    expect(response.status).toBe(400); expect((await response.json()).error).toContain('current physical direction');
+    expectNoGeneration();
+  });
+  it('retains lineage checks for an unrelated previous detail sheet', async () => {
+    const { world, details, body } = await fixture();
+    const otherPhysical = await generate({ ...physicalRequest(world), context: { ...world.context, materials: 'A different proposed finish' } });
+    const otherDetails = await generate({ ...body, context: otherPhysical.context, sourcePhysicalId: otherPhysical.id });
+    resetTransports();
+    const response = await post({ ...body, previousAssetId: otherDetails.id, detailsRefinement: refinement });
+    expect(response.status).toBe(400); expect((await response.json()).error).toContain('unrelated physical');
+    expectNoGeneration(); expect(details.sourcePhysicalId).toBe(body.sourcePhysicalId);
+  });
+  it('rejects capability identifiers in the instruction before text or image work', async () => {
+    const { physical, body } = await fixture();
+    const response = await post({ ...body, detailsRefinement: { ...refinement, instruction: `Use ${physical.id} in the caption.` } });
+    expect(response.status).toBe(400); expect((await response.json()).error).toContain('Remove saved-image identifiers');
+    expectNoGeneration();
+  });
+  it('plans details against an accepted packaging-only context without changing its physical authority', async () => {
+    const { world, physical, details, body } = await fixture();
+    const acceptedContext = { ...body.context, revisionNotes: 'Packaging-only navy sleeve.' };
+    const packaging = await generate({ ...body, stage: 'packaging', context: acceptedContext });
+    resetTransports(); state.output = { scope: 'details', context: {}, summary: 'Clarify the original reply reveal.' };
+    const response = await post({ contractVersion: PROPOSAL_CONTRACT_VERSION, action: 'plan-revision', brand: body.brand,
+      context: acceptedContext, instruction: refinement.instruction, sourceWorldId: world.id, sourcePhysicalId: physical.id, detailsId: details.id, packagingId: packaging.id });
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result.plan).toEqual({ scope: 'details', context: acceptedContext, summary: 'Clarify the original reply reveal.', detailsRefinement: refinement });
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(0); expect(state.download).not.toHaveBeenCalled();
+    state.output = undefined;
+    const revised = await generate({ ...body, detailsRefinement: result.plan.detailsRefinement, previousAssetId: details.id });
+    expect(revised.context).toEqual(physical.context); expect(revised.sourcePhysicalId).toBe(physical.id);
+  });
+});

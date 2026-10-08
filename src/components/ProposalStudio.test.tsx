@@ -182,4 +182,15 @@ describe('Complete proposal journey',()=>{
   it('keeps the v9 canvas route available separately',()=>{mount('/?canvas=legacy');expect(screen.getByRole('button',{name:'Generate my brand world'})).toBeInTheDocument();expect(screen.queryByRole('button',{name:'Generate my proposal'})).not.toBeInTheDocument();});
   it('simple mode supports refinement and the build-proposal handoff after a complete preview',async()=>{mocks.simple=true;mount();await introduction();fireEvent.click(screen.getByRole('button',{name:'Generate my proposal'}));await waitFor(()=>expect(screen.getAllByText(/Your complete proposal/).length).toBeGreaterThan(0));expect(screen.getByLabelText('Change your proposal')).toBeEnabled();expect(screen.getByRole('button',{name:'Request a Quote & Build Proposal'})).toBeEnabled();expect(screen.queryByText('Edit details')).toBeNull();expect(screen.getAllByRole('button',{name:/Download brief/}).length).toBeGreaterThan(0);});
   it('simple mode replaces the paused banner with a link to example worlds',async()=>{mocks.simple=true;mocks.paused=true;mocks.ready.mockResolvedValue(false);mount('/');expect(await screen.findByRole('link',{name:/Explore example worlds/})).toHaveAttribute('href','/showcase');expect(screen.queryByText(/Earlier workflow: visual studies only/)).toBeNull();});
+  it('regenerates only details with the original saved physical context after a packaging revision',async()=>{
+    mount();await complete();const original=loadProposalSession()!.accepted!;
+    fireEvent.change(screen.getByLabelText('Change your proposal'),{target:{value:'Make only the box navy'}});fireEvent.click(screen.getByRole('button',{name:'Update proposal'}));await waitFor(()=>expect(mocks.generate).toHaveBeenCalledTimes(5));await screen.findByRole('button',{name:'Update proposal'});
+    const packaged=loadProposalSession()!.accepted!;expect(packaged.context.revisionNotes).toBe('Packaging deep blue; object unchanged');
+    const instruction='Show the attached dial action, with matched close views';
+    mocks.plan.mockImplementationOnce(async body=>({plan:{scope:'details',context:body.context,summary:'Refine only the detail sheet.',detailsRefinement:{version:'details-refinement-v1',instruction:body.instruction}}}));
+    fireEvent.change(screen.getByLabelText('Change your proposal'),{target:{value:instruction}});fireEvent.click(screen.getByRole('button',{name:'Update proposal'}));await waitFor(()=>expect(mocks.generate).toHaveBeenCalledTimes(6));await screen.findByRole('button',{name:'Update proposal'});
+    const request=mocks.generate.mock.calls[5][0];expect(request).toMatchObject({stage:'details',context:original.context,sourceWorldId:original.assets.world,sourcePhysicalId:original.assets.physical,previousAssetId:original.assets.details,detailsRefinement:{version:'details-refinement-v1',instruction}});
+    const refined=loadProposalSession()!.accepted!;expect(refined.context).toEqual(packaged.context);expect(refined.assets.packaging).toBe(packaged.assets.packaging);expect(refined.assets.world).toBe(original.assets.world);expect(refined.assets.physical).toBe(original.assets.physical);
+  });
+
 });

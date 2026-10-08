@@ -1,11 +1,11 @@
 import { CONCEPT_PREVIEW_VERSION } from '../../supabase/functions/generate-concept/concept-preview';
 import { PROPOSAL_GENERATION_PAUSED, PROPOSAL_PAUSE_MESSAGE } from './proposal-availability';
 import {
-  PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGES, hasProposalCapabilities, isCustomerIdentity, isProposalConcept,
-  validateProposalRequest, type CustomerIdentity, type ProposalRequest, type ProposalConcept, type RevisionPlanRequest, type RevisionPlanResponse,
+  PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGES, hasProposalCapabilities, isCustomerIdentity, isDetailsRefinement, isProposalConcept, canonicalProposal,
+  validateProposalRequest, validateRevisionPlanRequest, type CustomerIdentity, type ProposalRequest, type ProposalConcept, type RevisionPlanRequest, type RevisionPlanResponse,
 } from '../../supabase/functions/generate-concept/proposal';
 export { PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGES };
-export type { ProposalRequest, ProposalConcept, ProposalStage, RevisionPlanRequest, RevisionPlanResponse } from '../../supabase/functions/generate-concept/proposal';
+export type { ProposalRequest, ProposalConcept, ProposalStage, DetailsRefinement, RevisionPlanRequest, RevisionPlanResponse } from '../../supabase/functions/generate-concept/proposal';
 export class ProposalContextNeededError extends Error {}
 export class ProposalConstructionNeededError extends Error {}
 export class ProposalUnavailableError extends Error {
@@ -44,6 +44,7 @@ export async function requestProposalAsset(body: ProposalRequest, signal: AbortS
   if (body.customerIdentity && (c.customerIdentity?.version!==body.customerIdentity.version || c.customerIdentity?.name!==body.customerIdentity.name || c.brand!==body.customerIdentity.name)) throw new Error('The response does not match your customer brand. Your accepted version is unchanged.');
   if (c.conceptPreview?.version !== CONCEPT_PREVIEW_VERSION) throw new Error('The new image has no creative-preview metadata. Your accepted version is unchanged.');
   if (c.stage !== body.stage || !equalContext(c.context, body.context) || c.sourceWorldId !== body.sourceWorldId || c.sourcePhysicalId !== body.sourcePhysicalId) throw new Error('The response does not match the current proposal. Your accepted version is unchanged.');
+  if (canonicalProposal(c.detailsRefinement) !== canonicalProposal(body.detailsRefinement)) throw new Error('The response does not match your details refinement. Your accepted version is unchanged.');
   if (body.stage === 'physical' && (JSON.stringify(c.selectedElementIds) !== JSON.stringify(body.selectedElementIds) || c.heroElementId !== body.heroElementId || JSON.stringify(c.replacements || []) !== JSON.stringify(body.replacements || []))) throw new Error('The response does not match your selected story elements.');
   return c;
 }
@@ -55,12 +56,20 @@ export async function restoreProposalAsset(id: string, signal: AbortSignal, expe
   return data.concept;
 }
 export async function planProposalRevision(body: RevisionPlanRequest, signal: AbortSignal): Promise<RevisionPlanResponse> {
+  active(signal); validateRevisionPlanRequest(body);
   if (!await supportsProposalGeneration(signal)) { active(signal); throw new ProposalUnavailableError(); }
   const data = await post(body, signal);
   if (!record(data)) throw new Error('The requested change could not be understood.');
   if (typeof data.clarification === 'string' && data.clarification.trim() && data.clarification.length <= 1000) return { clarification: data.clarification };
   // Validate context through the world request validator rather than trusting model output.
-  if (!record(data.plan) || !['world','physical','packaging'].includes(String(data.plan.scope)) || typeof data.plan.summary !== 'string' || data.plan.summary.length > 1000 || !data.plan.summary.trim()) throw new Error('The requested change could not be understood safely.');
+  if (!record(data.plan) || !['world','physical','details','packaging'].includes(String(data.plan.scope)) || typeof data.plan.summary !== 'string' || data.plan.summary.length > 600 || !data.plan.summary.trim()) throw new Error('The requested change could not be understood safely.');
   validateProposalRequest({ contractVersion: PROPOSAL_CONTRACT_VERSION, stage:'world', brand:body.brand, context:data.plan.context });
+  if (data.plan.scope === 'details') {
+    if (!isDetailsRefinement(data.plan.detailsRefinement) || data.plan.detailsRefinement.instruction !== body.instruction ||
+      !equalContext(data.plan.context as ProposalConcept['context'], body.context) ||
+      Object.keys(data.plan).some(key => !['scope', 'context', 'summary', 'detailsRefinement'].includes(key))) {
+      throw new Error('The details plan changed the accepted direction or instruction. Your accepted version is unchanged.');
+    }
+  } else if (data.plan.detailsRefinement !== undefined) throw new Error('Only a details revision can include a details refinement.');
   return data as unknown as RevisionPlanResponse;
 }

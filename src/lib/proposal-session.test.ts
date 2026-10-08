@@ -93,4 +93,15 @@ describe('Proposal sessions and immutable versions',()=>{
  it('exports and restores the complete proposed construction plan without claiming verification',()=>{const c=asset('physical');c.productPlan=makeProductPlan(['house']);expect(saveProposalSnapshot(c)).toBe(true);expect(loadProposalSnapshot(c.id)?.productPlan).toEqual(c.productPlan);const text=proposalBrief(session(),{[c.id]:c});expect(text).toContain('Proposed joins (unverified)');expect(text).toContain('Manufacturing unknowns');expect(text).toContain('not a CAD model');});
  it('preserves a preliminary saved world plan when physical generation is unfinished',()=>{const s=emptyProposalSession();const world=asset('world');world.productPlan=makeProductPlan(['house']);s.pending=addProposalAsset(pendingProposal(s,'world',s.context),world);const text=proposalBrief(s,{[world.id]:world});expect(text).toContain('Preliminary product plan; the physical hero is not available here yet');expect(text).not.toContain('This saved version has no construction plan');});
  it('exports a customer-only brief with truthful incomplete sections',()=>{const s=emptyProposalSession();s.context.business='A new customer idea';const text=proposalBrief(s,{});expect(text).toContain('A new customer idea');expect(text).toContain('PACKAGING: Not generated');expect(text).not.toMatch(/Airbnb|Tesla|A24/);expect(text).toContain('Recipient / submission destination: not set');});
+ it('keeps a details-only closure separate from a previous packaging revision and uses the saved physical context',()=>{
+   const s=session();const physical=asset('physical');s.accepted!.context={...s.context,revisionNotes:'Navy packaging only'};s.context=s.accepted!.context;
+   const pending=pendingProposal(s,'details',s.context,'Show the attached dial in matching before and after views');
+   expect(pending.assets).toEqual({world:ids.world,physical:ids.physical,packaging:ids.packaging});expect(pending.context).toEqual(s.accepted!.context);
+   expect(pending.detailsRefinement).toEqual({version:'details-refinement-v1',instruction:'Show the attached dial in matching before and after views'});
+   expect(()=>requestForStage(pending,'details')).toThrow(/Restore the matching physical/);
+   const request=requestForStage(pending,'details',physical.context);expect(request.context).toEqual(physical.context);expect(request.detailsRefinement).toEqual(pending.detailsRefinement);expect(request.previousAssetId).toBe(ids.details);
+   expect(requestForStage(pending,'packaging')).not.toHaveProperty('detailsRefinement');expect(saveProposalSession({...s,pending})).toBe(true);expect(loadProposalSession()?.pending).toEqual(pending);
+   for(const direction of ['', ' '.repeat(4), 'x'.repeat(2001)])expect(()=>pendingProposal(s,'details',s.context,direction)).toThrow();
+ });
+
 });
