@@ -19,7 +19,7 @@ export default function Showcase() {
       if (!live || !data) return;
       const next = { title: studioBrand.name, logo: '', link: '/' };
       for (const s of data) {
-        if (s.key === 'site_title' && s.value) next.title = s.value;
+        if (s.key === 'site_title' && s.value && !['dioramini', 'briq2.0', 'briq', 'form.', 'brandkin', 'stive', 'the absurd marshmallow test'].includes(s.value.trim().toLowerCase())) next.title = s.value;
         if (s.key === 'logo_url' && /^https?:\/\//i.test(s.value || '')) next.logo = s.value;
         if (s.key === 'logo_link' && s.value && s.value !== 'https://example.com') next.link = safeLink(s.value);
       }
