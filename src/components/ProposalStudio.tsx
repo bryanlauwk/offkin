@@ -16,6 +16,7 @@ import ProposalBoard from './ProposalBoard';
 import BuildProposalRequest from './BuildProposalRequest';
 import { proposalExportSnapshot } from '@/lib/proposal-export';
 import './proposal-studio.css';
+import './studio.css';
 
 const needsCustomerIdentity = (pending:PendingProposal) => !pending.assets.world && !isCustomerIdentity(pending.customerIdentity);
 const stageNames = {world:'brand world',physical:'product hero',details:'components & interaction',packaging:'packaging'};
