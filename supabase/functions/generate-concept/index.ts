@@ -1,6 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseSelection, designDirection, type Edition, type GiftFormat } from './options.ts';
-import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
+import { readCompanyWebsite, validatePublicWebsiteUrl, validatePublicSite, WebsiteReadError } from './website.ts';
+import { findBrandCandidates, validBrandName } from './brand-lookup.ts';
+import { firecrawlConfigFromEnv } from './firecrawl-reader.ts';
 import { websiteReadMessage } from './website-contract.ts';
 import { CANVAS_WORLD_PROMPT, CANVAS_PHYSICAL_PROMPT, canvasImagePrompt, BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION, parseConceptMode, modeDesignDirection, CO_CREATION_CONTRACT_VERSION, MAX_CONTEXT_CHARS, LEGACY_MAX_CONTEXT_CHARS, MAX_REQUEST_BYTES, isCoCreationContext } from './prompt.ts';
 import { CANVAS_CONTRACT_VERSION, CANVAS_CAPABILITIES, CanvasFailure, validateCanvasRequest, canvasCacheInput, parseCanvasManifest, serializeCanvasManifest, restoreCanvasRow, selectWorldElements, parseCanvasDesign, isCanvasContext, type CanvasManifest, type CanvasStoredRow } from './canvas.ts';
@@ -21,11 +23,11 @@ export async function handleRequest(req: Request) {
  if(req.method==='GET'){
   const sourceCapabilities={prompt_version:PROMPT_VERSION,capabilities:{...CANVAS_CAPABILITIES,...PROPOSAL_CAPABILITIES,proposal:proposalEnabled(),summary_only:true,electronic_story_scene:true,cocreation:true,context_max_chars:MAX_CONTEXT_CHARS}};
   const url=Deno.env.get('SUPABASE_URL'); const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if(!url||!service)return json({ready:false,...sourceCapabilities,reason:'Backend configuration is missing.'},503);
+  if(!url||!service)return json({ready:false,...sourceCapabilities,brand_lookup:true,reason:'Backend configuration is missing.'},503);
   const db=createClient(url,service);
   const {error}=await db.from('brick_concepts').select('id,cache_key,brand,title,story,image_path,prompt_version,edition,format,interaction,source_url,source_title').limit(0);
   const enabled=Boolean(Deno.env.get('LOVABLE_API_KEY'))&&Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
-  return json({ready:!error&&enabled,daily_limits_enforced:dailyLimitsEnforced(),...sourceCapabilities,verification:'Configuration and schema only; website transport and AI providers need a live test. Electronic story scenes are unvalidated concept studies requiring physical, electrical, firmware, privacy/content and cost validation.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
+  return json({ready:!error&&enabled,daily_limits_enforced:dailyLimitsEnforced(),...sourceCapabilities,brand_lookup:true,verification:'Configuration and schema only; website transport and AI providers need a live test. Electronic story scenes are unvalidated concept studies requiring physical, electrical, firmware, privacy/content and cost validation.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
  }
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try {
@@ -35,6 +37,10 @@ export async function handleRequest(req: Request) {
   const raw=new TextDecoder().decode(bytesIn);
   let input; try{input=JSON.parse(raw);}catch{return json({error:'Invalid request.'},400);}
   if(!input || typeof input!=='object' || Array.isArray(input))return json({error:'Invalid request.'},400);
+  if(input.action==='find-brand'){
+   if(!validBrandName(input.name))return json({error:'Enter a brand name between 2 and 80 characters.'},400);
+   try{return json({candidates:await findBrandCandidates(input.name,firecrawlConfigFromEnv(),u=>validatePublicSite(u))});}catch(e){return json({error:e instanceof Error?e.message.slice(0,300):'Brand lookup failed.'},502);}
+  }
   if(input.summaryOnly!==undefined && typeof input.summaryOnly!=='boolean')return json({error:'Invalid story request.'},400);
   if(input.inspectWebsite!==undefined && typeof input.inspectWebsite!=='boolean')return json({error:'Invalid inspection request.'},400);
   if(input.contractVersion!==undefined && input.contractVersion!==CO_CREATION_CONTRACT_VERSION && input.contractVersion!==CANVAS_CONTRACT_VERSION && input.contractVersion!==PROPOSAL_CONTRACT_VERSION)return json({error:'This co-creation contract is not supported.'},400);

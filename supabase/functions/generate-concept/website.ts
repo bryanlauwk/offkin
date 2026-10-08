@@ -415,3 +415,8 @@ export async function readCompanyWebsite(input: string, dependencies: WebsiteRea
     }
   }
 }
+
+/** Address + public-DNS validation without fetching the page. */
+export async function validatePublicSite(input: string, resolveDns: WebsiteDnsResolver = defaultResolveDns): Promise<URL> {
+  const url = validatePublicWebsiteUrl(input); await validateDns(url, resolveDns); return url;
+}

@@ -73,3 +73,13 @@ export async function planProposalRevision(body: RevisionPlanRequest, signal: Ab
   } else if (data.plan.detailsRefinement !== undefined) throw new Error('Only a details revision can include a details refinement.');
   return data as unknown as RevisionPlanResponse;
 }
+export type BrandCandidate = { name: string; url: string; description: string };
+/** A plain brand name rather than a story or address. */
+export function looksLikeBrandName(value: string): boolean {
+  const v = value.trim(); return v.length >= 2 && v.length <= 60 && v.split(/\s+/).length <= 4 && !/[.!?,;:\n]/.test(v.replace(/\.(com|co|io|ai)$/i, ''));
+}
+export async function findBrand(name: string, signal: AbortSignal): Promise<BrandCandidate[]> {
+  const data = await post({ action: 'find-brand', name: name.trim() }, signal);
+  const list = record(data) && Array.isArray(data.candidates) ? data.candidates : [];
+  return list.filter((c): c is BrandCandidate => record(c) && typeof c.name === 'string' && typeof c.url === 'string' && /^https:\/\//.test(c.url) && typeof c.description === 'string').slice(0, 3);
+}
