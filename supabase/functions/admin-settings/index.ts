@@ -36,12 +36,19 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid request.' }, 400);
   }
 
-  const { password, settings } = input as { password?: unknown; settings?: unknown };
+  const { password, settings, action } = input as { password?: unknown; settings?: unknown; action?: unknown };
   if (typeof password !== 'string' || password.length === 0 || password.length > 200) {
     return json({ error: 'Invalid request.' }, 400);
   }
   if (password !== adminPassword) {
     return json({ ok: false, error: 'Incorrect password' }, 401);
+  }
+
+  const db = createClient(url, service);
+  if (action === 'list-proposal-requests') {
+    const { data, error } = await db.from('proposal_requests').select('reference,buyer_name,work_email,company,quantity,timing,budget,priorities,brand_name,website,concept_story,concept_summary,status,created_at').order('created_at', { ascending: false }).limit(100);
+    if (error) return json({ error: 'Failed to load proposal requests.' }, 500);
+    return json({ ok: true, requests: data });
   }
 
   // Verify-only request (login gate).
@@ -66,7 +73,6 @@ Deno.serve(async (req) => {
     }
   }
 
-  const db = createClient(url, service);
   for (const [key, value] of entries) {
     const { error } = await db
       .from('site_settings')
