@@ -1,67 +1,65 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowUpRight, Download } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, Check, Send } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { CONCEPT_PREVIEW_NOTE, type ExportSnapshot } from '@/lib/proposal-export';
 
-import { CONCEPT_PREVIEW_NOTE, prepareProposalRequest, type ExportSnapshot, type PreparedRequest } from '@/lib/proposal-export';
+type Fields = { buyerName: string; workEmail: string; company: string; quantity: string; timing: string; budget: string; priorities: string; websiteField: string };
+const empty: Fields = { buyerName: '', workEmail: '', company: '', quantity: '', timing: '', budget: '', priorities: '', websiteField: '' };
 
-/** A local request draft. No contact endpoint exists and no inquiry is transmitted. */
 export default function BuildProposalRequest({ brief, snapshot, disabled = false, hasPending = false }: { brief: string; snapshot?: ExportSnapshot; disabled?: boolean; hasPending?: boolean }) {
   const [open, setOpen] = useState(false);
-  const [quantity, setQuantity] = useState('');
-  const [timing, setTiming] = useState('');
-  const [budget, setBudget] = useState('');
-  const [notes, setNotes] = useState('');
-  const [downloaded, setDownloaded] = useState(false);
-  const [preparing, setPreparing] = useState(false);
-  const [prepared, setPrepared] = useState<PreparedRequest | null>(null);
+  const [fields, setFields] = useState(empty);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [reference, setReference] = useState('');
   const trigger = useRef<HTMLButtonElement>(null);
-  const operation = useRef<AbortController | null>(null);
-  const currentKey = `${snapshot?.key || brief}:${disabled}`;
-  const latestKey = useRef(currentKey); latestKey.current = currentKey;
-  function cancel() { operation.current?.abort(); operation.current = null; setPreparing(false); }
-  function clearResult() { setDownloaded(false); setPrepared(null); setError(''); }
-  useEffect(() => { operation.current?.abort(); operation.current = null; setPreparing(false); setDownloaded(false); setPrepared(null); setError(''); }, [currentKey]);
-  useEffect(() => () => { operation.current?.abort(); operation.current = null; }, []);
-  function save(result: PreparedRequest) {
-    const url = URL.createObjectURL(new Blob([result.html], { type: 'text/html;charset=utf-8' }));
-    try {
-      const anchor = document.createElement('a'); anchor.href = url;
-      anchor.download = `OFFKIN-quote-build-proposal-${result.missing.length ? 'partial-' : ''}draft.html`;
-      anchor.click(); setDownloaded(true); setPrepared(null);
-    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
-  }
-  async function download() {
-    if (operation.current || disabled) return;
-    clearResult(); const controller = new AbortController(); operation.current = controller; const key = currentKey; setPreparing(true);
-    try {
-      const result = await prepareProposalRequest(snapshot, brief, { quantity, timing, budget, notes }, controller.signal);
-      if (controller.signal.aborted || operation.current !== controller || latestKey.current !== key) return;
-      if (result.missing.length) setPrepared(result); else save(result);
-    } catch {
-      if (!controller.signal.aborted && operation.current === controller && latestKey.current === key) setError('The request file could not be prepared. Your saved proposal is unchanged. Try again.');
-    } finally { if (operation.current === controller) { operation.current = null; setPreparing(false); } }
+  const key = snapshot?.key || brief;
+  useEffect(() => { setError(''); setReference(''); setOpen(false); }, [key]);
+  const assets = useMemo(() => snapshot?.stages.flatMap(item => item.asset ? [{ stage: item.stage, id: item.asset.id, title: item.asset.title, brand: item.asset.brand, story: item.asset.story, website: item.asset.sourceUrl }] : []) || [], [snapshot]);
+  const complete = assets.length === 4 && !hasPending;
+  const brand = assets[0]?.brand || 'Your brand';
+  const story = assets.find(asset => asset.stage === 'physical')?.story || assets[0]?.story || brief.slice(0, 6000);
+  const website = assets.find(asset => asset.website)?.website || '';
+  function update(name: keyof Fields, value: string) { setFields(current => ({ ...current, [name]: value })); setError(''); }
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (submitting || disabled || !complete) return;
+    if (!fields.buyerName.trim() || !fields.company.trim() || !/^\S+@\S+\.\S+$/.test(fields.workEmail.trim())) { setError('Add your name, company and a valid work email.'); return; }
+    setSubmitting(true); setError('');
+    const { data, error: requestError } = await supabase.functions.invoke('proposal-request', { body: {
+      ...fields, brandName: brand, website, conceptStory: story,
+      assetIds: assets.map(asset => asset.id),
+      conceptSummary: { title: assets.find(asset => asset.stage === 'physical')?.title || brand, stages: assets.map(asset => ({ stage: asset.stage, title: asset.title })) },
+    } });
+    setSubmitting(false);
+    if (requestError || !data?.ok || typeof data.reference !== 'string') { setError(data?.error || 'Your request could not be saved. Nothing was submitted; please try again.'); return; }
+    setReference(data.reference);
   }
   return <section className="op-build-request" aria-labelledby="op-build-request-title">
-    <div><p className="op-eyebrow">FROM PREVIEW TO POSSIBILITY</p><h2 id="op-build-request-title">Make It LIVE</h2><p>Like the direction? Shape the realistic build around the idea.</p><p className="op-subtle">{CONCEPT_PREVIEW_NOTE}</p></div>
-    <button ref={trigger} className="op-primary" disabled={disabled} onClick={() => { clearResult(); setOpen(true); }}>Request a Quote &amp; Build Proposal<ArrowUpRight size={16} aria-hidden="true"/></button>
-    <p className="op-subtle">Prepare a downloadable request draft. No inquiry is sent from this page.</p>
-    <Dialog open={open} onOpenChange={value => { if (!value) { cancel(); clearResult(); } setOpen(value); }}><DialogContent className="op-dialog" onCloseAutoFocus={event => { event.preventDefault(); trigger.current?.focus(); }}>
-      <DialogHeader><DialogTitle>Request a Quote &amp; Build Proposal</DialogTitle><DialogDescription>Prepare your request on this device. A contact destination hasn’t been selected, so you can download a self-contained HTML draft with the available concept images to share yourself. Nothing is sent automatically.</DialogDescription></DialogHeader>
-      {hasPending && <p className="op-warning">Your preview has unfinished sections. The draft identifies what is ready and what still needs work.</p>}
-      <fieldset className="op-detail-grid" disabled={preparing || disabled} style={{ border: 0, margin: 0, padding: 0 }}>
-        <label>Desired quantity <span>(optional)</span><input value={quantity} maxLength={120} onChange={event => { setQuantity(event.target.value); clearResult(); }} placeholder="e.g. 50 gifts, or one special piece"/></label>
-        <label>Target timing <span>(optional)</span><input value={timing} maxLength={120} onChange={event => { setTiming(event.target.value); clearResult(); }} placeholder="A launch date or flexible"/></label>
-        <label>Budget direction <span>(optional)</span><input value={budget} maxLength={160} onChange={event => { setBudget(event.target.value); clearResult(); }} placeholder="Amount and currency, or to discuss"/></label>
-        <label>What matters most? <span>(optional)</span><textarea value={notes} rows={3} maxLength={2000} onChange={event => { setNotes(event.target.value); clearResult(); }} placeholder="Details to keep, proposed interaction, questions…"/></label>
-      </fieldset>
-      <p className="op-subtle">The file includes the current displayed concept, original brief, selected story elements and your notes. Review it before sharing. Images are downloaded from their saved source only when you choose Download.</p>
-      <p className="op-subtle">Part counts, materials, tolerances, mechanisms, cost and production options are assessed during the build proposal. Engineering and prototype checks follow before production.</p>
-      <button className="op-primary" disabled={preparing || disabled} onClick={() => void download()}><Download size={15} aria-hidden="true"/>{preparing ? 'Preparing images…' : 'Download request draft'}</button>
-      {preparing && <><p role="status">Preparing the current concept images for an offline file…</p><button className="op-secondary" onClick={cancel}>Cancel download</button></>}
-      {prepared && <div className="op-warning" role="alert"><strong>Partial request: {prepared.embedded} of 4 images available.</strong><ul>{prepared.missing.map(reason => <li key={reason}>{reason}</li>)}</ul><p>Refresh saved images and try again, or explicitly download the incomplete file below. Missing visuals are labelled in the file.</p><button className="op-secondary" disabled={disabled} onClick={() => { try { save(prepared); } catch { setError('The file could not be downloaded. Try again.'); } }}>Download partial request draft</button></div>}
-      {error && <p role="alert">{error}</p>}
-      {downloaded && <p role="status">Request draft downloaded. It has not been sent, and no order has been placed.</p>}
+    <div><p className="op-eyebrow">NEXT / BUILD PROPOSAL</p><h2 id="op-build-request-title">Take the idea into the real world.</h2><p>Tell the studio what success looks like. We’ll review the concept, then scope materials, mechanisms, prototype, timing and price.</p></div>
+    <Button ref={trigger} className="op-primary" disabled={disabled || !complete} onClick={() => { setError(''); setOpen(true); }}>Request a Quote &amp; Build Proposal<ArrowRight aria-hidden="true"/></Button>
+    {!complete && <p className="op-subtle">Complete and restore all four concept sections before requesting a build proposal.</p>}
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="op-dialog op-request-dialog" onCloseAutoFocus={event => { event.preventDefault(); trigger.current?.focus(); }}>
+      {reference ? <div className="op-request-success"><span><Check aria-hidden="true"/></span><DialogHeader><DialogTitle>Request saved for review.</DialogTitle><DialogDescription>Your request is in the OFFKIN review inbox. No order has been placed and no email was sent.</DialogDescription></DialogHeader><strong>{reference}</strong><p>Keep this reference for your conversation with the studio.</p><Button className="op-primary" onClick={() => setOpen(false)}>Done</Button></div> : <form onSubmit={submit}>
+        <DialogHeader><DialogTitle>Request a Quote &amp; Build Proposal</DialogTitle><DialogDescription>Review the chosen concept, then leave your contact and project direction.</DialogDescription></DialogHeader>
+        <div className="op-request-summary"><span>CHOSEN CONCEPT</span><strong>{brand}</strong><p>{story}</p>{website && <small>{website}</small>}<ol>{assets.map(asset => <li key={asset.id}><span>{asset.stage}</span><b>{asset.title}</b><code>{asset.id.slice(0, 8)}</code></li>)}</ol></div>
+        {hasPending && <p className="op-warning">An unfinished revision is excluded. The accepted complete concept above will be submitted.</p>}
+        <fieldset className="op-request-fields" disabled={submitting || disabled}>
+          <label>Your name<input required autoComplete="name" maxLength={120} value={fields.buyerName} onChange={event => update('buyerName', event.target.value)}/></label>
+          <label>Work email<input required type="email" autoComplete="email" maxLength={254} value={fields.workEmail} onChange={event => update('workEmail', event.target.value)}/></label>
+          <label>Company<input required autoComplete="organization" maxLength={160} value={fields.company} onChange={event => update('company', event.target.value)}/></label>
+          <label>Desired quantity <span>(optional)</span><input maxLength={120} value={fields.quantity} onChange={event => update('quantity', event.target.value)} placeholder="50 gifts or one special piece"/></label>
+          <label>Target timing <span>(optional)</span><input maxLength={120} value={fields.timing} onChange={event => update('timing', event.target.value)} placeholder="Launch date or flexible"/></label>
+          <label>Budget direction <span>(optional)</span><input maxLength={160} value={fields.budget} onChange={event => update('budget', event.target.value)} placeholder="Amount and currency, or to discuss"/></label>
+          <label className="op-request-wide">Priorities and questions <span>(optional)</span><textarea rows={4} maxLength={2000} value={fields.priorities} onChange={event => update('priorities', event.target.value)} placeholder="What must the physical version preserve?"/></label>
+          <label className="op-honeypot" aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" value={fields.websiteField} onChange={event => update('websiteField', event.target.value)}/></label>
+        </fieldset>
+        <p className="op-request-note">{CONCEPT_PREVIEW_NOTE} This request asks for review; it does not approve spending or place an order.</p>
+        {error && <p className="op-request-error" role="alert">{error}</p>}
+        <Button type="submit" className="op-primary" disabled={submitting || disabled || !complete}><Send aria-hidden="true"/>{submitting ? 'Saving request…' : 'Submit for studio review'}</Button>
+      </form>}
     </DialogContent></Dialog>
   </section>;
 }

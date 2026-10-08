@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Eye } from 'lucide-react';
+import { ArrowLeft, Save, Eye, Inbox } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Admin() {
+  type ProposalRequest = { reference: string; buyer_name: string; work_email: string; company: string; quantity: string; timing: string; budget: string; priorities: string; brand_name: string; website: string; concept_story: string; concept_summary: { title?: string; stages?: { stage: string; title: string }[] }; status: string; created_at: string };
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
@@ -16,10 +17,12 @@ export default function Admin() {
   const [siteTitle, setSiteTitle] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [requests, setRequests] = useState<ProposalRequest[]>([]);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchSettings();
+      fetchRequests();
     }
   }, [isAuthenticated]);
 
@@ -42,6 +45,16 @@ export default function Admin() {
       toast.error('Failed to load settings');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchRequests = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-settings', { body: { password, action: 'list-proposal-requests' } });
+      if (error || !data?.ok) throw error ?? new Error('Load failed');
+      setRequests(Array.isArray(data.requests) ? data.requests : []);
+    } catch {
+      toast.error('Failed to load proposal requests');
     }
   };
 
@@ -131,7 +144,7 @@ export default function Admin() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <h1 className="font-serif text-2xl md:text-3xl font-bold italic">Site Settings</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Studio Admin</h1>
         </div>
 
         {isLoading ? (
@@ -209,6 +222,13 @@ export default function Admin() {
               <Save className="w-4 h-4 mr-2" />
               {isSaving ? 'Saving...' : 'Save Settings'}
             </Button>
+            <section aria-labelledby="proposal-inbox-title" className="space-y-4 pt-8 border-t">
+              <div className="flex items-center gap-3"><Inbox className="w-5 h-5"/><div><h2 id="proposal-inbox-title" className="text-xl font-semibold">Proposal requests</h2><p className="text-sm text-muted-foreground">Private buyer requests, newest first.</p></div></div>
+              {requests.length === 0 ? <p className="text-sm text-muted-foreground">No proposal requests yet.</p> : requests.map(request => <Card key={request.reference}>
+                <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><div><CardTitle>{request.brand_name}</CardTitle><CardDescription>{request.reference} · {new Date(request.created_at).toLocaleString()}</CardDescription></div><span className="text-xs uppercase tracking-wider text-muted-foreground">{request.status}</span></div></CardHeader>
+                <CardContent className="space-y-4 text-sm"><div className="grid gap-2 sm:grid-cols-2"><p><b>Buyer</b><br/>{request.buyer_name} · {request.company}</p><p><b>Contact</b><br/><a className="underline" href={`mailto:${request.work_email}`}>{request.work_email}</a></p><p><b>Quantity</b><br/>{request.quantity || 'To discuss'}</p><p><b>Timing / budget</b><br/>{request.timing || 'To discuss'} · {request.budget || 'To discuss'}</p></div>{request.priorities && <p><b>Priorities</b><br/>{request.priorities}</p>}<details><summary className="cursor-pointer font-medium">Concept submitted</summary><p className="mt-3 whitespace-pre-wrap">{request.concept_story}</p>{request.website && <a className="block mt-2 underline" href={request.website} target="_blank" rel="noreferrer">{request.website}</a>}<ul className="mt-3 list-disc pl-5">{request.concept_summary?.stages?.map(stage => <li key={stage.stage}>{stage.stage}: {stage.title}</li>)}</ul></details></CardContent>
+              </Card>)}
+            </section>
           </div>
         )}
       </div>
