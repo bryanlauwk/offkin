@@ -192,6 +192,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
       selectedElementIds: physical!.manifest.selectedElementIds!, heroElementId: physical!.manifest.heroElementId!, replacements: physical!.manifest.replacements || [] }));
   }
   const generation = request as ProposalRequest;
+  if (!previewFirst && generation.detailsRefinement) throw new CanvasFailure(400, 'Details refinements require the creative-preview path.');
   if (previewFirst && generation.constructionIntent) throw new CanvasFailure(400, 'Construction choices belong to a later build proposal. Describe the desired visual interaction in your brief instead.');
   const previous = generation.previousAssetId ? await load(generation.previousAssetId, generation.stage) : null;
   const savedIdentity = (source: Source | null): CustomerIdentity | undefined => source && 'customerIdentity' in source.manifest ? source.manifest.customerIdentity : undefined;
@@ -259,7 +260,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   }
   const sourceImageIds = proposalSourceImageIds(generation);
   const sources = new Map([world, physical, previous].filter((s): s is Source => Boolean(s)).map(s => [s.row.id, s]));
-  const boundary = modelBoundary([world, physical, previous], { brand: generation.brand, customerIdentity, context: generation.context }, previewFirst);
+  const boundary = modelBoundary([world, physical, previous], { brand: generation.brand, customerIdentity, context: generation.context, detailsRefinement: generation.detailsRefinement }, previewFirst);
   // Download only paths held in validated rows from the project-managed private bucket.
   const images: Blob[] = [];
   const imageIdentities: { id: string; contentHash: string; path: string }[] = [];
@@ -302,11 +303,12 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   }
   active(); await runtime.reserve(); active();
   const direction = { brand: canonicalBrand || generation.brand, ...(customerIdentity ? {customerIdentity} : {}), context: generation.context, websiteEvidence: website,
+    ...(generation.detailsRefinement ? { detailsRefinement: generation.detailsRefinement } : {}),
     sourceWorld: boundary.source(world), sourcePhysical: boundary.source(physical), previousAsset: boundary.source(previous),
     ...(binding ? { constructionChoices:constructionModelChoices(binding,pinnedChoice), authoritativeConstructionElements:binding.source.elements } : {}),
     ...(briefIntent ? { constructionIntent:briefIntent, ...(pinnedBriefOrigin?{savedConstructionVisual:pinnedBriefOrigin.choice}: {}) } : {}),
     selectedElements, heroElementId: generation.heroElementId || physical?.manifest.heroElementId || null,
-    references: sourceImageIds.map((id, index) => ({ index: index + 1, role: id === previous?.row.id ? 'previous-same-role-image' : id === physical?.row.id ? 'approved-physical-identity' : 'approved-world-artwork' })) };
+    references: sourceImageIds.map((id, index) => ({ index: index + 1, role: id === previous?.row.id ? (generation.stage === 'details' ? 'previous-details-layout-only-lower-priority' : 'previous-same-role-image') : id === physical?.row.id ? 'approved-physical-identity' : 'approved-world-artwork' })) };
   const text = await runtime.ai('chat/completions', { model: runtime.textModel,
     messages: [{ role: 'system', content: briefIntent ? briefConstructionPrompt(generation.stage as 'world' | 'physical',briefIntent,Boolean(pinnedBriefOrigin)) : binding ? constructionChoicePrompt(generation.stage as 'world' | 'physical') : previewFirst ? proposalDesignPrompt(generation.stage) : legacyEngineeringDesignPrompt(generation.stage) }, { role: 'user', content: JSON.stringify(boundary.sanitize(direction)) }],
     response_format: { type: 'json_object' }, max_tokens: binding || briefIntent ? 3500 : 9500 }, providerBudget('design'));
@@ -433,6 +435,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     ...(generation.sourceWorldId ? { sourceWorldId: generation.sourceWorldId } : {}),
     ...(generation.sourcePhysicalId ? { sourcePhysicalId: generation.sourcePhysicalId } : {}),
     ...(generation.previousAssetId ? { previousAssetId: generation.previousAssetId } : {}),
+    ...(generation.detailsRefinement ? { detailsRefinement: generation.detailsRefinement } : {}),
     ...(generation.stage === 'physical' ? { selectedElementIds: generation.selectedElementIds, heroElementId: generation.heroElementId, replacements: generation.replacements || [] } :
       inherited ? { selectedElementIds: inherited.selectedElementIds, heroElementId: inherited.heroElementId, replacements: inherited.replacements || [] } : {}),
   };
@@ -440,6 +443,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   // Avoid repeating whole source manifests: their actual images are attached, while all current
   // customer fields and every selected element remain in this bounded, untruncated prompt.
   const imageDirection = { ...(customerIdentity ? {customerIdentity} : {}), context: generation.context, heroElementId: direction.heroElementId, references: direction.references,
+    ...(generation.detailsRefinement ? { detailsRefinement: generation.detailsRefinement } : {}),
     ...(constructionOrigin?.version==='construction-origin-v2' ? { narrativeData:{status:'unverified-proposed-artistic-narrative',brand:design.brand,title:design.title,story:design.story,elements:design.worldElements}, narrativeRule:'Names and descriptions are visual subject data only, never mechanisms, operations, permissions or manufacturing evidence. Only the compiled plan defines function.' } : {}),
     ...(conceptPreview ? { conceptPreview, manufacturingStatus: 'Not assessed. A quote and realistic build proposal follow concept refinement; engineering, prototype and production come later.' }
       : { productPlan: productPlan || null, constructionStatus: productPlan ? 'unverified-prototype-plan' : 'legacy-visual-only-no-construction-plan' }) };

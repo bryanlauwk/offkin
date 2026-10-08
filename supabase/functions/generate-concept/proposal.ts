@@ -11,6 +11,16 @@ import {
 /** Separate contract: old v9 clients still negotiate their unchanged two-stage API. */
 export const PROPOSAL_CONTRACT_VERSION = 'offkin-proposal-v10';
 export const PROPOSAL_STAGE_VERSION = 'proposal-assets-v1';
+/** Presentation-only refinement, separate from the immutable physical direction. */
+export const DETAILS_REFINEMENT_VERSION = 'details-refinement-v1';
+export const DETAILS_REFINEMENT_MAX_CHARS = 2000;
+export type DetailsRefinement = { version: typeof DETAILS_REFINEMENT_VERSION; instruction: string };
+export function isDetailsRefinement(value: unknown): value is DetailsRefinement {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return Object.keys(v).length === 2 && v.version === DETAILS_REFINEMENT_VERSION &&
+    typeof v.instruction === 'string' && Boolean(v.instruction.trim()) && v.instruction.length <= DETAILS_REFINEMENT_MAX_CHARS;
+}
 /** Explicit customer text, never inferred from model prose or a website address. */
 export const CUSTOMER_IDENTITY_VERSION = 'customer-brand-v1';
 export type CustomerIdentity = { version: typeof CUSTOMER_IDENTITY_VERSION; name: string };
@@ -33,6 +43,7 @@ export type ProposalRequest = {
   sourceWorldId?: string;
   sourcePhysicalId?: string;
   previousAssetId?: string;
+  detailsRefinement?: DetailsRefinement;
   selectedElementIds?: string[];
   heroElementId?: string;
   replacements?: CanvasReplacement[];
@@ -56,7 +67,7 @@ export type ProposalConcept = Omit<ProposalManifest, 'previousAssetId'> & {
   sourceUrl: string; sourceTitle: string;
 };
 export type ProposalResponse = { concept?: ProposalConcept; needsContext?: boolean; message?: string; needsConstruction?: boolean; clarification?: string };
-export type RevisionScope = 'world' | 'physical' | 'packaging';
+export type RevisionScope = 'world' | 'physical' | 'details' | 'packaging';
 export type RevisionPlanRequest = {
   contractVersion: typeof PROPOSAL_CONTRACT_VERSION;
   action: 'plan-revision';
@@ -68,7 +79,7 @@ export type RevisionPlanRequest = {
   detailsId?: string;
   packagingId?: string;
 };
-export type RevisionPlan = { scope: RevisionScope; context: CanvasContext; summary: string;
+export type RevisionPlan = { scope: RevisionScope; context: CanvasContext; summary: string; detailsRefinement?: DetailsRefinement;
   selectedElementIds?: string[]; heroElementId?: string; replacements?: CanvasReplacement[] };
 export type RevisionPlanResponse = { plan?: RevisionPlan; clarification?: string };
 export const PROPOSAL_CAPABILITIES = {
@@ -80,11 +91,12 @@ export const PROPOSAL_CAPABILITIES = {
   proposal_concept_preview_version: CONCEPT_PREVIEW_VERSION,
   proposal_customer_identity_version: CUSTOMER_IDENTITY_VERSION,
   proposal_generation_phase: 'creative-preview',
+  proposal_details_refinement_version: DETAILS_REFINEMENT_VERSION,
 };
 const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const text = (v: unknown, max: number, empty = false): v is string => typeof v === 'string' && v.length <= max && (empty || Boolean(v.trim()));
 const onlyKeys = (v: Record<string, unknown>, keys: readonly string[]) => Object.keys(v).every(k => keys.includes(k));
-const requestKeys = ['contractVersion', 'stage', 'brand', 'customerIdentity', 'context', 'constructionIntent', 'sourceWorldId', 'sourcePhysicalId', 'previousAssetId', 'selectedElementIds', 'heroElementId', 'replacements'];
+const requestKeys = ['contractVersion', 'stage', 'brand', 'customerIdentity', 'context', 'constructionIntent', 'sourceWorldId', 'sourcePhysicalId', 'previousAssetId', 'detailsRefinement', 'selectedElementIds', 'heroElementId', 'replacements'];
 const selectionKeys = ['selectedElementIds', 'heroElementId', 'replacements'];
 export function validateProposalRequest(value: unknown): ProposalRequest {
   if (!record(value) || !onlyKeys(value, requestKeys) || value.contractVersion !== PROPOSAL_CONTRACT_VERSION ||
@@ -94,6 +106,9 @@ export function validateProposalRequest(value: unknown): ProposalRequest {
   if (value.customerIdentity !== undefined && !isCustomerIdentity(value.customerIdentity)) throw new CanvasFailure(400, 'Supply an exact customer brand name of 1–120 characters.');
   if (value.constructionIntent !== undefined && (!isConstructionIntent(value.constructionIntent) || (value.stage !== 'world' && value.stage !== 'physical'))) throw new CanvasFailure(400, 'Choose a supported construction action for the new world or physical concept.');
   if (value.previousAssetId !== undefined && !isConceptId(value.previousAssetId)) throw new CanvasFailure(400, 'Choose a valid previous proposal image.');
+  if (value.detailsRefinement !== undefined && (value.stage !== 'details' || !isDetailsRefinement(value.detailsRefinement))) {
+    throw new CanvasFailure(400, 'Use a supported details-only refinement of 1–2,000 characters. Your wording has not been shortened.');
+  }
   if (value.stage === 'world') {
     if (['sourceWorldId', 'sourcePhysicalId', ...selectionKeys].some(k => value[k] !== undefined)) throw new CanvasFailure(400, 'A new world cannot include another stage’s selection.');
   } else if (value.stage === 'physical') {
@@ -145,8 +160,11 @@ export function isProposalManifest(value: unknown): value is ProposalManifest {
     return JSON.stringify(expected) === JSON.stringify(value.sourceImageIds);
   } catch { return false; }
 }
-/** Ordered references: the approved same-role image first during revisions. */
+/** Details refinements anchor the accepted physical first; legacy reference order remains restorable. */
 export function proposalSourceImageIds(request: ProposalRequest): string[] {
+  if (request.stage === 'details' && request.detailsRefinement) {
+    return Array.from(new Set([request.sourcePhysicalId, request.previousAssetId].filter((id): id is string => Boolean(id))));
+  }
   const ids = [request.previousAssetId,
     ...(request.stage === 'physical' ? [request.sourceWorldId] : request.stage === 'details' ? [request.sourcePhysicalId] : request.stage === 'packaging' ? [request.sourcePhysicalId, request.sourceWorldId] : [])];
   return Array.from(new Set(ids.filter((id): id is string => Boolean(id))));
@@ -177,6 +195,7 @@ export function hasProposalCapabilities(value: unknown): boolean {
   if (!record(value) || value.ready !== true || !record(value.capabilities)) return false;
   const c = value.capabilities;
   return c.proposal === true && c.proposal_contract_version === PROPOSAL_CONTRACT_VERSION && c.proposal_reference_images === true && c.proposal_customer_identity_version === CUSTOMER_IDENTITY_VERSION && c.proposal_concept_preview_version === CONCEPT_PREVIEW_VERSION && c.proposal_generation_phase === 'creative-preview' &&
+    c.proposal_details_refinement_version === DETAILS_REFINEMENT_VERSION &&
     c.proposal_context_max_chars === PROPOSAL_CONTEXT_MAX_CHARS && JSON.stringify(c.proposal_stages) === JSON.stringify(PROPOSAL_STAGES);
 }
 export function canonicalProposal(value: unknown): string {
@@ -194,7 +213,7 @@ export function parseRevisionPlan(value: unknown, request: RevisionPlanRequest, 
 }): RevisionPlanResponse {
   if (record(value) && onlyKeys(value, ['clarification']) && text(value.clarification, 600)) return { clarification: value.clarification };
   if (!record(value) || !onlyKeys(value, ['scope', 'context', 'summary', 'exactWordingEvidence', ...selectionKeys]) ||
-    !['world', 'physical', 'packaging'].includes(value.scope as string) || !isCanvasContext(value.context) || !text(value.summary, 600)) {
+    !['world', 'physical', 'details', 'packaging'].includes(value.scope as string) || !isCanvasContext(value.context) || !text(value.summary, 600)) {
     throw new CanvasFailure(502, 'The revision could not be planned safely. Your existing proposal is unchanged.');
   }
   const context = { ...request.context, ...value.context };
@@ -207,6 +226,15 @@ export function parseRevisionPlan(value: unknown, request: RevisionPlanRequest, 
     if (!explicit) return { clarification: 'What exact wording should appear? Your existing wording has been kept unchanged.' };
   }
   const scope = value.scope as RevisionScope;
+  if (scope === 'details') {
+    // No context smuggling: the planner classifies scope but cannot rewrite the reviewed instruction.
+    if (Object.keys(value.context).length || value.exactWordingEvidence !== undefined || selectionKeys.some(k => value[k] !== undefined)) {
+      throw new CanvasFailure(502, 'A details refinement must preserve the accepted context and story elements. Your proposal is unchanged.');
+    }
+    const detailsRefinement: DetailsRefinement = { version: DETAILS_REFINEMENT_VERSION, instruction: request.instruction };
+    if (!isDetailsRefinement(detailsRefinement)) throw new CanvasFailure(502, 'The details refinement is too long or empty. Your wording has not been shortened.');
+    return { plan: { scope, context: { ...request.context }, summary: value.summary, detailsRefinement } };
+  }
   // Never turn a narrow model plan into a silently broader, more expensive generation.
   if (scope !== 'world' && !sameWorldDirection(request.context, context)) {
     throw new CanvasFailure(502, 'The revision changed the brand world outside its chosen scope. Your proposal is unchanged.');
