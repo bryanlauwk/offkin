@@ -11,11 +11,11 @@ const stages = [
 /** Orientation only: these are stages of a proposal, never sample customer results. */
 export default function ProposalJourney({ compact = false }: { compact?: boolean }) {
   return <section id="proposal-worlds" tabIndex={-1} className={`op-journey${compact ? ' op-journey--compact' : ''}`} aria-label="Four connected proposal stages">
-    {!compact && <div className="op-journey-heading"><div><h2>Your story. A rich preview. A path to real.</h2></div></div>}
+    {!compact && <div className="op-journey-heading"><div><p className="op-eyebrow">THE INVITED-BUYER JOURNEY</p><h2>One name. One researched story. One world worth holding.</h2></div></div>}
     <ol>{stages.map(({ name, description, art }, index) => <li key={name}>
       <div className="op-step-top"><span>{String(index + 1).padStart(2, '0')}</span></div>
       <div className="op-step-copy"><h3>{name}</h3>{!compact && <p>{description}</p>}</div>{!compact && <MarketingArtwork kind={art}/>}
     </li>)}</ol>
-    {!compact && <p className="op-journey-note"><ArrowDown size={15} aria-hidden="true"/>Brand / IP → rich concept preview → refine → quote & build proposal → engineering, prototype and production. Final design, functionality and pricing are confirmed during the build proposal.</p>}
+    {!compact && <p className="op-journey-note"><ArrowDown size={15} aria-hidden="true"/>Research → concept preview → studio review → build proposal. Final design, functionality and pricing are confirmed during the build proposal.</p>}
   </section>;
 }
