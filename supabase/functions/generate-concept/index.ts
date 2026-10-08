@@ -27,7 +27,7 @@ export async function handleRequest(req: Request) {
   const db=createClient(url,service);
   const {error}=await db.from('brick_concepts').select('id,cache_key,brand,title,story,image_path,prompt_version,edition,format,interaction,source_url,source_title').limit(0);
   const enabled=Boolean(Deno.env.get('LOVABLE_API_KEY'))&&Deno.env.get('BRICK_GENERATION_ENABLED')==='true';
-  return json({ready:!error&&enabled,daily_limits_enforced:dailyLimitsEnforced(),...sourceCapabilities,verification:'Configuration and schema only; website transport and AI providers need a live test. Electronic story scenes are unvalidated concept studies requiring physical, electrical, firmware, privacy/content and cost validation.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
+  return json({ready:!error&&enabled,daily_limits_enforced:dailyLimitsEnforced(),...sourceCapabilities,brand_lookup:true,verification:'Configuration and schema only; website transport and AI providers need a live test. Electronic story scenes are unvalidated concept studies requiring physical, electrical, firmware, privacy/content and cost validation.',reason:error?'Concept storage setup is incomplete.':!enabled?'AI generation is not enabled.':'Ready for a generation test.'},!error&&enabled?200:503);
  }
  if(req.method!=='POST')return json({error:'Method not allowed'},405);
  try {
