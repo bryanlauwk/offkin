@@ -1,5 +1,5 @@
 import { PROPOSAL_GENERATION_PAUSED } from '@/lib/proposal-availability';
-import { useLocation, useSearchParams, Link } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { supportsProposalGeneration } from '@/lib/proposal-api';
 const LegacyConcept = lazy(() => import('./LegacyConcept'));
