@@ -141,7 +141,7 @@ async function decodeImage(bytes: Uint8Array, signal: AbortSignal): Promise<void
     signal.addEventListener('abort', cancel, { once: true });
     const checked = (width: number, height: number) => { try { boundedDimensions(width, height); finish(); } catch (error) { finish(error as Error); } };
     try { if (typeof createImageBitmap === 'function') {
-      void createImageBitmap(new Blob([bytes], { type: mimeOf(bytes)! })).then(bitmap => {
+      void createImageBitmap(new Blob([new Uint8Array(bytes)], { type: mimeOf(bytes)! })).then(bitmap => {
         if (!settled) checked(bitmap.width, bitmap.height);
         bitmap.close();
       }, () => finish(new Error('Image could not be decoded. It may be incomplete or damaged.')));
@@ -155,7 +155,7 @@ async function decodeImage(bytes: Uint8Array, signal: AbortSignal): Promise<void
   active(signal);
 }
 async function digest(bytes: Uint8Array): Promise<string> {
-  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), value => value.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes))), value => value.toString(16).padStart(2, '0')).join('');
 }
 function dataUrl(bytes: Uint8Array): string {
   let binary = '';

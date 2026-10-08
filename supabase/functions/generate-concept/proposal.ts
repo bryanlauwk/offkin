@@ -205,7 +205,7 @@ export function canonicalProposal(value: unknown): string {
 export function sameProposalContext(a: CanvasContext, b: CanvasContext): boolean { return canonicalProposal(a) === canonicalProposal(b); }
 /** These changes require a new illustrated world; product and packaging direction may differ. */
 export function sameWorldDirection(a: CanvasContext, b: CanvasContext): boolean {
-  const keys = ['business', 'hiddenDetail', 'angle', 'audience', 'exactWording', 'style', 'brandIdentifiers', 'avoid'];
+  const keys = ['business', 'hiddenDetail', 'angle', 'audience', 'exactWording', 'style', 'brandIdentifiers', 'avoid'] as const;
   return keys.every(k => (a[k] ?? '') === (b[k] ?? ''));
 }
 export function parseRevisionPlan(value: unknown, request: RevisionPlanRequest, selection?: {
@@ -239,7 +239,7 @@ export function parseRevisionPlan(value: unknown, request: RevisionPlanRequest, 
   if (scope !== 'world' && !sameWorldDirection(request.context, context)) {
     throw new CanvasFailure(502, 'The revision changed the brand world outside its chosen scope. Your proposal is unchanged.');
   }
-  if (scope === 'packaging' && ['mode', 'interaction', 'scale', 'materials'].some(k => (request.context[k] ?? '') !== (context[k] ?? ''))) {
+  if (scope === 'packaging' && (['mode', 'interaction', 'scale', 'materials'] as const).some(k => (request.context[k] ?? '') !== (context[k] ?? ''))) {
     throw new CanvasFailure(502, 'The packaging revision also changed the physical concept. Your proposal is unchanged.');
   }
   let nextSelection: Pick<RevisionPlan, 'selectedElementIds' | 'heroElementId' | 'replacements'> = {};
