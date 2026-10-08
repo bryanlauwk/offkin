@@ -16,6 +16,7 @@
 
 import { WEBSITE_MAX_BYTES, WEBSITE_TIMEOUT_MS, WebsiteReadError } from './website-contract.ts';
 export { WebsiteReadError } from './website-contract.ts';
+import { firecrawlConfigFromEnv, firecrawlFallbackAllowed, readWithFirecrawl, type FirecrawlReaderConfig } from './firecrawl-reader.ts';
 
 export interface WebsiteSource {
   url: string;
@@ -399,13 +400,15 @@ export async function readCompanyWebsiteDirect(input: string, dependencies: Webs
 }
 
 /** Direct pinned read first; only an accessibility failure may retry through the linked Firecrawl reader. */
-export async function readCompanyWebsite(input: string, dependencies: WebsiteReaderDependencies & { firecrawl?: import('./firecrawl-reader.ts').FirecrawlReaderConfig | null } = {}): Promise<WebsiteSource> {
+export async function readCompanyWebsite(input: string, dependencies: WebsiteReaderDependencies & { firecrawl?: FirecrawlReaderConfig | null } = {}): Promise<WebsiteSource> {
   try { return await readCompanyWebsiteDirect(input, dependencies); }
   catch (error) {
-    const { firecrawlFallbackAllowed, readWithFirecrawl, firecrawlConfigFromEnv } = await import('./firecrawl-reader.ts');
     const config = dependencies.firecrawl === undefined ? firecrawlConfigFromEnv() : dependencies.firecrawl;
     if (!config || !(error instanceof WebsiteReadError) || !firecrawlFallbackAllowed(error.code)) throw error;
-    try { return await readWithFirecrawl(input, config, { resolveDns: dependencies.resolveDns ?? defaultResolveDns, maxBytes: dependencies.maxBytes }); }
+    try { return await readWithFirecrawl(input, config, {
+      validateUrl: validatePublicWebsiteUrl, validateDns: (url) => validateDns(url, dependencies.resolveDns ?? defaultResolveDns),
+      readBody: readBoundedBody, cleanText, maxBytes: lowerLimit(dependencies.maxBytes, WEBSITE_MAX_BYTES), maxExcerptChars: MAX_EXCERPT_CHARS,
+    }); }
     catch (fallbackError) {
       if (fallbackError instanceof WebsiteReadError && fallbackError.code === 'unsafe_url') throw fallbackError;
       throw error;
