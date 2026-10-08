@@ -4,3 +4,6 @@
  */
 export const PROPOSAL_GENERATION_PAUSED = true;
 export const PROPOSAL_PAUSE_MESSAGE = 'New complete-proposal generation is temporarily unavailable. Your saved proposals and brief tools are still available.';
+
+/** This phase keeps the public journey to answer → generate once; refinement and Edit details are hidden. */
+export const PROPOSAL_SIMPLE_MODE = true;

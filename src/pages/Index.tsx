@@ -1,5 +1,5 @@
-import { PROPOSAL_GENERATION_PAUSED } from '@/lib/proposal-availability';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { PROPOSAL_GENERATION_PAUSED, PROPOSAL_SIMPLE_MODE } from '@/lib/proposal-availability';
+import { useLocation, useSearchParams, Link } from 'react-router-dom';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { supportsProposalGeneration } from '@/lib/proposal-api';
 const LegacyConcept = lazy(() => import('./LegacyConcept'));
@@ -24,9 +24,10 @@ export default function Index() {
   if (legacyConcept) return <Suspense fallback={<main aria-busy="true">Opening your concept…</main>}><LegacyConcept /></Suspense>;
   if (legacyCanvas) return <CanvasStudio />;
   // Saved proposals can always be restored without generation, including during an outage.
-  if (savedProposal || PROPOSAL_GENERATION_PAUSED || proposalReady === true) return <ProposalStudio simple />;
+  if (savedProposal || PROPOSAL_GENERATION_PAUSED || proposalReady === true) return <ProposalStudio simple={PROPOSAL_SIMPLE_MODE} />;
   if (proposalReady === null) return <main className="op-app" aria-busy="true"><p className="op-service">Opening your creative studio…</p></main>;
   // Never replace a working two-stage release with a disabled four-stage generator.
   // A v10 brief is not sent to the older API; this is an explicitly labelled separate canvas.
-  return <ProposalStudio simple />;
+  if (PROPOSAL_SIMPLE_MODE) return <ProposalStudio simple />;
+  return <><aside className="op-rollout-notice" role="status">Complete proposal generation is not available yet. This earlier canvas creates world and physical studies only. <Link to="/?proposal=1">Open a saved complete proposal</Link></aside><CanvasStudio /></>;
 }
