@@ -1,6 +1,13 @@
 // @vitest-environment node
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
+
+// Offline generation/reader behavior only. The real, unmocked public hold is
+// exercised in server-generation-hold.test.ts; this is not an activation switch.
+vi.mock('../../supabase/functions/generate-concept/server-generation-hold', async original => ({
+  ...(await original<typeof import('../../supabase/functions/generate-concept/server-generation-hold')>()),
+  serverGenerationHeld: () => false,
+}));
 import {
   PROPOSAL_CONTRACT_VERSION, PROPOSAL_CAPABILITIES, PROPOSAL_STAGE_VERSION,
   hasProposalCapabilities, isProposalConcept, parseProposalManifest, parseRevisionPlan, serializeProposalManifest,

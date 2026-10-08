@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Maximize2, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, Maximize2, ZoomIn, ZoomOut } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import BuildProposalRequest from '@/components/BuildProposalRequest';
+import PilotProcess from '@/components/PilotProcess';
 import { studioBrand } from '@/lib/studio-brand';
 import { showcaseWorlds, SHOWCASE_DISCLAIMER, SHOWCASE_IMAGE_NOTE, SHOWCASE_PREVIEW_NOTE, type ShowcaseWorld } from '@/lib/showcase-worlds';
 import '@/components/proposal-studio.css';
@@ -71,12 +73,12 @@ export default function Showcase() {
   return <div className="op-app sc-page">
     <a href="#sc-main" className="op-skip-link">Skip to the concept studies</a>
     <header className="op-header"><a href={settings.link} aria-label={`${settings.title} home`} className="op-logo">{settings.logo && <img src={settings.logo} alt="" />}<span>{settings.title}<small>异趣伙伴</small></span></a><Link to="/" className="op-text-link"><ArrowLeft size={14} aria-hidden="true" />Start your world</Link></header>
-    <main id="sc-main">
+    <main id="sc-main" tabIndex={-1}>
       <section className="sc-intro">
         <p className="op-eyebrow">EXAMPLE WORLDS / {studioBrand.headline}</p>
         <h1>From IP to <br /><span>“I Want That”</span></h1>
         <p>A brand story becomes a world worth looking closer at. Explore three collectible directions, from the big idea to the small details and the unboxing.</p>
-        <p className="sc-disclaimer">{SHOWCASE_DISCLAIMER} Brand names identify the inspiration only.</p>
+        <p className="sc-proof-note">AI-generated concept studies. No physical prototypes shown.</p><p className="sc-disclaimer">{SHOWCASE_DISCLAIMER} Brand names identify the inspiration only.</p>
       </section>
       <div className="sc-tabs" role="tablist" aria-label="Choose an example world">
         {showcaseWorlds.map((w, index) => <button key={w.id} ref={node => { tabRefs.current[index] = node; }} type="button" role="tab" id={`sc-tab-${w.id}`} tabIndex={w.id === active ? 0 : -1} aria-selected={w.id === active} aria-controls={`sc-${w.id}`} className={w.id === active ? 'is-active' : ''} onClick={() => setActive(w.id)} onKeyDown={event => navigateTabs(event, index)}><strong>{w.brand}</strong><span>{w.tagline}</span></button>)}
@@ -107,8 +109,9 @@ export default function Showcase() {
           </section>
         </div>
       </article>
+      <PilotProcess/>
       <section className="sc-journey" aria-labelledby="sc-journey-title"><p className="sc-kicker">YOUR STORY COMES NEXT</p><h2 id="sc-journey-title">Give People Something To Talk About</h2><ol><li><span>01</span>Your brand or IP</li><li><span>02</span>A rich concept preview</li><li><span>03</span>Refine the direction</li><li><span>04</span>Request a Quote &amp; Build Proposal</li><li><span>05</span>Engineering, prototype &amp; production</li></ol><p>{SHOWCASE_PREVIEW_NOTE}</p></section>
-      <section className="sc-cta"><div><p className="sc-kicker">FROM PREVIEW TO POSSIBILITY</p><h2>Make It <span>LIVE.</span></h2><p>Start with your brand. Find the direction worth building.</p></div><Link to="/" className="op-primary">Start your concept preview<ArrowRight size={16} aria-hidden="true" /></Link></section>
+      <section className="sc-cta"><div><p className="sc-kicker">FROM PREVIEW TO POSSIBILITY</p><h2>Make It <span>LIVE.</span></h2><p>Plan a project like this, around your own brand or story.</p></div><BuildProposalRequest compact projectEntry brief="New project enquiry. No customer concept has been generated." inspiration={`${world.brand}: ${world.tagline}`}/></section>
     </main>
   </div>;
 }

@@ -77,3 +77,23 @@ describe('Public entry layout boundaries', () => {
     }
   });
 });
+
+describe('Buyer-pilot small-screen contracts (not browser measurements)', () => {
+  it.each([320, 375, 414])('stacks request fields and actions with contained modal width at %ipx', viewport => {
+    expect(declarations(['.op-request-fields .op-detail-grid'], viewport)['grid-template-columns']).toBe('minmax(0,1fr)');
+    expect(declarations(['.op-enquiry-actions button'], viewport).width).toBe('100%');
+    expect(declarations(['.op-enquiry-dialog'], viewport).width).toBe('calc(100vw - 20px)');
+    expect(declarations(['.op-enquiry-dialog'], viewport)['max-height']).toBe('calc(100dvh - 20px)');
+    expect(declarations(['.op-enquiry-dialog>button:last-child'], viewport).width).toBe('44px');
+    expect(declarations(['.op-enquiry-dialog>button:last-child'], viewport).height).toBe('44px');
+    expect(declarations(['.op-process-steps'], viewport)['grid-template-columns']).toBe('1fr');
+  });
+  it('provides portal-contained focus visibility, 16px form type, and clear contrast for primary controls', () => {
+    expect(declarations(['.op-enquiry-dialog :is(button,input,textarea,summary,select):focus-visible'], 375).outline).toBe('3px solid #ac3a27');
+    expect(declarations(['.op-enquiry-dialog :is(input,textarea)'], 375)['font-size']).toBe('16px');
+    // WCAG relative luminance calculation for the actual primary color pair.
+    const luminance = (hex:string) => hex.match(/[a-f0-9]{2}/gi)!.map(value => parseInt(value,16)/255).map(value => value <= .04045 ? value/12.92 : ((value+.055)/1.055)**2.4).reduce((sum,value,index) => sum+value*[.2126,.7152,.0722][index],0);
+    expect((luminance('faf5e9')+.05)/(luminance('141411')+.05)).toBeGreaterThan(7);
+    expect((luminance('faf5e9')+.05)/(luminance('655e52')+.05)).toBeGreaterThan(4.5);
+  });
+});

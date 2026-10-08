@@ -1,13 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseSelection, designDirection, type Edition, type GiftFormat } from './options.ts';
-import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
+import { readCompanyWebsite, readCompanyWebsiteDirect, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
 import { websiteReadMessage } from './website-contract.ts';
 import { CANVAS_WORLD_PROMPT, CANVAS_PHYSICAL_PROMPT, canvasImagePrompt, BRAND_PROMPT, IMAGE_PROMPT, PROMPT_VERSION, parseConceptMode, modeDesignDirection, CO_CREATION_CONTRACT_VERSION, MAX_CONTEXT_CHARS, LEGACY_MAX_CONTEXT_CHARS, MAX_REQUEST_BYTES, isCoCreationContext } from './prompt.ts';
 import { CANVAS_CONTRACT_VERSION, CANVAS_CAPABILITIES, CanvasFailure, validateCanvasRequest, canvasCacheInput, parseCanvasManifest, serializeCanvasManifest, restoreCanvasRow, selectWorldElements, parseCanvasDesign, isCanvasContext, type CanvasManifest, type CanvasStoredRow } from './canvas.ts';
 import { PROPOSAL_CONTRACT_VERSION, PROPOSAL_CAPABILITIES, restoreProposalRow } from './proposal.ts';
 import { handleProposal, supportsProposalModel } from './proposal-handler.ts';
 import { providerCallTimeout } from './proposal-budget.ts';
-const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Cache-Control':'no-store'}});
+import { serverGenerationHeld, SERVER_GENERATION_HOLD_MESSAGE, isRestoreOnlyRequest } from './server-generation-hold.ts';
+import { requestPilotDigest, loadPilotAccess, publicPilotAccess, pilotExecution, PILOT_ACCESS_VERSION } from './pilot-access.ts';
+const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status, headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info, x-offkin-invite, x-offkin-recovery','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Cache-Control':'no-store'}});
 const hash = async (s:string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');
 // Temporary owner-requested test waiver. Set BRICK_ENFORCE_DAILY_LIMITS=true to restore caps.
 // Only an absent setting or explicit false bypasses quotas; unknown values fail closed.
@@ -19,8 +21,24 @@ class Failure extends Error { constructor(public status:number, message:string){
 export async function handleRequest(req: Request) {
  if(req.method==='OPTIONS')return json({});
  if(req.method==='GET'){
-  const sourceCapabilities={prompt_version:PROMPT_VERSION,capabilities:{...CANVAS_CAPABILITIES,...PROPOSAL_CAPABILITIES,proposal:proposalEnabled(),summary_only:true,electronic_story_scene:true,cocreation:true,context_max_chars:MAX_CONTEXT_CHARS}};
+  const held=serverGenerationHeld();
+  const sourceCapabilities={prompt_version:PROMPT_VERSION,capabilities:{...CANVAS_CAPABILITIES,...PROPOSAL_CAPABILITIES,proposal:!held&&proposalEnabled(),summary_only:true,electronic_story_scene:true,cocreation:true,context_max_chars:MAX_CONTEXT_CHARS}};
+  const paused=()=>json({ready:false,generation_paused:true,invite_access_ready:false,pilot_access:{version:PILOT_ACCESS_VERSION,authorized:false},daily_limits_enforced:dailyLimitsEnforced(),...sourceCapabilities,reason:SERVER_GENERATION_HOLD_MESSAGE,verification:'Server-enforced hold. No website or AI provider was contacted; saved-link restoration remains a separate read-only request.'},503);
   const url=Deno.env.get('SUPABASE_URL'); const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if(held){
+   const digest=await requestPilotDigest(req);
+   if(!digest||!url||!service)return paused();
+   try{
+    const db=createClient(url,service);const access=await loadPilotAccess(db,digest);
+    if(!access)return paused();
+    const {error}=await db.from('brick_concepts').select('id,pilot_invite_id').limit(0);
+    if(error)return paused();
+    const ready=Boolean(Deno.env.get('LOVABLE_API_KEY'))&&Deno.env.get('BRICK_GENERATION_ENABLED')==='true'&&proposalEnabled();
+    // A valid status read succeeds even when its remaining generation allowance
+    // is zero. Clients must also require ready + exact generation capabilities.
+    return json({ready,generation_paused:!ready,invite_access_ready:true,pilot_access:publicPilotAccess(access),...sourceCapabilities,capabilities:{...sourceCapabilities.capabilities,proposal:true},reason:ready?'Private pilot requests are available within this invitation’s remaining allowance; completed attempts can be recovered without another provider call.':'New generation is paused. Explicit saved-result recovery remains available.',verification:'Invite, campaign, configuration and schema checked. Provider quality still requires separately authorized live acceptance.'},200);
+   }catch{return paused();}
+  }
   if(!url||!service)return json({ready:false,...sourceCapabilities,reason:'Backend configuration is missing.'},503);
   const db=createClient(url,service);
   const {error}=await db.from('brick_concepts').select('id,cache_key,brand,title,story,image_path,prompt_version,edition,format,interaction,source_url,source_title').limit(0);
@@ -35,6 +53,17 @@ export async function handleRequest(req: Request) {
   const raw=new TextDecoder().decode(bytesIn);
   let input; try{input=JSON.parse(raw);}catch{return json({error:'Invalid request.'},400);}
   if(!input || typeof input!=='object' || Array.isArray(input))return json({error:'Invalid request.'},400);
+  // This boundary precedes database/cache/source reads and every website/provider
+  // route, including legacy generation, revision planning and Firecrawl fallback.
+  // A UUID mixed with generation fields is not a read-only restore request.
+  const held=serverGenerationHeld();const restoring=isRestoreOnlyRequest(input);
+  if(req.headers.has('x-offkin-recovery')&&req.headers.get('x-offkin-recovery')!=='1')return json({error:'Use the supported saved-result recovery request.'},400);
+  const inviteDigest=held&&!restoring?await requestPilotDigest(req):null;
+  if(held){
+   if(restoring){
+    if(typeof input.id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.id))return json({error:'Invalid concept link.'},400);
+   }else if(!inviteDigest||Object.prototype.hasOwnProperty.call(input,'id'))return json({error:SERVER_GENERATION_HOLD_MESSAGE,generation_paused:true,invite_access_ready:false},503);
+  }
   if(input.summaryOnly!==undefined && typeof input.summaryOnly!=='boolean')return json({error:'Invalid story request.'},400);
   if(input.inspectWebsite!==undefined && typeof input.inspectWebsite!=='boolean')return json({error:'Invalid inspection request.'},400);
   if(input.contractVersion!==undefined && input.contractVersion!==CO_CREATION_CONTRACT_VERSION && input.contractVersion!==CANVAS_CONTRACT_VERSION && input.contractVersion!==PROPOSAL_CONTRACT_VERSION)return json({error:'This co-creation contract is not supported.'},400);
@@ -49,6 +78,13 @@ export async function handleRequest(req: Request) {
   const url=Deno.env.get('SUPABASE_URL');const service=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if(!url||!service)throw new Failure(503,'Concept generation is being connected. Please try again later.');
   const db=createClient(url,service);
+  const pilot=held&&!restoring?await loadPilotAccess(db,inviteDigest!):null;
+  if(held&&!restoring&&!pilot)return json({error:SERVER_GENERATION_HOLD_MESSAGE,generation_paused:true,invite_access_ready:false},503);
+  // The pilot permits only v10 asset/planning requests. In particular, legacy
+  // website inspection cannot reach its paid Firecrawl fallback through here.
+  if(pilot&&(!proposal||input.inspectWebsite!==undefined||input.summaryOnly!==undefined))return json({error:'Only complete-proposal generation is available through this private pilot invitation.'},403);
+  const recoveryOnly=Boolean(pilot)&&req.headers.get('x-offkin-recovery')==='1';
+  const execution=pilot?pilotExecution(db,pilot,recoveryOnly):null;
   const deliver=async(row:CanvasStoredRow & {edition?:Edition;format?:GiftFormat})=>{
    const {data,error}=await db.storage.from('brick-concepts').createSignedUrl(row.image_path,3600);
    if(error||!data)throw new Failure(503,'The concept image is temporarily unavailable. Please retry.');
@@ -75,6 +111,7 @@ export async function handleRequest(req: Request) {
    if(req.signal.aborted)throw new Failure(499,'The request was cancelled.');
    const timeout=providerCallTimeout(timeoutMs);
    if(!timeout)throw new Failure(504,'The generation request ran out of time. Your brief and existing images are unchanged.');
+   if(execution)await execution.claim(path);
    const multipart=body instanceof FormData;
    const headers:Record<string,string>={'Authorization':`Bearer ${key}`,'Lovable-API-Key':key!};
    // Fetch supplies the multipart boundary. A manually set Content-Type would corrupt it.
@@ -84,8 +121,22 @@ export async function handleRequest(req: Request) {
    return await response.json();
   }
   if(proposal){
-   return await handleProposal(input,req,{db,generationMode:'creative-preview',requireCustomerIdentity:true,enabled:Boolean(key)&&enabled&&proposalEnabled(),textModel:Deno.env.get('BRICK_TEXT_MODEL')||'google/gemini-3-flash-preview',imageModel:proposalImageModel(),ai,hash,respond:json,deliver,
-    reserve:async()=>{
+   try{
+   const result=await handleProposal(input,req,{db,generationMode:'creative-preview',requireCustomerIdentity:true,enabled:recoveryOnly||(Boolean(key)&&enabled&&proposalEnabled()),textModel:Deno.env.get('BRICK_TEXT_MODEL')||'google/gemini-3-flash-preview',imageModel:recoveryOnly&&!supportsProposalModel(proposalImageModel())?'openai/gpt-image-2':proposalImageModel(),ai,hash,respond:json,deliver,
+    ...(pilot?{cacheScope:pilot.inviteId,pilotInviteId:pilot.inviteId,assertSourceAccess:execution!.assertSource,readWebsite:readCompanyWebsiteDirect,recoveryOnly,
+      beforeAssetSave:execution!.beforeAssetSave,completeAsset:execution!.completeAsset,completePlanner:execution!.completePlanner,recoverAsset:execution!.recoverAsset}:{}),
+    reserve:async(request)=>{
+     if(execution){
+      if(!request)throw new Failure(503,'A complete pilot request is required.');
+      const replay=await execution.reserve(request);
+      if(replay&&'payload' in replay)return json(replay.payload);
+      if(replay&&'assetId' in replay){
+       const {data:row,error}=await db.from('brick_concepts').select('id,cache_key,brand,title,story,image_path,edition,format,interaction,source_url,source_title,prompt_version,pilot_invite_id').eq('id',replay.assetId).maybeSingle();
+       if(error||!row)throw new Failure(503,'The completed pilot result could not be restored. No provider request was sent.');
+       execution.assertSource(row);return deliver(row);
+      }
+      return;
+     }
      if(!dailyLimitsEnforced())return;
      const client=await hash(service+':'+(req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'unknown'));
      const {data:allowed,error:limitError}=await db.rpc('reserve_brick_generation',{client_key:client});
@@ -93,6 +144,17 @@ export async function handleRequest(req: Request) {
      if(!allowed)throw new Failure(429,'Today’s generation limit has been reached. Completed proposal sections are saved.');
     }
    });
+   if(execution)await execution.finish(result);
+   return result;
+   }catch(error){
+    const counted=execution?await execution.fail():false;
+    if(counted){
+     const known=error instanceof Failure||error instanceof CanvasFailure;
+     const message=known?error.message.slice(0,320):'The generation could not be completed.';
+     throw new CanvasFailure(known?error.status:503,message+' This pilot attempt remains counted and will not be retried automatically.');
+    }
+    throw error;
+   }
   }
   if(canvas){
    const request=validateCanvasRequest(input);

@@ -2,7 +2,7 @@ import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { exportFixture, exportIds, EXPORT_PNG } from '@/test/proposal-export-fixture';
 import { pendingProposal, saveProposalSession, loadProposalSession, saveProposalSnapshot, loadProposalSnapshot } from './proposal-session';
-import { EXPORT_IMAGE_LIMIT, EXPORT_IMAGE_TIMEOUT, prepareProposalRequest, proposalExportSnapshot } from './proposal-export';
+import { EXPORT_IMAGE_LIMIT, EXPORT_IMAGE_TIMEOUT, prepareCollectibleImage, prepareProposalRequest, proposalExportSnapshot } from './proposal-export';
 import { makeProductPlan } from '@/test/product-plan-fixture';
 const notes = { quantity: '50 gifts', timing: 'Spring', budget: 'To discuss in MYR', notes: 'Keep the silhouette' };
 const png = Uint8Array.from(atob(EXPORT_PNG.split(',')[1]), c => c.charCodeAt(0));
@@ -107,4 +107,21 @@ describe('Self-contained concept request export', () => {
     vi.stubGlobal('Image',FallbackImage);const result=await run();expect(result.embedded).toBe(success?4:0);expect(result.missing).toHaveLength(success?0:4);expect(sources.filter(value=>!value)).toHaveLength(4);
   });
 
+});
+
+
+describe('Ordinary collectible-image handoff',()=>{
+  it('preserves the exact chosen hero bytes and source hash',async()=>{
+    const fixture=exportFixture();const fetch=vi.spyOn(globalThis,'fetch');const result=await prepareCollectibleImage(proposalExportSnapshot(fixture.session,fixture.all),new AbortController().signal);
+    expect(result.bytes).toEqual(png);expect(result.mime).toBe('image/png');expect(result.filename).toBe('OFFKIN-collectible-concept.png');expect(result.sourceHash).toHaveLength(64);expect(fetch).not.toHaveBeenCalled();
+  });
+  it('rejects missing/mismatched hero metadata and unsafe image sources',async()=>{
+    const f=exportFixture();const snapshot=proposalExportSnapshot(f.session,f.all);
+    await expect(prepareCollectibleImage(undefined,new AbortController().signal)).rejects.toThrow(/unavailable/);
+    const hero=snapshot.stages.find(item=>item.stage==='physical')!;hero.asset={...hero.asset!,image:'https://attacker.example/private.png'};const fetch=vi.spyOn(globalThis,'fetch');
+    await expect(prepareCollectibleImage(snapshot,new AbortController().signal)).rejects.toThrow(/saved private image/);expect(fetch).not.toHaveBeenCalled();
+  });
+  it('cancels before opening any saved image',async()=>{
+    const abort=new AbortController();abort.abort();const fetch=vi.spyOn(globalThis,'fetch');await expect(prepareCollectibleImage(proposalExportSnapshot(exportFixture().session,exportFixture().all),abort.signal)).rejects.toThrow(/Cancelled/);expect(fetch).not.toHaveBeenCalled();
+  });
 });

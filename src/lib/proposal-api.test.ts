@@ -1,3 +1,4 @@
+import { forgetPilotInvite, setPilotInvite } from './pilot-access';
 import { makeConceptPreview } from '../../supabase/functions/generate-concept/concept-preview';
 import { makeProductPlan } from '../test/product-plan-fixture';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,9 +9,10 @@ vi.mock('./proposal-availability',async original=>({...await original<object>(),
 const id='00000000-0000-4000-8000-000000000001';const world:ProposalRequest={contractVersion:'offkin-proposal-v10',stage:'world',brand:'no-website',customerIdentity:{version:CUSTOMER_IDENTITY_VERSION,name:'  Fable Finch 字 Café 🪁  '},context:{mode:'mechanical',interaction:'Display only',business:'Paper gifts',exactWording:'  字\nCafé 🪁 '}};
 function concept(overrides:Partial<ProposalConcept>={}):ProposalConcept{return {...world,id,stageVersion:'proposal-assets-v1',brand:world.customerIdentity!.name,title:'Paper world',story:'A rich paper city.',design:'Many connected scenes',interaction:'Explore',worldElements:[{id:'house',label:'Paper house',description:'A proposed story home',kind:'proposal'}],sourceImageIds:[],conceptPreview:makeConceptPreview(['house'], 'house'),image:'https://images.example/world.png',sourceUrl:'',sourceTitle:'',...overrides};}
 const reply=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status});
-const readiness=()=>reply({ready:true,capabilities:PROPOSAL_CAPABILITIES});
-beforeEach(()=>{availability.paused=false;vi.stubEnv('VITE_SUPABASE_URL','https://test.invalid');vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY','public-key');});
-afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.restoreAllMocks();});
+const access={version:'offkin-pilot-v1',authorized:true,images_remaining:5,planners_remaining:1,expires_at:'2099-01-01T00:00:00Z'};
+const readiness=()=>reply({ready:true,capabilities:PROPOSAL_CAPABILITIES,pilot_access:access});
+beforeEach(()=>{setPilotInvite('a'.repeat(43));availability.paused=false;vi.stubEnv('VITE_SUPABASE_URL','https://test.invalid');vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY','public-key');});
+afterEach(()=>{forgetPilotInvite();vi.unstubAllEnvs();vi.unstubAllGlobals();vi.restoreAllMocks();});
 describe('Proposal API fail-closed negotiation',()=>{
  it.each([undefined,'customer-brand-v0','customer-brand-v2'])('requires exact customer identity capability %j before generation',async version=>{
    const fetch=vi.fn(async()=>reply({ready:true,capabilities:{...PROPOSAL_CAPABILITIES,proposal_customer_identity_version:version}}));vi.stubGlobal('fetch',fetch);
@@ -62,7 +64,7 @@ describe('Proposal API fail-closed negotiation',()=>{
    expect((await restoreProposalAsset(id,new AbortController().signal)).constructionIntent).toBeUndefined();expect(fetch).toHaveBeenCalledOnce();expect(JSON.parse(String(fetch.mock.calls[0][1].body))).toEqual({id});
  });
 
- it('holds new paid work without a request while saved restore remains available',async()=>{availability.paused=true;const fetch=vi.fn(async()=>reply({concept:concept()}));vi.stubGlobal('fetch',fetch);expect(await supportsProposalGeneration(new AbortController().signal)).toBe(false);await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/temporarily unavailable/);expect(fetch).not.toHaveBeenCalled();await restoreProposalAsset(id,new AbortController().signal);expect(fetch).toHaveBeenCalledOnce();});
+ it('holds new paid work without a request while saved restore remains available',async()=>{availability.paused=true;forgetPilotInvite();const fetch=vi.fn(async()=>reply({concept:concept()}));vi.stubGlobal('fetch',fetch);expect(await supportsProposalGeneration(new AbortController().signal)).toBe(false);await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/temporarily unavailable/);expect(fetch).not.toHaveBeenCalled();await restoreProposalAsset(id,new AbortController().signal);expect(fetch).toHaveBeenCalledOnce();});
  it('reads readiness without transmitting the direction',async()=>{const fetch=vi.fn(async(_url:string,_init:RequestInit)=>readiness());vi.stubGlobal('fetch',fetch);expect(await supportsProposalGeneration(new AbortController().signal)).toBe(true);expect(fetch.mock.calls[0][1]).not.toHaveProperty('body');});
  it('never downgrades v10 to the v9 backend',async()=>{const fetch=vi.fn(async()=>reply({ready:true,capabilities:{canvas:true,canvas_contract_version:'offkin-canvas-v9'}}));vi.stubGlobal('fetch',fetch);await expect(requestProposalAsset(world,new AbortController().signal)).rejects.toThrow(/not available/);expect(fetch).toHaveBeenCalledOnce();});
  it('rechecks capabilities immediately before generation and preserves exact context',async()=>{const fetch=vi.fn(async(_url,init)=>init.method==='POST'?reply({concept:concept()}):readiness());vi.stubGlobal('fetch',fetch);const c=await requestProposalAsset(world,new AbortController().signal);expect(c.context.exactWording).toBe(world.context.exactWording);expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual(world);});
@@ -135,4 +137,27 @@ describe('details refinement API response validation', () => {
     vi.stubGlobal('fetch', vi.fn(async (_url, init) => init.method === 'POST' ? reply({ plan }) : readiness()));
     return expect(planProposalRevision(planRequest, new AbortController().signal)).rejects.toThrow();
   });
+});
+
+it('never accepts an old public capability response as private pilot authorization',async()=>{
+  const fetch=vi.fn(async()=>reply({ready:true,capabilities:PROPOSAL_CAPABILITIES}));vi.stubGlobal('fetch',fetch);
+  expect(await supportsProposalGeneration(new AbortController().signal)).toBe(false);expect(fetch).toHaveBeenCalledOnce();
+});
+it('authenticates readiness and paid requests in headers but leaves capability restores credential-free',async()=>{
+  const fetch=vi.fn(async(_url,init)=>init.method==='POST'?reply({concept:concept()}):readiness());vi.stubGlobal('fetch',fetch);
+  await requestProposalAsset(world,new AbortController().signal);expect(fetch.mock.calls[0][1].headers['x-offkin-invite']).toBe('a'.repeat(43));expect(fetch.mock.calls[1][1].headers['x-offkin-invite']).toBe('a'.repeat(43));
+  expect(String(fetch.mock.calls[1][1].body)).not.toContain('a'.repeat(43));await restoreProposalAsset(id,new AbortController().signal);expect(fetch.mock.calls[2][1].headers).not.toHaveProperty('x-offkin-invite');
+});
+it('keeps paid actions disabled when a verified invite is exhausted or provider readiness is paused',async()=>{
+  vi.stubGlobal('fetch',vi.fn(async()=>reply({ready:false,capabilities:{...PROPOSAL_CAPABILITIES,proposal:false},pilot_access:{...access,images_remaining:0}})));
+  expect(await supportsProposalGeneration(new AbortController().signal)).toBe(false);
+});
+it('recovers a saved image through an explicit no-spend header even when paid generation is paused',async()=>{
+  const fetch=vi.fn(async(_url,init)=>init.method==='POST'?reply({concept:concept()}):reply({ready:false,capabilities:{...PROPOSAL_CAPABILITIES,proposal:false},pilot_access:{...access,images_remaining:0,recovery_available:true}}));vi.stubGlobal('fetch',fetch);
+  await expect(requestProposalAsset(world,new AbortController().signal,true)).resolves.toMatchObject({id});
+  expect(fetch.mock.calls[1][1].headers).toMatchObject({'x-offkin-recovery':'1','x-offkin-invite':'a'.repeat(43)});expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual(world);
+});
+it('never sends a recovery request to a backend without the explicit recovery contract',async()=>{
+  const fetch=vi.fn(async()=>readiness());vi.stubGlobal('fetch',fetch);
+  await expect(requestProposalAsset(world,new AbortController().signal,true)).rejects.toThrow(/not available/);expect(fetch).toHaveBeenCalledOnce();
 });

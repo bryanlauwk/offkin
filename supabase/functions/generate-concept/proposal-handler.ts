@@ -10,13 +10,13 @@ import {
   PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGE_VERSION, CUSTOMER_IDENTITY_VERSION, canonicalProposal,
   parseProposalManifest, parseRevisionPlan, proposalSourceImageIds, sameProposalContext, sameWorldDirection,
   serializeProposalManifest, validateProposalRequest, validateRevisionPlanRequest,
-  type CustomerIdentity, type ProposalManifest, type ProposalRequest, type ProposalStage,
+  type CustomerIdentity, type ProposalManifest, type ProposalRequest, type ProposalStage, type RevisionPlanRequest, type RevisionPlanResponse,
 } from './proposal.ts';
 import { proposalDesignPrompt, proposalImagePrompt, legacyEngineeringDesignPrompt, legacyEngineeringImagePrompt, PRODUCT_PLAN_CORRECTION_PROMPT, PROPOSAL_REVISION_PROMPT, PROPOSAL_PROMPT_REVISION, CONSTRUCTION_PROMPT_REVISION, constructionChoicePrompt } from './proposal-prompt.ts';
 import { readCompanyWebsite, validatePublicWebsiteUrl, WebsiteReadError } from './website.ts';
 import { proposalCallTimeout, type ProposalProviderCall } from './proposal-budget.ts';
 
-type StoredRow = CanvasStoredRow & { cache_key?: string; edition?: 'inside'; format?: 'miniature' };
+type StoredRow = CanvasStoredRow & { cache_key?: string; edition?: 'inside'; format?: 'miniature'; pilot_invite_id?: string | null };
 type Result<T> = { data?: T; error?: unknown };
 type Source = { row: StoredRow; manifest: CanvasManifest | ProposalManifest };
 type ImageBlob = { size: number; type: string; arrayBuffer(): Promise<ArrayBuffer> };
@@ -47,12 +47,22 @@ export type ProposalRuntime = {
   requireConstructionIntent?: boolean;
   /** Legacy test adapters only may omit an explicit name; production always requires it for a new world. */
   requireCustomerIdentity?: boolean;
-  reserve(): Promise<void>;
+  /** Supplied only by the server's authenticated pilot adapter. */
+  cacheScope?: string;
+  pilotInviteId?: string;
+  assertSourceAccess?(row: StoredRow): void;
+  readWebsite?(url: string): Promise<{url:string;title:string;excerpt:string}>;
+  recoveryOnly?: boolean;
+  beforeAssetSave?():void;
+  completeAsset?(id:string):Promise<void>;
+  completePlanner?(payload:RevisionPlanResponse):Promise<void>;
+  recoverAsset?(request:ProposalRequest,id:string):Promise<void>;
+  reserve(request?: ProposalRequest | RevisionPlanRequest): Promise<Response|void>;
   hash(text: string): Promise<string>;
   respond(data: unknown, status?: number): Response;
   deliver(row: StoredRow): Promise<Response>;
 };
-const columns = 'id,cache_key,brand,title,story,image_path,interaction,source_url,source_title,prompt_version';
+const baseColumns = 'id,cache_key,brand,title,story,image_path,interaction,source_url,source_title,prompt_version';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 // Bound the one correction input without ever truncating a plan or customer selection.
 const MAX_PLAN_CORRECTION_CHARS = 32000;
@@ -129,6 +139,7 @@ function imageResult(result: unknown): { bytes: Uint8Array; mime: string } {
 /** One asset per request. Successful rows survive later-stage failure; no background-job claim. */
 export async function handleProposal(input: unknown, req: Request, runtime: ProposalRuntime): Promise<Response> {
   const { db, respond, deliver } = runtime;
+  const columns=baseColumns+(runtime.pilotInviteId?',pilot_invite_id':'');
   const previewFirst = runtime.generationMode !== 'legacy-engineering';
   const now = runtime.now || (() => performance.now());
   const started = now();
@@ -151,6 +162,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     const { data: row, error } = await db.from('brick_concepts').select(columns).eq('id', id).maybeSingle();
     if (error) throw new CanvasFailure(503, 'The source proposal could not be loaded.');
     if (!row) throw new CanvasFailure(404, 'The source proposal could not be found.');
+    runtime.assertSourceAccess?.(row);
     const manifest = row.prompt_version === PROPOSAL_CONTRACT_VERSION ? parseProposalManifest(row.story) :
       row.prompt_version === CANVAS_CONTRACT_VERSION ? parseCanvasManifest(row.story) : null;
     if (manifest && 'customerIdentity' in manifest && manifest.customerIdentity && row?.brand !== manifest.customerIdentity.name) throw new CanvasFailure(400, 'The saved customer identity is inconsistent. Your saved proposal is unchanged.');
@@ -179,7 +191,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
       throw new CanvasFailure(400, 'Open the current saved proposal before planning a revision.');
     }
     const boundary = modelBoundary([world, physical, details, packaging], { brand: planRequest.brand, context: planRequest.context, instruction: planRequest.instruction }, previewFirst);
-    active(); await runtime.reserve(); active();
+    active(); const replay=await runtime.reserve(planRequest);if(replay)return replay;active();
     const result = await runtime.ai('chat/completions', {
       model: runtime.textModel,
       messages: [{ role: 'system', content: PROPOSAL_REVISION_PROMPT }, { role: 'user', content: JSON.stringify(boundary.sanitize({
@@ -188,8 +200,13 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
       })) }], response_format: { type: 'json_object' }, max_tokens: 4000,
     });
     active();
-    return respond(parseRevisionPlan(boundary.inspect(textResult(result)), planRequest, { worldElements: world!.manifest.worldElements,
-      selectedElementIds: physical!.manifest.selectedElementIds!, heroElementId: physical!.manifest.heroElementId!, replacements: physical!.manifest.replacements || [] }));
+    const resolved=parseRevisionPlan(boundary.inspect(textResult(result)), planRequest, { worldElements: world!.manifest.worldElements,
+      selectedElementIds: physical!.manifest.selectedElementIds!, heroElementId: physical!.manifest.heroElementId!, replacements: physical!.manifest.replacements || [] });
+    if(runtime.pilotInviteId&&'plan' in resolved&&resolved.plan&&!['details','packaging'].includes(resolved.plan.scope)){
+      throw new CanvasFailure(403,'This pilot includes one details-only or packaging-only revision. That change needs more images, so no revision image was generated. The planning attempt has been used.');
+    }
+    await runtime.completePlanner?.(resolved);
+    return respond(resolved);
   }
   const generation = request as ProposalRequest;
   if (!previewFirst && generation.detailsRefinement) throw new CanvasFailure(400, 'Details refinements require the creative-preview path.');
@@ -284,7 +301,7 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
     catch (error) { throw new CanvasFailure(400, error instanceof Error ? error.message : 'Enter a public company website.'); }
   }
   if (generation.stage === 'world' && !websiteUrl && !generation.context.business?.trim()) return respond({ needsContext: true, message: 'Tell us what the business does so this proposal starts with real facts.' });
-  const cacheKey = await runtime.hash(canonicalProposal({ contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION, promptRevision: PROPOSAL_PROMPT_REVISION,
+  const cacheKey = await runtime.hash(canonicalProposal({ ...(runtime.cacheScope?{pilotScope:runtime.cacheScope}:{}),contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION, promptRevision: PROPOSAL_PROMPT_REVISION,
     request: generation, generationMode: previewFirst ? 'creative-preview' : 'legacy-engineering', conceptPreviewVersion: previewFirst ? CONCEPT_PREVIEW_VERSION : undefined, customerIdentity, customerIdentityVersion:CUSTOMER_IDENTITY_VERSION, websiteUrl, sourceManifests: Array.from(sources.values()).map(s => ({ id: s.row.id, brand:s.row.brand, manifest: s.manifest })),
     ...(briefIntent || inheritedCompiled?.version==='construction-origin-v2' ? { briefConstructionIdentity:{semantics:BRIEF_CONSTRUCTION_SEMANTICS,promptRevision:BRIEF_PROMPT_REVISION,intent:briefIntent||(inheritedCompiled?.version==='construction-origin-v2'?inheritedCompiled.intent:undefined)} } : {}),
     ...(binding || inheritedCompiled?.version==='construction-origin-v1' ? { constructionIdentity: { semantics:CONSTRUCTION_SEMANTICS, promptRevision:CONSTRUCTION_PROMPT_REVISION, ...(binding ? {binding} : {}) } } : {}),
@@ -292,16 +309,20 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   const { data: cached, error: cacheError } = await db.from('brick_concepts').select(columns).eq('cache_key', cacheKey).maybeSingle();
   if (cacheError) throw new CanvasFailure(503, 'Proposal storage is temporarily unavailable.');
   active();
-  if (cached) return deliver(cached);
+  if (cached) {runtime.assertSourceAccess?.(cached);await runtime.recoverAsset?.(generation,cached.id);return deliver(cached);}
+  if(runtime.recoveryOnly){
+    const recovered=await runtime.reserve(generation);if(recovered)return recovered;
+    throw new CanvasFailure(409,'No saved result is available for this exact attempt. No generation was started.');
+  }
   let website: { url: string; title: string; excerpt: string } | null = null;
   if (generation.stage === 'world' && websiteUrl) {
-    try { website = await readCompanyWebsite(websiteUrl); }
+    try { website = await (runtime.readWebsite||readCompanyWebsite)(websiteUrl); }
     catch (error) {
       if (error instanceof WebsiteReadError && error.status === 400) throw new CanvasFailure(400, error.message);
       if (!generation.context.business?.trim()) return respond({ needsContext: true, message: 'We could not read that website. Add factual business details instead of guessing.' });
     }
   }
-  active(); await runtime.reserve(); active();
+  active(); const replay=await runtime.reserve(generation);if(replay)return replay;active();
   const direction = { brand: canonicalBrand || generation.brand, ...(customerIdentity ? {customerIdentity} : {}), context: generation.context, websiteEvidence: website,
     ...(generation.detailsRefinement ? { detailsRefinement: generation.detailsRefinement } : {}),
     sourceWorld: boundary.source(world), sourcePhysical: boundary.source(physical), previousAsset: boundary.source(previous),
@@ -469,15 +490,25 @@ export async function handleProposal(input: unknown, req: Request, runtime: Prop
   const { error: uploadError } = await db.storage.from('brick-concepts').upload(imagePath, bytes, { contentType: mime, upsert: false });
   if (uploadError) throw new CanvasFailure(503, 'The proposal image could not be saved. Other completed sections are safe.');
   if (req.signal.aborted) { await db.storage.from('brick-concepts').remove([imagePath]); active(); }
-  const row: StoredRow = { id, cache_key: cacheKey, brand: design.brand, title: design.title, story: serialized,
+  const row: StoredRow = { ...(runtime.pilotInviteId?{pilot_invite_id:runtime.pilotInviteId}:{}),id, cache_key: cacheKey, brand: design.brand, title: design.title, story: serialized,
     image_path: imagePath, prompt_version: PROPOSAL_CONTRACT_VERSION, edition: 'inside', format: 'miniature', interaction: design.interaction,
     source_url: website?.url || world?.row.source_url || '', source_title: website?.title || world?.row.source_title || '' };
+  runtime.beforeAssetSave?.();
   const { error: saveError } = await db.from('brick_concepts').insert(row);
   if (saveError) {
-    await db.storage.from('brick-concepts').remove([imagePath]);
     const { data: existing } = await db.from('brick_concepts').select(columns).eq('cache_key', cacheKey).maybeSingle();
-    if (existing) return deliver(existing);
+    if (existing) {
+      runtime.assertSourceAccess?.(existing);
+      if(existing.id!==id)await db.storage.from('brick-concepts').remove([imagePath]);
+      await runtime.completeAsset?.(existing.id);return deliver(existing);
+    }
+    // A pilot insert acknowledgement may be lost after commit. Keep its uploaded
+    // image and consumed reservation available for exact saved-row recovery.
+    if(!runtime.pilotInviteId)await db.storage.from('brick-concepts').remove([imagePath]);
     throw new CanvasFailure(503, 'The proposal image could not be saved. Other completed sections are safe.');
   }
+  // Persist accounting before presentation. Signing failures must never turn a
+  // completed asset into a failed operation or prevent later lineage continuation.
+  await runtime.completeAsset?.(id);
   return deliver(row);
 }

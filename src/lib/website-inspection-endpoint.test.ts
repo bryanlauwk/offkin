@@ -1,6 +1,13 @@
 // @vitest-environment node
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
+
+// Offline generation/reader behavior only. The real, unmocked public hold is
+// exercised in server-generation-hold.test.ts; this is not an activation switch.
+vi.mock('../../supabase/functions/generate-concept/server-generation-hold', async original => ({
+  ...(await original<typeof import('../../supabase/functions/generate-concept/server-generation-hold')>()),
+  serverGenerationHeld: () => false,
+}));
 import { WebsiteReadError } from '../../supabase/functions/generate-concept/website-contract';
 const state = vi.hoisted(() => ({ readWebsite: vi.fn() }));
 vi.mock('https://esm.sh/@supabase/supabase-js@2', () => ({

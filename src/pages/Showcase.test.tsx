@@ -23,7 +23,7 @@ describe('Showcase concept previews', () => {
     expect(screen.getByRole('heading', { name: 'Make It LIVE.' })).toBeInTheDocument();
     expect(screen.getByText('Request a Quote & Build Proposal')).toBeInTheDocument();
     expect(screen.getAllByText(SHOWCASE_PREVIEW_NOTE)).toHaveLength(2);
-    expect(screen.getByRole('link', { name: 'Start your concept preview' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('button', { name: 'Plan my project' })).toBeEnabled();
     expect(screen.queryByText(/inquiry sent|request submitted|production.ready/i)).not.toBeInTheDocument();
     await waitFor(() => expect(document.title).toBe('Example worlds · OFFKIN'));
     expect(fetch).not.toHaveBeenCalled();

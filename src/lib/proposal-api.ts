@@ -1,3 +1,4 @@
+import { pilotCredentialVersion, pilotInviteHeaders, pilotInviteTokenPresent, rememberPilotAccess } from './pilot-access';
 import { CONCEPT_PREVIEW_VERSION } from '../../supabase/functions/generate-concept/concept-preview';
 import { PROPOSAL_GENERATION_PAUSED, PROPOSAL_PAUSE_MESSAGE } from './proposal-availability';
 import {
@@ -18,25 +19,36 @@ function target() {
   return { url: `${url}/functions/v1/generate-concept`, key };
 }
 export async function supportsProposalGeneration(signal: AbortSignal): Promise<boolean> {
-  if (PROPOSAL_GENERATION_PAUSED) return false;
-  try { active(signal); const { url, key } = target(); const response = await fetch(url, { headers: { apikey: key }, signal }); const data = await response.json(); return response.ok && !signal.aborted && hasProposalCapabilities(data); } catch { return false; }
+  if (!pilotInviteTokenPresent()) return false;
+  try { active(signal); const version = pilotCredentialVersion(); const { url, key } = target(); const response = await fetch(url, { headers: { apikey: key, ...pilotInviteHeaders() }, signal, credentials: 'omit', referrerPolicy: 'no-referrer' }); const data = await response.json(); if(signal.aborted || version !== pilotCredentialVersion()) return false; const access = rememberPilotAccess(response.ok ? data?.pilot_access : null); return response.ok && Boolean(access) && hasProposalCapabilities(data); } catch { return false; }
 }
-async function post(body: unknown, signal: AbortSignal): Promise<unknown> {
+/** Recovery is negotiated separately and the server forbids new reservations/dispatch. */
+export async function supportsProposalRecovery(signal: AbortSignal): Promise<boolean> {
+  if (!pilotInviteTokenPresent()) return false;
+  try {
+    active(signal); const version=pilotCredentialVersion(); const {url,key}=target();
+    const response=await fetch(url,{headers:{apikey:key,...pilotInviteHeaders()},signal,credentials:'omit',referrerPolicy:'no-referrer'});
+    const data=await response.json(); if(signal.aborted||version!==pilotCredentialVersion())return false;
+    const access=rememberPilotAccess(response.ok?data?.pilot_access:null);
+    return Boolean(access&&access.recovery_available===true)&&hasProposalCapabilities({...data,ready:true,capabilities:{...data?.capabilities,proposal:true}});
+  }catch{return false;}
+}
+async function post(body: unknown, signal: AbortSignal, authenticated = true, recoveryOnly = false): Promise<unknown> {
   active(signal); const { url, key } = target();
   const text = JSON.stringify(body); if (new TextEncoder().encode(text).byteLength > 48000) throw new Error('This direction is too long. Your wording has not been shortened.');
-  const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key }, body: text, signal });
+  const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key, ...(authenticated ? pilotInviteHeaders() : {}), ...(recoveryOnly ? {'x-offkin-recovery':'1'} : {}) }, body: text, signal, credentials: 'omit', referrerPolicy: 'no-referrer' });
   const data = await response.json().catch(() => null); active(signal);
   if (!response.ok) throw new Error(typeof data?.error === 'string' && data.error.length <= 500 ? data.error : 'This section could not be finished. Completed sections are saved; continue when you are ready.');
   return data;
 }
 const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 function equalContext(a: ProposalConcept['context'], b: ProposalConcept['context']) { return Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([key,value])=>b[key] === value); }
-export async function requestProposalAsset(body: ProposalRequest, signal: AbortSignal): Promise<ProposalConcept> {
+export async function requestProposalAsset(body: ProposalRequest, signal: AbortSignal, recoveryOnly = false): Promise<ProposalConcept> {
   active(signal); validateProposalRequest(body);
   if (body.stage==='world'&&!isCustomerIdentity(body.customerIdentity)) throw new Error('Enter the exact brand name before generating your proposal.');
   if (body.constructionIntent) throw new Error('Construction choices belong to a later build proposal. Start with your visual direction.');
-  if (!await supportsProposalGeneration(signal)) { active(signal); throw new ProposalUnavailableError(); }
-  const data = await post(body, signal);
+  if (!await (recoveryOnly ? supportsProposalRecovery(signal) : supportsProposalGeneration(signal))) { active(signal); throw new ProposalUnavailableError(); }
+  const data = await post(body, signal, true, recoveryOnly);
   if (record(data) && data.needsConstruction === true) throw new ProposalConstructionNeededError(typeof data.clarification === 'string' && data.clarification.trim() && data.clarification.length <= 600 ? data.clarification : 'The physical construction needs a little more detail.');
   if (record(data) && data.needsContext === true) throw new ProposalContextNeededError(typeof data.message === 'string' && data.message.length <= 1000 ? data.message : 'Tell us a little more about what this business does.');
   if (!record(data) || !isProposalConcept(data.concept)) throw new Error(record(data) && typeof data.message === 'string' ? data.message : 'The backend returned an incomplete proposal section.');
@@ -50,15 +62,15 @@ export async function requestProposalAsset(body: ProposalRequest, signal: AbortS
 }
 export async function restoreProposalAsset(id: string, signal: AbortSignal, expectedIdentity?: CustomerIdentity): Promise<ProposalConcept> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new Error('Invalid saved proposal.');
-  const data = await post({ id }, signal);
+  const data = await post({ id }, signal, false);
   if (!record(data) || !isProposalConcept(data.concept) || data.concept.id !== id) throw new Error('The saved proposal section could not be opened.');
   if (expectedIdentity && (data.concept.customerIdentity?.version!==expectedIdentity.version || data.concept.customerIdentity?.name!==expectedIdentity.name || data.concept.brand!==expectedIdentity.name)) throw new Error('The saved section does not match this customer brand.');
   return data.concept;
 }
-export async function planProposalRevision(body: RevisionPlanRequest, signal: AbortSignal): Promise<RevisionPlanResponse> {
+export async function planProposalRevision(body: RevisionPlanRequest, signal: AbortSignal, recoveryOnly = false): Promise<RevisionPlanResponse> {
   active(signal); validateRevisionPlanRequest(body);
-  if (!await supportsProposalGeneration(signal)) { active(signal); throw new ProposalUnavailableError(); }
-  const data = await post(body, signal);
+  if (!await (recoveryOnly ? supportsProposalRecovery(signal) : supportsProposalGeneration(signal))) { active(signal); throw new ProposalUnavailableError(); }
+  const data = await post(body, signal, true, recoveryOnly);
   if (!record(data)) throw new Error('The requested change could not be understood.');
   if (typeof data.clarification === 'string' && data.clarification.trim() && data.clarification.length <= 1000) return { clarification: data.clarification };
   // Validate context through the world request validator rather than trusting model output.

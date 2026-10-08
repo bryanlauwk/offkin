@@ -1,3 +1,4 @@
+import { pilotInviteHeaders } from './pilot-access';
 import { websiteReadMessage } from '../../supabase/functions/generate-concept/website-contract';
 import { parseSelection } from '../../supabase/functions/generate-concept/options';
 import { CO_CREATION_CONTRACT_VERSION, MAX_CONTEXT_CHARS, LEGACY_MAX_CONTEXT_CHARS, isCoCreationContext } from '../../supabase/functions/generate-concept/prompt';
@@ -63,7 +64,7 @@ export async function requestConcept(body: Record<string, unknown>, signal: Abor
     if (body.context.length > LEGACY_MAX_CONTEXT_CHARS || richContext) throw new CoCreationUnavailableError();
   }
   if (signal.aborted) throw new DOMException('The request was cancelled.', 'AbortError');
-  const response = await fetch(`${url}/functions/v1/generate-concept`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key }, body: JSON.stringify(body), signal });
+  const response = await fetch(`${url}/functions/v1/generate-concept`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: key, ...(body.inspectWebsite ? pilotInviteHeaders() : {}) }, body: JSON.stringify(body), signal });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 429) throw new Error('We’re busy right now. Please try again a little later.');
