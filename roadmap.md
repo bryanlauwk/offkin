@@ -5,7 +5,8 @@
 - [x] Home cleanup: yellow paused banner replaced, fine print folded into Details
 - [ ] Ambient sound toggle (ElevenLabs) — BLOCKED: ElevenLabs account has an unpaid invoice
 - [x] Tests, build, desktop/mobile screenshots
-- [ ] Brand-first invited-buyer journey and research confirmation
-- [ ] Reference-led four-image proposal board redesign
-- [ ] Private proposal request form and admin review inbox
-- [ ] Tests and desktop/mobile verification for the redesigned journey
+- [x] Brand-first invited-buyer journey and research confirmation
+- [x] Reference-led four-image proposal board redesign
+- [x] Private proposal request form and admin review inbox
+- [x] Tests and desktop/mobile verification for the redesigned journey
+- [x] Rebuild studio from scratch with generation re-enabled

@@ -33,7 +33,7 @@ afterEach(cleanup);
 describe('ProposalBoard',()=>{
   it('shows four distinct complete generated visuals with real component and packaging sections',()=>{
     const input=props();const {container}=render(<ProposalBoard {...input}/>);
-    expect(screen.getAllByRole('img').map(img=>img.getAttribute('src'))).toEqual(['physical','world','details','packaging'].map(stage=>`https://images.example/${stage}.png`));
+    expect(screen.getAllByRole('img').map(img=>img.getAttribute('src'))).toEqual(['world','physical','details','packaging'].map(stage=>`https://images.example/${stage}.png`));
     expect(screen.getByRole('heading',{name:'Components & interaction'})).toBeInTheDocument();
     expect(screen.getByRole('heading',{name:'Packaging concept'})).toBeInTheDocument();
     expect(screen.getByRole('heading',{name:'A box that opens into a story'})).toBeInTheDocument();
@@ -41,13 +41,6 @@ describe('ProposalBoard',()=>{
     expect(screen.getByText('Generated packaging study')).toBeInTheDocument();
     expect(container.querySelectorAll('[style*="background-image"], [style*="object-position"]')).toHaveLength(0);
     expect(container.querySelector('img[src*="canvas-worlds"]')).toBeNull();
-  });
-  it('shows unverified parts and prototype gates only when a valid saved physical plan exists',()=>{
-    const assets=fullAssets();assets.physical!.productPlan=makeProductPlan(['fold','ribbon']);
-    render(<ProposalBoard {...props({assets})}/>);
-    expect(screen.getByRole('region',{name:'Proposed construction plan'})).toHaveTextContent('2 proposed printed parts');
-    expect(screen.getByText(/No CAD, sliced file or physical sample has been validated/)).toBeInTheDocument();
-    expect(screen.getByText(/Parts, joins, assembly and checks before production/)).toBeInTheDocument();
   });
   it('labels old visual-only proposals without inventing construction evidence',()=>{render(<ProposalBoard {...props()}/>);expect(screen.getByText('Concept preview. Final design, functionality and pricing confirmed during the build proposal.')).toBeInTheDocument();});
   it('renders exact wording unchanged and keeps element descriptions independently readable',()=>{

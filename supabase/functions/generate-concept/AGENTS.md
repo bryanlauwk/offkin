@@ -1,2 +1,4 @@
 - Website reading tries the pinned direct reader first and only falls back to Firecrawl for blocked/unreadable/empty/secure/timeout failures, after the same URL and public-DNS validation, re-validating the final URL and keeping the byte/excerpt ceilings. Why: improve reach without weakening SSRF or size limits.
 - Brand-name lookup uses Firecrawl search only (no model call), returns at most 3 origin-only candidates that each pass the public URL + DNS checks, and the visitor must confirm one; failures fall back to the visitor's own words. Why: research the right brand without trusting search output or widening SSRF surface.
+
+- Proposal image edits use bytes downloaded from validated saved private storage rows, never client-provided image URLs. The v10 capability stays gated until the gateway reference-image route is verified; never silently fall back to prompt-only images. Why: prevents SSRF and silent quality downgrades.
