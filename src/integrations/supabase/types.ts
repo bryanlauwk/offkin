@@ -80,6 +80,81 @@ export type Database = {
         }
         Relationships: []
       }
+      proposal_request_limits: {
+        Row: {
+          expires_at: string
+          key: string
+          used: number
+        }
+        Insert: {
+          expires_at: string
+          key: string
+          used?: number
+        }
+        Update: {
+          expires_at?: string
+          key?: string
+          used?: number
+        }
+        Relationships: []
+      }
+      proposal_requests: {
+        Row: {
+          asset_ids: string[]
+          brand_name: string
+          budget: string
+          buyer_name: string
+          company: string
+          concept_story: string
+          concept_summary: Json
+          created_at: string
+          id: string
+          priorities: string
+          quantity: string
+          reference: string
+          status: string
+          timing: string
+          website: string
+          work_email: string
+        }
+        Insert: {
+          asset_ids: string[]
+          brand_name: string
+          budget?: string
+          buyer_name: string
+          company: string
+          concept_story: string
+          concept_summary?: Json
+          created_at?: string
+          id?: string
+          priorities?: string
+          quantity?: string
+          reference?: string
+          status?: string
+          timing?: string
+          website?: string
+          work_email: string
+        }
+        Update: {
+          asset_ids?: string[]
+          brand_name?: string
+          budget?: string
+          buyer_name?: string
+          company?: string
+          concept_story?: string
+          concept_summary?: Json
+          created_at?: string
+          id?: string
+          priorities?: string
+          quantity?: string
+          reference?: string
+          status?: string
+          timing?: string
+          website?: string
+          work_email?: string
+        }
+        Relationships: []
+      }
       quiz_responses: {
         Row: {
           choice: string
@@ -143,6 +218,10 @@ export type Database = {
     }
     Functions: {
       reserve_brick_generation: {
+        Args: { client_key: string }
+        Returns: boolean
+      }
+      reserve_proposal_request: {
         Args: { client_key: string }
         Returns: boolean
       }
