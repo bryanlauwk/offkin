@@ -24,9 +24,9 @@ export default function Index() {
   if (legacyConcept) return <Suspense fallback={<main aria-busy="true">Opening your concept…</main>}><LegacyConcept /></Suspense>;
   if (legacyCanvas) return <CanvasStudio />;
   // Saved proposals can always be restored without generation, including during an outage.
-  if (savedProposal || PROPOSAL_GENERATION_PAUSED || proposalReady === true) return <ProposalStudio />;
+  if (savedProposal || PROPOSAL_GENERATION_PAUSED || proposalReady === true) return <ProposalStudio simple />;
   if (proposalReady === null) return <main className="op-app" aria-busy="true"><p className="op-service">Opening your creative studio…</p></main>;
   // Never replace a working two-stage release with a disabled four-stage generator.
   // A v10 brief is not sent to the older API; this is an explicitly labelled separate canvas.
-  return <><aside className="op-rollout-notice" role="status">Complete proposal generation is not available yet. This earlier canvas creates world and physical studies only. <Link to="/?proposal=1">Open a saved complete proposal</Link></aside><CanvasStudio /></>;
+  return <ProposalStudio simple />;
 }
