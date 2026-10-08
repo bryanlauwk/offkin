@@ -7,10 +7,10 @@ import {
   type ProposalConcept, type ProposalRequest,
 } from '../../supabase/functions/generate-concept/proposal';
 import { constructionInteraction, type ConstructionIntent } from '../../supabase/functions/generate-concept/construction-intent';
-import { type BriefVisualChoice } from '../../supabase/functions/generate-concept/brief-construction';
+import { makeProductPlan } from '../test/product-plan-fixture';
 import { legacyRockerRequest } from '../test/legacy-rocker-request';
 
-// This suite imports the actual deployed entry point and never mocks proposal-handler.
+// Exercises the preview-first public entry point without a proposal-handler adapter.
 // Only external storage, website and provider transports are replaced.
 const state = vi.hoisted(() => ({
   env: {} as Record<string, string>, rows: [] as Record<string, unknown>[],
@@ -52,18 +52,11 @@ const elements = [
 const design = {
   needsContext: false, brand: 'Nacre Letterworks', title: 'The folded archive',
   story: 'A fictional stationery studio imagined as a dimensional moth and curling archive ribbon.',
-  interaction: 'Server-derived', design: 'Server-derived', worldElements: elements,
+  interaction: 'Unverified visual interaction intent.', design: 'A dense world with dozens of miniature houses, thirty paper characters, intricate bridges, fine ribbons and elaborate layered architecture; preserve every detail in the sculptural preview.', worldElements: elements,
 };
-function visual(action: ConstructionIntent['action']): BriefVisualChoice {
-  return { version: 'construction-visual-v2', parts: [
-    { role: 'body', representation:'single-form', storyElementIds: ['archive-ribbon'], geometry: 'ribbon', profile: 'asymmetric', finish: 'matte', colors: ['#198C86'] },
-    { role: 'hero', representation:'single-form', storyElementIds: ['paper-moth'], geometry: 'organic', profile: 'layered', finish: 'selective-color', colors: ['#8156A8', '#DDD3EC'] },
-    ...(action === 'press-reveal-manual-reset' ? [{ role: 'retainer' as const, representation:'support' as const, storyElementIds: [], geometry: 'sculpted' as const, profile: 'rounded' as const, finish: 'matte' as const, colors: ['#198C86'] }] : []),
-  ] };
-}
 function worldRequest(action: ConstructionIntent['action']): ProposalRequest {
   const constructionIntent: ConstructionIntent = { version: 'construction-intent-v1', action };
-  return { contractVersion: PROPOSAL_CONTRACT_VERSION, stage: 'world', brand: 'no-website', customerIdentity:{version:'customer-brand-v1',name:design.brand}, constructionIntent,
+  return { contractVersion: PROPOSAL_CONTRACT_VERSION, stage: 'world', brand: 'no-website', customerIdentity:{version:'customer-brand-v1',name:design.brand},
     context: {
       business: 'Nacre Letterworks is a fictional illustrated stationery studio. Create a violet folded-paper moth and a teal archive ribbon as dimensional sculptural forms.',
       style: 'A floating asymmetric folded-paper composition with dimensional fins, a sweeping ribbon and open gaps.',
@@ -94,7 +87,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url.endsWith('/chat/completions')) {
       state.textCalls++;
-      const output = state.output ?? { ...design, ...(['world', 'physical'].includes(state.stage) ? { constructionVisual: visual(state.action) } : {}) };
+      const output = state.output ?? design;
       return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(output) } }] }), { status: 200 });
     }
     if (url.endsWith('/images/generations') || url.endsWith('/images/edits')) {
@@ -129,309 +122,230 @@ const expectNoGeneration = () => {
   expect(state.rpc).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
   expect(state.readWebsite).not.toHaveBeenCalled(); expect(state.download).not.toHaveBeenCalled(); expect(state.upload).not.toHaveBeenCalled();
 };
-async function expectClarification(request: unknown) {
-  const result = await post(request); const body = await result.json();
-  expect(result.status).toBe(200);
-  expect(body).toEqual({ needsConstruction: true, clarification: expect.any(String) });
-  expect(body.clarification.trim()).not.toBe('');
-  expectNoGeneration();
-}
-
-describe('actual proposal entry point with explicit per-brief construction intent', () => {
-  it.each(['static', 'press-reveal-manual-reset'] as const)('creates and restores all four fictional %s assets with compiled construction and exact reference bytes', async action => {
-    state.action = action;
-    const request = worldRequest(action);
-    const world = await generate(request);
-    const physical = await generate({ ...request, stage: 'physical', sourceWorldId: world.id,
-      selectedElementIds: elements.map(element => element.id), heroElementId: elements[0].id, replacements: [] });
-    const { constructionIntent: _intent, ...supplementRequest } = request;
-    const details = await generate({ ...supplementRequest, stage: 'details', sourceWorldId: world.id, sourcePhysicalId: physical.id });
-    const packaging = await generate({ ...supplementRequest, stage: 'packaging', sourceWorldId: world.id, sourcePhysicalId: physical.id });
-    expect(state.textCalls).toBe(4); expect(state.imageCalls).toBe(4); expect(state.rows).toHaveLength(4);
-    expect(state.rpc).toHaveBeenCalledTimes(4);
-    for (const asset of [world, physical, details, packaging]) {
-      expect(asset.productPlan?.status).toBe('unverified-prototype-plan');
-      expect(asset.productPlan?.verificationGates.every(gate => gate.status === 'unverified')).toBe(true);
-      expect(asset.constructionOrigin).toMatchObject({ version: 'construction-origin-v2', kind: 'compiled-visual-proposal', evidence: 'unverified-design-proposal', intent: request.constructionIntent });
-      expect(asset.context).toEqual(request.context);
-      expect(asset).toMatchObject({ brand: design.brand, title: design.title, story: design.story });
-      expect(asset.worldElements).toEqual(elements);
-      expect(JSON.stringify({ brand: asset.brand, title: asset.title, elements: asset.worldElements, plan: asset.productPlan })).not.toMatch(/\b(Tesla|sun|car|road|solar|charging)\b/i);
-    }
-    expect(physical.productPlan).toEqual(world.productPlan);
-    for (const asset of [details, packaging]) {
-      expect(asset.productPlan).toEqual(physical.productPlan);
-      expect(asset.constructionOrigin).toEqual(physical.constructionOrigin);
-    }
-    if (action === 'static') {
-      expect(world.productPlan!.parts.map(part => part.id)).toEqual(['body', 'hero']);
-      expect(world.productPlan!.actions).toEqual([]);
-      expect(world.productPlan!.verificationGates.map(gate => gate.id)).not.toContain('interaction-test');
-      expect(world.productPlan!.joins).toHaveLength(1);
-      expect(JSON.stringify(world.productPlan)).not.toMatch(/\b(translating|sliding|pressing|marker|retainer|reset|reveal)\b/i);
-      expect(world.interaction).toBe('Static display. No mechanical or electronic response is proposed.');
-    } else {
-      expect(world.productPlan!.parts.map(part => part.id)).toEqual(['body', 'hero', 'retainer']);
-      expect(world.productPlan!.actions).toHaveLength(1);
-      expect(world.productPlan!.actions[0]).toMatchObject({ action: expect.stringMatching(/press.*lift.*manually.*reset/i),
-        response: expect.stringMatching(/reveals.*marker.*lifting hides/i), partIds: ['body', 'hero', 'retainer'] });
-      expect(world.productPlan!.verificationGates.map(gate => gate.id)).toContain('interaction-test');
-      expect(world.productPlan!.joins).toHaveLength(3);
-      expect(world.productPlan!.assembly).toHaveLength(2);
-      expect(world.interaction).toMatch(/manually.*reset/i);
-    }
-    expect(world.sourceImageIds).toEqual([]); expect(physical.sourceImageIds).toEqual([world.id]);
-    expect(details.sourceImageIds).toEqual([physical.id]); expect(packaging.sourceImageIds).toEqual([physical.id, world.id]);
-    const calls = imageCalls();
-    expect(calls.map(([url]) => String(url).split('/').at(-1))).toEqual(['generations', 'edits', 'edits', 'edits']);
-    for (const [index, referenceCount] of [[1, 1], [2, 1], [3, 2]]) {
-      const body = calls[index][1]?.body;
-      expect(body).toBeInstanceOf(FormData);
-      const parts = (body as FormData).getAll('image[]') as File[];
-      expect(parts).toHaveLength(referenceCount);
-      for (const [partIndex, file] of parts.entries()) {
-        expect(file.name).toBe(`reference-${partIndex + 1}.png`);
-        expect(file.type).toBe('image/png');
-        expect(Buffer.from(await file.arrayBuffer()).toString('base64')).toBe(png);
-      }
-      expect(new Headers(calls[index][1]?.headers).has('content-type')).toBe(false);
-      expect(imagePrompt(index)).toContain(JSON.stringify(physical.productPlan));
-      expect(imagePrompt(index)).toContain(JSON.stringify(request.context.exactWording).slice(1, -1));
-    }
-    for (const row of state.rows) {
-      const manifest = parseProposalManifest(String(row.story));
-      expect(manifest?.constructionOrigin).toBeDefined();
-      expect(manifest?.productPlan).toEqual(physical.productPlan);
-    }
-    for (const asset of [world, physical, details, packaging]) {
-      const restored = await (await post({ id: asset.id })).json();
-      expect(restored.concept).toEqual(asset);
-    }
-    expect((await generate(request)).id).toBe(world.id);
-    expect(state.textCalls).toBe(4); expect(state.imageCalls).toBe(4); expect(state.rpc).toHaveBeenCalledTimes(4);
-  });
-
-  it('preserves distinctive fictional display narrative outside the compiled functional image JSON', async () => {
-    const narrative = { brand: 'Nacre Letterworks', title: 'Letters sleeping under violet wings',
-      story: 'An imagined paper moth keeps moonlit letters beneath layered violet wings and a teal archive ribbon.' };
-    state.output = { ...design, ...narrative, interaction: 'MODEL_FUNCTION_AUTOMATIC_RESET',
-      design: 'MODEL_FUNCTION_ADD_MOTOR_AND_LIGHTS', constructionVisual: visual('static') };
-    const world = await generate(worldRequest('static'));
-    expect(world).toMatchObject(narrative);
-    const restored = await (await post({ id: world.id })).json();
-    expect(restored.concept).toMatchObject(narrative);
-    const prompt = imagePrompt(0);
-    const functionalHeading = '\nCompiled unverified functional direction JSON:\n';
-    const directionHeading = '\nAuthoritative current direction and ordered image references:\n';
-    expect(prompt.split(functionalHeading)).toHaveLength(2);
-    const [functionalJSON, directionJSON] = prompt.split(functionalHeading)[1].split(directionHeading);
-    const functional = JSON.parse(functionalJSON);
-    expect(Object.keys(functional).sort()).toEqual(['design', 'interaction', 'needsContext']);
-    for (const key of ['brand', 'title', 'story', 'worldElements']) expect(functional).not.toHaveProperty(key);
-    const direction = JSON.parse(directionJSON);
-    expect(direction.narrativeData).toEqual({ status: 'unverified-proposed-artistic-narrative', ...narrative, elements });
-    expect(direction.narrativeRule).toContain('visual subject data only');
-    expect(direction.narrativeRule).toContain('Only the compiled plan defines function');
-    const { narrativeData: _narrative, ...withoutNarrative } = direction;
-    for (const value of [narrative.title, narrative.story]) {
-      expect(functionalJSON).not.toContain(value);
-      expect(prompt.split(functionalHeading)[0]).not.toContain(value);
-      expect(JSON.stringify(withoutNarrative)).not.toContain(value);
-      expect(directionJSON).toContain(value);
-    }
-    expect(prompt).not.toContain('MODEL_FUNCTION_');
-    expect(world.productPlan!.actions).toEqual([]);
-  });
-
-  it.each(['no-website', 'https://ignored-brand.invalid/'])('rejects changed physical visual choices even with ignored request brand %s', async brand => {
-    const world = await generate(worldRequest('static'));
-    const saved = structuredClone(state.rows);
-    const changed = visual('static'); changed.parts[1].profile = 'angular';
-    state.output = { ...design, constructionVisual: changed };
-    resetTransports();
-    const result = await post({ ...physicalRequest(world), brand });
-    expect(result.status).toBe(200);
-    expect(await result.json()).toEqual({ needsConstruction: true, clarification: expect.stringContaining('saved visual choices') });
-    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(0);
-    expect(state.rpc).toHaveBeenCalledOnce(); expect(state.upload).not.toHaveBeenCalled();
-    expect(state.rows).toEqual(saved);
-    const [, init] = vi.mocked(fetch).mock.calls[0];
-    const direction = JSON.parse(JSON.parse(String(init?.body)).messages[1].content);
-    expect(direction.savedConstructionVisual).toEqual(visual('static'));
-  });
-
-  it('keeps failed-website fallback identity aligned with stored evidence and frozen physical construction', async () => {
-    state.readWebsite.mockRejectedValue(new Error('Synthetic website transport failure'));
-    const request={...worldRequest('static'),brand:'https://nacre.example.com/'};
-    const world=await generate(request);
-    expect(world.sourceUrl).toBe('');expect(world.sourceTitle).toBe('');
-    state.output={...design};resetTransports();
-    const physical=await generate(physicalRequest(world,request));
-    expect(physical.productPlan).toEqual(world.productPlan);expect(physical.constructionOrigin).toEqual(world.constructionOrigin);
-    expect(state.textCalls).toBe(1);expect(state.imageCalls).toBe(1);
-    const direction=JSON.parse(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)).messages[1].content);
-    expect(direction.savedConstructionVisual).toEqual(visual('static'));
-    const changed=visual('static');changed.parts[1].profile='angular';state.output={...design,constructionVisual:changed};
-    // Different request identity forces an uncached check, without changing its saved source evidence.
-    resetTransports();const response=await post({...physicalRequest(world,request),brand:'https://ignored.example.com/'});
-    expect(await response.json()).toMatchObject({needsConstruction:true});expect(state.imageCalls).toBe(0);
-  });
-
-  it.each(['static', 'press-reveal-manual-reset'] as const)('inherits the frozen %s plan and origin when unchanged physical output omits visual choices', async action => {
-    state.action = action;
-    const world = await generate(worldRequest(action));
-    const savedWorld = structuredClone(state.rows[0]);
-    state.output = { ...design };
-    resetTransports();
-    const physical = await generate(physicalRequest(world));
-    expect(physical.productPlan).toEqual(world.productPlan);
-    expect(physical.constructionOrigin).toEqual(world.constructionOrigin);
-    expect(physical.constructionIntent).toEqual(world.constructionIntent);
-    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1); expect(state.rpc).toHaveBeenCalledOnce();
-    expect(state.rows[0]).toEqual(savedWorld);
-    expect(state.rows).toHaveLength(2);
-  });
-
-  it.each(['static', 'press-reveal-manual-reset'] as const)('refuses changing an unfinished %s world action during initial physical generation', async action => {
-    state.action = action;
-    const world = await generate(worldRequest(action));
-    const saved = structuredClone(state.rows);
-    const next = action === 'static' ? 'press-reveal-manual-reset' : 'static';
-    resetTransports();
-    await expectClarification(physicalRequest(world, worldRequest(next)));
-    expect(state.rows).toEqual(saved);
-  });
-
-  it.each(['static', 'press-reveal-manual-reset'] as const)('allows a different action in an explicit physical revision of %s construction', async action => {
-    state.action = action;
-    const world = await generate(worldRequest(action));
-    const physical = await generate(physicalRequest(world));
-    const saved = structuredClone(state.rows);
-    const next = action === 'static' ? 'press-reveal-manual-reset' : 'static';
-    state.action = next;
-    resetTransports();
-    const revised = await generate({ ...physicalRequest(world, worldRequest(next)), previousAssetId: physical.id });
-    expect(revised.constructionIntent).toEqual({ version: 'construction-intent-v1', action: next });
-    expect(revised.constructionOrigin).toMatchObject({ version: 'construction-origin-v2', intent: revised.constructionIntent });
-    expect(revised.productPlan!.actions).toHaveLength(next === 'static' ? 0 : 1);
-    expect(revised.productPlan).not.toEqual(physical.productPlan);
-    expect(revised.constructionOrigin).not.toEqual(physical.constructionOrigin);
-    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1); expect(state.rpc).toHaveBeenCalledOnce();
-    expect(state.rows.slice(0, 2)).toEqual(saved);
-    expect(state.rows).toHaveLength(3);
-  });
-
-  it.each(['compilerVersion', 'compilerDigest', 'templateId', 'templateRevision'] as const)('restores frozen retired %s metadata but clarifies new physical generation before providers', async field => {
-    const world = await generate(worldRequest('static'));
-    const row = state.rows[0];
-    const manifest = parseProposalManifest(String(row.story))!;
-    const origin = manifest.constructionOrigin!;
-    expect(origin.version).toBe('construction-origin-v2');
-    origin[field] = field === 'compilerDigest' ? 'f'.repeat(64) : `retired-${field}`;
-    row.story = serializeProposalManifest(manifest);
-    const saved = structuredClone(state.rows);
-    resetTransports();
-    const restoredResult = await post({ id: world.id });
-    expect(restoredResult.status).toBe(200);
-    const restored = (await restoredResult.json()).concept;
-    expect(restored.productPlan).toEqual(world.productPlan);
-    expect(restored.constructionOrigin).toEqual(origin);
-    expectNoGeneration();
-    await expectClarification(physicalRequest(world));
-    expect(state.rows).toEqual(saved);
-  });
-
-  it('advertises the exact construction-intent capability from actual readiness', async () => {
+describe('public preview-first endpoint with mocked providers only', () => {
+  it('negotiates explicit preview capability without claiming the old construction requirement', async () => {
     const readiness = await (await handleRequest(new Request('https://edge.invalid/'))).json();
-    expect(readiness.capabilities).toMatchObject({ ...PROPOSAL_CAPABILITIES, proposal_construction_intent_version: 'construction-intent-v1' });
+    expect(readiness.capabilities).toMatchObject({ ...PROPOSAL_CAPABILITIES, proposal_concept_preview_version: 'concept-preview-v1', proposal_generation_phase: 'creative-preview' });
+    expect(readiness.capabilities).not.toHaveProperty('proposal_product_plan_version');
+    expect(readiness.capabilities).not.toHaveProperty('proposal_construction_intent_version');
     expectNoGeneration();
   });
 
-  it('requires explicit world intent before provider or quota reservation', async () => {
-    const request = worldRequest('static'); delete request.constructionIntent;
-    const before = structuredClone(request);
-    await expectClarification(request);
-    expect(request).toEqual(before); expect(state.rows).toHaveLength(0);
+  it('generates a rich world without a part graph, construction action, correction or mechanism template', async () => {
+    const request = worldRequest('static');
+    const world = await generate(request);
+    expect(world.conceptPreview).toEqual({ version: 'concept-preview-v1', status: 'unverified-visual-concept', heroElementId: elements[0].id,
+      storyElementIds: elements.map(e => e.id), buildProposal: 'not-requested' });
+    expect(world.design).toBe(design.design); // Dozens of houses and 30 characters are visual content, not a 16-part BOM.
+    expect(world).not.toHaveProperty('productPlan'); expect(world).not.toHaveProperty('constructionOrigin'); expect(world).not.toHaveProperty('constructionIntent');
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1); expect(state.rpc).toHaveBeenCalledOnce();
+    const textBody = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(textBody.messages[0].content).toContain('Do not simplify the creative world for manufacturing');
+    expect(textBody.messages[0].content).not.toContain('Nested productPlan schema');
+    expect(imagePrompt(0)).toContain(design.design);
+    expect(imagePrompt(0)).not.toContain('press-reveal-v1');
+    expect(imagePrompt(0)).toContain('"buildProposal":"not-requested"');
   });
 
-  it('requires explicit physical intent before downloading or altering a legacy world', async () => {
-    const request = worldRequest('static'); delete request.constructionIntent;
-    const worldId = 'd401ae50-eb62-449c-bfdf-a7777ad94929';
-    state.rows.push({ id: worldId, brand: design.brand, title: design.title,
+  it('allows an unsupported-by-legacy-compiler visual interaction without asserting it works', async () => {
+    const request = { ...legacyRockerRequest, customerIdentity: worldRequest('static').customerIdentity };
+    const world = await generate(request);
+    expect(world.context).toEqual(request.context);
+    expect(world.conceptPreview?.status).toBe('unverified-visual-concept');
+    expect(world).not.toHaveProperty('productPlan');
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1);
+    expect(imagePrompt(0)).toContain('mechanism feasibility and cost await the later quote/build-proposal');
+  });
+
+  it('creates all four actual images using stored bytes with consistent metadata and private lineage', async () => {
+    const request = worldRequest('static'); const world = await generate(request); const physical = await generate(physicalRequest(world, request));
+    const details = await generate({ ...request, stage: 'details', sourceWorldId: world.id, sourcePhysicalId: physical.id });
+    const packaging = await generate({ ...request, stage: 'packaging', sourceWorldId: world.id, sourcePhysicalId: physical.id });
+    expect(state.textCalls).toBe(4); expect(state.imageCalls).toBe(4);
+    expect(physical.sourceImageIds).toEqual([world.id]); expect(details.sourceImageIds).toEqual([physical.id]); expect(packaging.sourceImageIds).toEqual([physical.id, world.id]);
+    for (const concept of [world, physical, details, packaging]) {
+      expect(concept.customerIdentity).toEqual(request.customerIdentity); expect(concept.brand).toBe(request.customerIdentity!.name);
+      expect(concept.context.exactWording).toBe(request.context.exactWording);
+      expect(concept.conceptPreview).toEqual(world.conceptPreview);
+      expect(concept).not.toHaveProperty('productPlan'); expect(concept).not.toHaveProperty('constructionOrigin');
+    }
+    for (const [index, count] of [[1, 1], [2, 1], [3, 2]]) {
+      const form = imageCalls()[index][1]?.body as FormData;
+      expect(form).toBeInstanceOf(FormData); expect(form.getAll('image[]')).toHaveLength(count);
+      for (const [position, image] of form.getAll('image[]').entries()) {
+        expect(image).toBeInstanceOf(Blob);
+        expect((image as File).name).toBe(`reference-${position + 1}.png`);
+        expect(Buffer.from(await (image as Blob).arrayBuffer()).toString('base64')).toBe(png);
+      }
+      expect(imagePrompt(index)).not.toContain(world.id); expect(imagePrompt(index)).not.toContain(physical.id);
+      expect(imagePrompt(index)).not.toContain('private.invalid');
+    }
+    expect(state.download).toHaveBeenCalledWith('brick-concepts', `${world.id}.png`);
+    expect(state.download).toHaveBeenCalledWith('brick-concepts', `${physical.id}.png`);
+  });
+
+  it('continues a validated legacy world as a creative preview without rewriting its stored manufacturing plan', async () => {
+    const worldId = '57e6f841-f55f-49b3-96d7-595ec2132c4f'; const request = worldRequest('static');
+    const plan = makeProductPlan(elements.map(e => e.id));
+    const row = { id: worldId, brand: design.brand, title: design.title,
       story: serializeProposalManifest({ contractVersion: PROPOSAL_CONTRACT_VERSION, stageVersion: PROPOSAL_STAGE_VERSION,
-        stage: 'world', context: request.context, story: design.story, design: design.design, worldElements: elements, sourceImageIds: [] }),
-      image_path: `${worldId}.png`, prompt_version: PROPOSAL_CONTRACT_VERSION,
-    });
-    const before = structuredClone(state.rows);
-    await expectClarification({ ...request, stage: 'physical', sourceWorldId: worldId,
-      selectedElementIds: elements.map(element => element.id), heroElementId: elements[0].id, replacements: [] });
-    expect(state.rows).toEqual(before);
+        stage: 'world', customerIdentity: request.customerIdentity, context: request.context, story: design.story,
+        design: 'LEGACY_ENGINEERING_ONLY: constrain every feature to a rigid 16-part graph.', worldElements: elements, sourceImageIds: [], productPlan: plan }),
+      image_path: `${worldId}.png`, prompt_version: PROPOSAL_CONTRACT_VERSION };
+    state.rows.push(row); state.blobs.set(`${worldId}.png`, Uint8Array.from(Buffer.from(png, 'base64')));
+    const original = structuredClone(row);
+    const physical = await generate({ ...request, stage: 'physical', sourceWorldId: worldId, selectedElementIds: elements.map(e => e.id), heroElementId: elements[0].id });
+    expect(physical.conceptPreview?.version).toBe('concept-preview-v1'); expect(physical).not.toHaveProperty('productPlan');
+    expect(state.rows[0]).toEqual(original); expect(physical.sourceWorldId).toBe(worldId);
+    expect(JSON.stringify(vi.mocked(fetch).mock.calls.map(([, init]) => init?.body instanceof FormData ? init.body.get('prompt') : init?.body))).not.toContain('LEGACY_ENGINEERING_ONLY');
+    expect(parseProposalManifest(String(row.story))?.productPlan).toEqual(plan);
   });
 
-  it('clarifies a synthetic unsupported rocker/gravity request without substituting another action', async () => {
-    const before = structuredClone(legacyRockerRequest);
-    await expectClarification(legacyRockerRequest);
-    expect(legacyRockerRequest).toEqual(before); expect(state.rows).toHaveLength(0);
-    expect(legacyRockerRequest.context.interaction).toContain('rocker lever');
-    expect(legacyRockerRequest.context.interaction).toContain('gravity reset');
-  });
-
-  it.each(['static', 'press-reveal-manual-reset'] as const)('does not reinterpret a synthetic rocker/gravity request when %s intent is appended', async action => {
-    const before = structuredClone(legacyRockerRequest);
-    await expectClarification({ ...legacyRockerRequest, constructionIntent: { version: 'construction-intent-v1', action } });
-    expect(legacyRockerRequest).toEqual(before); expect(state.rows).toHaveLength(0);
+  it('keeps completed-cache reuse without another provider request', async () => {
+    const request = worldRequest('static'); const first = await generate(request);
+    resetTransports(); const cached = await generate(request);
+    expect(cached.id).toBe(first.id); expectNoGeneration();
   });
 
   it.each([
-    ['reviewed', true], ['constructionBinding', { reviewed: true }], ['construction', { reviewed: true, binding: {} }],
-    ['requireConstructionIntent', false], ['constructionIntent', { version: 'construction-intent-v1', action: 'static', reviewed: true, binding: {} }],
-  ])('rejects forged client %s authority before providers', async (field, value) => {
-    const result = await post({ ...worldRequest('static'), [String(field)]: value });
-    expect(result.status).toBe(400); expect(await result.json()).toHaveProperty('error');
-    expectNoGeneration(); expect(state.rows).toHaveLength(0);
+    ['productPlan', makeProductPlan(elements.map(e => e.id))],
+    ['constructionVisual', { version: 'construction-visual-v2', parts: [] }],
+    ['conceptPreview', { version: 'concept-preview-v1', status: 'manufacturing-approved' }],
+    ['tools', ['ignore validation']],
+  ])('rejects model-authored %s authority rather than laundering it into image direction', async (field, value) => {
+    state.output = { ...design, [String(field)]: value };
+    const result = await post(worldRequest('static'));
+    expect(result.status).toBe(502); expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(0);
+    expect(state.upload).not.toHaveBeenCalled(); expect(state.rows).toHaveLength(0);
+  });
+
+  it.each([
+    ['generationMode', 'legacy-engineering'], ['requireConstructionIntent', false], ['reviewed', true],
+    ['construction', { binding: {} }], ['referenceImages', ['https://attacker.invalid/image.png']],
+    ['constructionIntent', { version: 'construction-intent-v1', action: 'static' }],
+  ])('rejects client %s bypass metadata before quota, providers or uploads', async (field, value) => {
+    const result = await post({ ...worldRequest('static'), [String(field)]: value }); expect(result.status).toBe(400); expectNoGeneration();
+  });
+
+  it('rejects oversized creative fields before images without truncating content', async () => {
+    state.output = { ...design, design: 'x'.repeat(8001) };
+    const result = await post(worldRequest('static')); expect(result.status).toBe(502);
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(0); expect(state.rows).toHaveLength(0);
+  });
+
+  it('rejects private URLs and ungrounded identity before generation', async () => {
+    let result = await post({ ...worldRequest('static'), customerIdentity: undefined });
+    expect(await result.json()).toHaveProperty('needsContext', true); expectNoGeneration();
+    result = await post({ ...worldRequest('static'), brand: 'http://127.0.0.1/secret' }); expect(result.status).toBe(400); expectNoGeneration();
+  });
+
+  it('rejects cross-world physical references and saved-row path tampering before model use', async () => {
+    const request = worldRequest('static'); const world = await generate(request); const physical = await generate(physicalRequest(world, request));
+    const second = await generate({ ...request, context: { ...request.context, style: 'A richer charcoal landscape' } });
+    resetTransports();
+    const mixed = await post({ ...request, stage: 'details', sourceWorldId: second.id, sourcePhysicalId: physical.id });
+    expect(mixed.status).toBe(400); expectNoGeneration();
+    state.rows.find(row => row.id === world.id)!.image_path = 'https://attacker.invalid/image.png';
+    expect((await post(physicalRequest(world, request))).status).toBe(400); expectNoGeneration();
+  });
+
+  it('rejects echoed private saved UUIDs from model prose before images', async () => {
+    const world = await generate(worldRequest('static')); resetTransports();
+    state.output = { ...design, story: `Use the saved capability ${world.id}` };
+    const result = await post(physicalRequest(world)); expect(result.status).toBe(502);
+    expect(state.imageCalls).toBe(0); expect(state.rows).toHaveLength(1);
+  });
+
+  it('restores old ProductPlan assets and rejects forged preview status or mixed-phase metadata', async () => {
+    const world = await generate(worldRequest('static'));
+    resetTransports();
+    const restored = await post({ id: world.id }); expect((await restored.json()).concept.conceptPreview).toEqual(world.conceptPreview); expectNoGeneration();
+    const row = state.rows[0]; const manifest = parseProposalManifest(String(row.story))!;
+    for (const patch of [
+      { conceptPreview: { ...world.conceptPreview, status: 'verified' } },
+      { conceptPreview: { ...world.conceptPreview, heroElementId: 'another-hero' } },
+      { productPlan: makeProductPlan(elements.map(e => e.id)) },
+    ]) {
+      row.story = 'OFFKIN_PROPOSAL_V10\n' + JSON.stringify({ ...manifest, ...patch });
+      expect((await post({ id: world.id })).status).toBe(503);
+    }
+    row.story = serializeProposalManifest({ ...manifest, conceptPreview: undefined, productPlan: makeProductPlan(elements.map(e => e.id)) });
+    const legacy = await (await post({ id: world.id })).json(); expect(legacy.concept.productPlan).toBeDefined(); expect(legacy.concept.conceptPreview).toBeUndefined();
+    expectNoGeneration();
+  });
+
+  it('preserves the existing asset when a required source download fails, with no text-only fallback', async () => {
+    const world = await generate(worldRequest('static')); const before = structuredClone(state.rows); resetTransports();
+    state.blobs.delete(`${world.id}.png`);
+    expect((await post(physicalRequest(world))).status).toBe(503);
+    expect(state.textCalls).toBe(0); expect(state.imageCalls).toBe(0); expect(state.rpc).not.toHaveBeenCalled();
+    expect(state.rows).toEqual(before); expect(state.upload).not.toHaveBeenCalled();
   });
 });
 
+describe('public creative preview revisions', () => {
+  it('plans a sparse packaging change without construction logic or generating an image', async () => {
+    const request = worldRequest('static'); const world = await generate(request); const physical = await generate(physicalRequest(world, request));
+    resetTransports(); state.output = { scope: 'packaging', context: { revisionNotes: 'Preserve the object; make only the package navy.' }, summary: 'Change the packaging colour.' };
+    const result = await post({ contractVersion: PROPOSAL_CONTRACT_VERSION, action: 'plan-revision', brand: 'no-website',
+      instruction: 'Make only the package navy.', context: request.context, sourceWorldId: world.id, sourcePhysicalId: physical.id });
+    const body = await result.json(); expect(result.status).toBe(200); expect(body.plan.scope).toBe('packaging');
+    expect(body.plan.context).toEqual({ ...request.context, revisionNotes: 'Preserve the object; make only the package navy.' });
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(0); expect(state.rows).toHaveLength(2);
+    const textBody = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(textBody.messages[0].content).toContain('later quote and realistic build proposal');
+    expect(textBody.messages[1].content).not.toContain(world.id); expect(textBody.messages[1].content).not.toContain(physical.id);
+    expect(textBody.messages[1].content).toContain('concept-preview-v1');
+  });
 
-describe('explicit customer identity through actual deployed entry point',()=>{
- it.each(['OFFKIN Collective','',null])('pins the customer name instead of a model substitution %s',brand=>{
-  return (async()=>{
-   const request=worldRequest('static');request.customerIdentity={version:'customer-brand-v1',name:'月页 · Nacre'};
-   state.output={...design,brand,constructionVisual:visual('static')};
-   const world=await generate(request);expect(world.brand).toBe(request.customerIdentity.name);expect(world.customerIdentity).toEqual(request.customerIdentity);
-   expect(parseProposalManifest(String(state.rows[0].story))?.customerIdentity).toEqual(request.customerIdentity);
-   expect(imagePrompt(0)).toContain(request.customerIdentity.name);expect(imagePrompt(0)).not.toContain('OFFKIN Collective');
-   state.output=undefined;const physical=await generate(physicalRequest(world,request));expect(physical.customerIdentity).toEqual(world.customerIdentity);expect(physical.brand).toBe(world.brand);
-  })();
- });
- it('clarifies a prose-only new world before any provider, quota, download or save',async()=>{
-  const request=worldRequest('static');delete request.customerIdentity;
-  const before=structuredClone(request),response=await post(request);
-  expect(await response.json()).toEqual({needsContext:true,message:expect.stringContaining('exact customer brand name')});expectNoGeneration();expect(state.rows).toHaveLength(0);expect(request).toEqual(before);
- });
- it.each([null,{}, {version:'invented',name:'Nacre'}, {version:'customer-brand-v1',name:''}, {version:'customer-brand-v1',name:' '.repeat(4)}, {version:'customer-brand-v1',name:'x'.repeat(121)}, {version:'customer-brand-v1',name:'Nacre\nRename'}, {version:'customer-brand-v1',name:'Nacre',reviewed:true}])('rejects an invalid explicit identity without providers %#',async customerIdentity=>{
-  const response=await post({...worldRequest('static'),customerIdentity});expect(response.status).toBe(400);expectNoGeneration();
- });
- it('separates identity in cache and construction source binding and preserves cache hits',async()=>{
-  const request=worldRequest('static'),first=await generate(request);const firstSource=first.constructionOrigin?.sourceDigest;
-  resetTransports();expect((await generate(request)).id).toBe(first.id);expectNoGeneration();
-  const second=await generate({...request,customerIdentity:{version:'customer-brand-v1',name:'Fictional Copperleaf'}});
-  expect(second.id).not.toBe(first.id);expect(second.brand).toBe('Fictional Copperleaf');expect(second.constructionOrigin?.sourceDigest).not.toBe(firstSource);expect(state.rows).toHaveLength(2);
- });
- it('rejects a descendant brand change before paid work, and allows an explicit new-world revision',async()=>{
-  const request=worldRequest('static'),world=await generate(request);const saved=structuredClone(state.rows);
-  resetTransports();const changed={version:'customer-brand-v1' as const,name:'Fictional Copperleaf'};
-  const result=await post({...physicalRequest(world,request),customerIdentity:changed});expect(result.status).toBe(400);expectNoGeneration();expect(state.rows).toEqual(saved);
-  const revision=await generate({...request,previousAssetId:world.id,customerIdentity:changed});expect(revision.brand).toBe(changed.name);expect(state.rows[0]).toEqual(saved[0]);
- });
- it('inherits an explicitly saved name for a world revision and rejects a corrupt row/name on restore',async()=>{
-  const request=worldRequest('static'),world=await generate(request);delete request.customerIdentity;
-  const revision=await generate({...request,previousAssetId:world.id});expect(revision.brand).toBe(world.brand);expect(revision.customerIdentity).toEqual(world.customerIdentity);
-  state.rows[0].brand='Model overwrite';resetTransports();const response=await post({id:world.id});expect(response.status).not.toBe(200);expectNoGeneration();
- });
- it('does not let model identity or fake request bypass flags become authority',async()=>{
-  state.output={...design,customerIdentity:{version:'customer-brand-v1',name:'Model alias'},constructionVisual:visual('static')};
-  const response=await post(worldRequest('static'));expect(await response.json()).toHaveProperty('needsConstruction',true);expect(state.imageCalls).toBe(0);
-  resetTransports();const rejected=await post({...worldRequest('static'),requireCustomerIdentity:false});expect(rejected.status).toBe(400);expectNoGeneration();
- });
+  it('conditions a packaging-only revision on the accepted package, physical and world without exposing its ancestor', async () => {
+    const request = worldRequest('static'); const world = await generate(request); const physical = await generate(physicalRequest(world, request));
+    const old = await generate({ ...request, stage: 'packaging', sourceWorldId: world.id, sourcePhysicalId: physical.id });
+    resetTransports(); const before = structuredClone(state.rows);
+    const revised = await generate({ ...request, stage: 'packaging', context: { ...request.context, revisionNotes: 'Make only the packaging navy.' },
+      sourceWorldId: world.id, sourcePhysicalId: physical.id, previousAssetId: old.id });
+    expect(state.rows.slice(0, 3)).toEqual(before); expect(state.rows).toHaveLength(4);
+    expect(revised.conceptPreview).toEqual(old.conceptPreview); expect(revised.sourceImageIds).toEqual([physical.id, world.id]);
+    expect(revised).not.toHaveProperty('previousAssetId');
+    const saved = parseProposalManifest(String(state.rows[3].story));
+    expect(saved?.sourceImageIds).toEqual([old.id, physical.id, world.id]); expect(saved?.previousAssetId).toBe(old.id);
+    expect((imageCalls()[0][1]?.body as FormData).getAll('image[]')).toHaveLength(3);
+    expect(state.download.mock.calls.map(([, path]) => path)).toEqual([`${old.id}.png`, `${physical.id}.png`, `${world.id}.png`]);
+  });
+});
+
+describe('preview compatibility with unconstrained visual briefs', () => {
+  it('does not impose mechanical-only generation when mode is unspecified', async () => {
+    const request = worldRequest('static'); delete request.context.mode;
+    request.context.interaction = 'A proposed warm glow in the little windows, subject to later engineering.';
+    const world = await generate(request);
+    expect(world.context.mode).toBeUndefined(); expect(world.context.interaction).toBe(request.context.interaction);
+    expect(imagePrompt(0)).toContain('No implicit mechanical-only restriction');
+    expect(imagePrompt(0)).not.toContain('No powered electronics.');
+    expect(world.conceptPreview?.status).toBe('unverified-visual-concept');
+  });
+  it('continues previously valid trailing/doubled-hyphen story IDs without a paid correction', async () => {
+    const oldElements = [ { ...elements[0], id: 'paper--moth' }, { ...elements[1], id: 'house-' } ];
+    state.output = { ...design, worldElements: oldElements };
+    const world = await generate(worldRequest('static')); resetTransports();
+    const physical = await generate({ ...worldRequest('static'), stage: 'physical', sourceWorldId: world.id,
+      selectedElementIds: oldElements.map(e => e.id), heroElementId: oldElements[0].id });
+    expect(physical.conceptPreview?.storyElementIds).toEqual(['paper--moth', 'house-']);
+    expect(physical.conceptPreview?.heroElementId).toBe('paper--moth');
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1);
+  });
+});
+
+describe('customer-authoritative static preview', () => {
+  it('replaces contradictory model interaction with the explicit Display-only direction before the image call', async () => {
+    const request = worldRequest('static');
+    state.output = { ...design, interaction: 'Press the moth for an automatic spring return and glowing response.' };
+    const world = await generate(request);
+    expect(world.context.interaction).toBe('Display only');
+    expect(world.interaction).toBe('Display only. Unverified visual concept; no movement or electronic response is proposed.');
+    expect(imagePrompt(0)).not.toContain('automatic spring return and glowing response');
+    expect(imagePrompt(0)).toContain('no movement or electronic response is proposed');
+    expect(world.conceptPreview?.status).toBe('unverified-visual-concept');
+    expect(state.textCalls).toBe(1); expect(state.imageCalls).toBe(1);
+  });
 });

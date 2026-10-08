@@ -49,13 +49,13 @@ vi.mock('../../supabase/functions/generate-concept/website', async importOrigina
   return { ...original, readCompanyWebsite: (...args: unknown[]) => state.readWebsite(...args) };
 });
 // These historical provider/repair tests deliberately opt into the legacy ProductPlan path.
-// Production-gate cases set the flag true, leaving the deployed runtime gate unchanged.
+// They do not represent the public preview gate, tested separately without a handler adapter.
 vi.mock('../../supabase/functions/generate-concept/proposal-handler', async importOriginal => {
   const original = await importOriginal<typeof import('../../supabase/functions/generate-concept/proposal-handler')>();
   return { ...original, handleProposal: (...[input, request, runtime]: Parameters<typeof original.handleProposal>) => {
     state.proposalRuntime(runtime);
-    return original.handleProposal(input, request, { ...runtime, requireCustomerIdentity:false,
-      ...(state.requireConstructionIntent ? {} : { requireConstructionIntent: false }),
+    return original.handleProposal(input, request, { ...runtime, generationMode:'legacy-engineering', requireCustomerIdentity:false,
+      requireConstructionIntent: state.requireConstructionIntent,
       reserve: async () => { state.reserve(); await runtime.reserve(); },
     });
   } };
@@ -126,13 +126,13 @@ function modelPayloadText(value: unknown): string {
     [key, typeof part === 'string' ? part : { name: part.name, type: part.type, size: part.size }])) : String(value);
 }
 
-describe('deployed proposal construction-intent gate with mocked providers only', () => {
+describe('offline historical construction-intent gate with mocked providers only', () => {
   beforeEach(() => {
     state.requireConstructionIntent = true;
     state.env.BRICK_ENFORCE_DAILY_LIMITS = 'true';
   });
   const expectNoGeneration = () => {
-    expect(state.proposalRuntime).toHaveBeenCalledWith(expect.objectContaining({ requireConstructionIntent: true }));
+    expect(state.proposalRuntime).toHaveBeenCalledWith(expect.objectContaining({ generationMode: 'creative-preview' }));
     expect(state.textCalls).toBe(0); expect(state.imageCalls).toBe(0);
     expect(state.reserve).not.toHaveBeenCalled(); expect(state.rpc).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled(); expect(state.readWebsite).not.toHaveBeenCalled();
@@ -147,9 +147,9 @@ describe('deployed proposal construction-intent gate with mocked providers only'
     expectNoGeneration();
   };
 
-  it('advertises construction-intent-v1 in readiness', async () => {
+  it('advertises current preview capability while old tests exercise engineering', async () => {
     const readiness = await (await handleRequest(new Request('https://edge.invalid/'))).json();
-    expect(PROPOSAL_CAPABILITIES).toHaveProperty('proposal_construction_intent_version', 'construction-intent-v1');
+    expect(PROPOSAL_CAPABILITIES).toHaveProperty('proposal_concept_preview_version', 'concept-preview-v1');
     expect(readiness.capabilities).toMatchObject(PROPOSAL_CAPABILITIES);
     expect(hasProposalCapabilities(readiness)).toBe(true);
     expect(fetch).not.toHaveBeenCalled(); expect(state.reserve).not.toHaveBeenCalled();

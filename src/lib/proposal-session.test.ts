@@ -49,18 +49,18 @@ describe('Proposal sessions and immutable versions',()=>{
  it.each(['static','press-reveal-manual-reset'] as const)('persists optional %s intent in schema 10 without marking it reviewed',action=>{
    const s=emptyProposalSession();s.customerIdentity={version:CUSTOMER_IDENTITY_VERSION,name:'Fable Finch'};const intent:ConstructionIntent={version:CONSTRUCTION_INTENT_VERSION,action};s.constructionIntent=intent;s.context={...s.context,mode:'mechanical',interaction:constructionInteraction(intent)};
    s.pending=pendingProposal(s,'world',s.context);expect(s.pending.constructionIntent).toEqual(intent);expect(saveProposalSession(s)).toBe(true);expect(loadProposalSession()).toEqual(s);expect(JSON.stringify(s)).not.toContain('reviewed');
-   for(const stage of ['world','physical'] as const)expect(requestForStage(s.pending,stage).constructionIntent).toEqual(intent);
+   for(const stage of ['world','physical'] as const)expect(requestForStage(s.pending,stage)).not.toHaveProperty('constructionIntent');
    for(const stage of ['details','packaging'] as const)expect(requestForStage(s.pending,stage)).not.toHaveProperty('constructionIntent');
  });
- it('requires a new explicit action for world and physical revisions while packaging inherits',()=>{
-   const s=session();const intent:ConstructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};s.constructionIntent=intent;s.accepted!.constructionIntent=intent;s.accepted!.context={...s.context,mode:'mechanical',interaction:'Display only'};
-   for(const scope of ['world','physical'] as const){const p=pendingProposal(s,scope,s.context);expect(p.constructionIntent).toBeUndefined();expect(()=>requestForStage(p,scope)).toThrow(/Choose the construction action/);}
+ it('does not require legacy engineering intent for new previews while retaining saved metadata',()=>{
+   const s=session();s.accepted!.customerIdentity={version:CUSTOMER_IDENTITY_VERSION,name:'Fable Finch'};const intent:ConstructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};s.constructionIntent=intent;s.accepted!.constructionIntent=intent;s.accepted!.context={...s.context,mode:'mechanical',interaction:'Display only'};
+   for(const scope of ['world','physical'] as const){const p=pendingProposal(s,scope,s.context);expect(p.constructionIntent).toBeUndefined();expect(requestForStage(p,scope)).not.toHaveProperty('constructionIntent');}
    expect(confirmedPackagingChange(s,'Blue packaging only').constructionIntent).toEqual(intent);expect(s.accepted!.constructionIntent).toEqual(intent);
  });
  it('does not carry a draft action into a different initial context',()=>{const s=emptyProposalSession();s.constructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};s.context.interaction='Display only';expect(pendingProposal(s,'world',{...s.context,business:'A changed business'}).constructionIntent).toBeUndefined();});
- it('rejects stale canonical interaction before forming a new product request',()=>{
-   const s=emptyProposalSession();s.constructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};s.context.interaction='Press a panel';
-   expect(()=>requestForStage(pendingProposal(s,'world',s.context),'world')).toThrow(/Choose the construction action/);
+ it('preserves freeform proposed interaction rather than overriding it with a legacy mechanism',()=>{
+   const s=emptyProposalSession();s.customerIdentity={version:CUSTOMER_IDENTITY_VERSION,name:'Fable Finch'};s.constructionIntent={version:CONSTRUCTION_INTENT_VERSION,action:'static'};s.context.interaction='Press a panel';
+   expect(requestForStage(pendingProposal(s,'world',s.context),'world').context.interaction).toBe('Press a panel');
  });
  it('rejects unknown actions, versions and reviewed flags without rejecting old schema 10 state',()=>{
    const old=session();expect(parseProposalSession(old)).toEqual(old);

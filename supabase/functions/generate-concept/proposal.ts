@@ -1,6 +1,7 @@
-import { CONSTRUCTION_INTENT_VERSION, isConstructionIntent, type ConstructionIntent } from './construction-intent.ts';
+import { CONCEPT_PREVIEW_VERSION, isConceptPreview, type ConceptPreview } from './concept-preview.ts';
+import { isConstructionIntent, type ConstructionIntent } from './construction-intent.ts';
 import { isConstructionOrigin, type ConstructionOrigin } from './construction.ts';
-import { PRODUCT_PLAN_VERSION, isProductPlan, type ProductPlan } from './product-plan.ts';
+import { isProductPlan, type ProductPlan } from './product-plan.ts';
 import {
   CANVAS_CONTEXT_MAX_CHARS, CANVAS_MAX_ELEMENTS, CanvasFailure, isCanvasContext,
   isConceptId, isWorldElements, validateCanvasRequest,
@@ -42,7 +43,9 @@ export type ProposalManifest = Omit<ProposalRequest, 'brand'> & {
   design: string;
   worldElements: WorldElement[];
   sourceImageIds: string[];
-  /** Optional only for restoring or continuing legacy visual-only assets. */
+  /** Required on new creative previews; absent on restorable legacy assets. */
+  conceptPreview?: ConceptPreview;
+  /** Legacy engineering metadata remains strictly validated, never a preview prerequisite. */
   productPlan?: ProductPlan;
   /** Optional on legacy assets; immutable server-authored origin, never manufacturing approval. */
   constructionOrigin?: ConstructionOrigin;
@@ -74,9 +77,9 @@ export const PROPOSAL_CAPABILITIES = {
   proposal_stages: [...PROPOSAL_STAGES],
   proposal_context_max_chars: PROPOSAL_CONTEXT_MAX_CHARS,
   proposal_reference_images: true,
-  proposal_product_plan_version: PRODUCT_PLAN_VERSION,
+  proposal_concept_preview_version: CONCEPT_PREVIEW_VERSION,
   proposal_customer_identity_version: CUSTOMER_IDENTITY_VERSION,
-  proposal_construction_intent_version: CONSTRUCTION_INTENT_VERSION,
+  proposal_generation_phase: 'creative-preview',
 };
 const record = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 const text = (v: unknown, max: number, empty = false): v is string => typeof v === 'string' && v.length <= max && (empty || Boolean(v.trim()));
@@ -113,13 +116,15 @@ export function validateRevisionPlanRequest(value: unknown): RevisionPlanRequest
   }
   return value as RevisionPlanRequest;
 }
-const manifestKeys = [...requestKeys.filter(k => k !== 'brand'), 'stageVersion', 'story', 'design', 'worldElements', 'sourceImageIds', 'productPlan', 'constructionOrigin'];
+const manifestKeys = [...requestKeys.filter(k => k !== 'brand'), 'stageVersion', 'story', 'design', 'worldElements', 'sourceImageIds', 'conceptPreview', 'productPlan', 'constructionOrigin'];
 const prefix = 'OFFKIN_PROPOSAL_V10\n';
 export function isProposalManifest(value: unknown): value is ProposalManifest {
   if (!record(value) || !onlyKeys(value, manifestKeys) || value.stageVersion !== PROPOSAL_STAGE_VERSION ||
     !text(value.story, 2000) || !text(value.design, 8000) || !isWorldElements(value.worldElements) ||
     !Array.isArray(value.sourceImageIds) || value.sourceImageIds.length > 3 || !value.sourceImageIds.every(isConceptId) ||
     new Set(value.sourceImageIds).size !== value.sourceImageIds.length || JSON.stringify(value).length > 44000) return false;
+  if (value.conceptPreview !== undefined && (!isConceptPreview(value.conceptPreview, value.worldElements.map(e => e.id), value.stage === 'world' ? value.worldElements[0]?.id : value.heroElementId as string) ||
+    value.productPlan !== undefined || value.constructionOrigin !== undefined || value.constructionIntent !== undefined)) return false;
   if (value.productPlan !== undefined && !isProductPlan(value.productPlan, value.worldElements.map(e => e.id))) return false;
   if (value.constructionOrigin !== undefined && (!value.productPlan || !isConstructionOrigin(value.constructionOrigin))) return false;
   if (value.constructionIntent !== undefined && !isConstructionIntent(value.constructionIntent)) return false;
@@ -171,7 +176,7 @@ export function isProposalConcept(value: unknown): value is ProposalConcept {
 export function hasProposalCapabilities(value: unknown): boolean {
   if (!record(value) || value.ready !== true || !record(value.capabilities)) return false;
   const c = value.capabilities;
-  return c.proposal === true && c.proposal_contract_version === PROPOSAL_CONTRACT_VERSION && c.proposal_reference_images === true && c.proposal_customer_identity_version === CUSTOMER_IDENTITY_VERSION && c.proposal_product_plan_version === PRODUCT_PLAN_VERSION && c.proposal_construction_intent_version === CONSTRUCTION_INTENT_VERSION &&
+  return c.proposal === true && c.proposal_contract_version === PROPOSAL_CONTRACT_VERSION && c.proposal_reference_images === true && c.proposal_customer_identity_version === CUSTOMER_IDENTITY_VERSION && c.proposal_concept_preview_version === CONCEPT_PREVIEW_VERSION && c.proposal_generation_phase === 'creative-preview' &&
     c.proposal_context_max_chars === PROPOSAL_CONTEXT_MAX_CHARS && JSON.stringify(c.proposal_stages) === JSON.stringify(PROPOSAL_STAGES);
 }
 export function canonicalProposal(value: unknown): string {
