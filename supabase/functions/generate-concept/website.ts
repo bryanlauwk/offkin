@@ -16,6 +16,7 @@
 
 import { WEBSITE_MAX_BYTES, WEBSITE_TIMEOUT_MS, WebsiteReadError } from './website-contract.ts';
 export { WebsiteReadError } from './website-contract.ts';
+import { firecrawlConfigFromEnv, firecrawlFallbackAllowed, readWithFirecrawl, type FirecrawlReaderConfig } from './firecrawl-reader.ts';
 
 export interface WebsiteSource {
   url: string;
@@ -116,7 +117,7 @@ async function defaultResolveDns(hostname: string, type: RecordType): Promise<st
   return runtime.Deno.resolveDns(hostname, type);
 }
 
-async function validateDns(url: URL, resolveDns: WebsiteDnsResolver): Promise<string[]> {
+export async function validateDns(url: URL, resolveDns: WebsiteDnsResolver): Promise<string[]> {
   const lookup = async (type: RecordType) => {
     try { return await resolveDns(url.hostname, type); }
     catch (error) {
@@ -140,7 +141,7 @@ const ENTITIES: Record<string, string> = {
   hellip: '…', copy: '©', reg: '®', trade: '™', bull: '•',
 };
 
-function cleanText(value: string): string {
+export function cleanText(value: string): string {
   return value.replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (match, entity: string) => {
     if (entity[0] !== '#') return ENTITIES[entity.toLowerCase()] ?? match;
     const code = entity[1].toLowerCase() === 'x' ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
@@ -295,7 +296,7 @@ function discardBody(response: Response): void {
   void response.body?.cancel().catch(() => undefined);
 }
 
-async function readBoundedBody(response: Response, maxBytes: number, signal: AbortSignal): Promise<string> {
+export async function readBoundedBody(response: Response, maxBytes: number, signal: AbortSignal): Promise<string> {
   const declaredLength = response.headers.get('content-length');
   if (declaredLength && /^\d+$/.test(declaredLength) && Number(declaredLength) > maxBytes) {
     discardBody(response);
@@ -328,7 +329,7 @@ async function readBoundedBody(response: Response, maxBytes: number, signal: Abo
   }
 }
 
-export async function readCompanyWebsite(input: string, dependencies: WebsiteReaderDependencies = {}): Promise<WebsiteSource> {
+export async function readCompanyWebsiteDirect(input: string, dependencies: WebsiteReaderDependencies = {}): Promise<WebsiteSource> {
   let url = validatePublicWebsiteUrl(input);
   const fetchPage = dependencies.fetch ?? fetchPinnedWebsite;
   const resolveDns = dependencies.resolveDns ?? defaultResolveDns;
@@ -396,4 +397,21 @@ export async function readCompanyWebsite(input: string, dependencies: WebsiteRea
     if (controller.signal.aborted) throw timeoutError;
     throw new WebsiteReadError(422, 'That website could not be read securely. Check its HTTPS address or try a different public company page.', 'secure');
   } finally { clearTimeout(timer!); }
+}
+
+/** Direct pinned read first; only an accessibility failure may retry through the linked Firecrawl reader. */
+export async function readCompanyWebsite(input: string, dependencies: WebsiteReaderDependencies & { firecrawl?: FirecrawlReaderConfig | null } = {}): Promise<WebsiteSource> {
+  try { return await readCompanyWebsiteDirect(input, dependencies); }
+  catch (error) {
+    const config = dependencies.firecrawl === undefined ? firecrawlConfigFromEnv() : dependencies.firecrawl;
+    if (!config || !(error instanceof WebsiteReadError) || !firecrawlFallbackAllowed(error.code)) throw error;
+    try { return await readWithFirecrawl(input, config, {
+      validateUrl: validatePublicWebsiteUrl, validateDns: (url) => validateDns(url, dependencies.resolveDns ?? defaultResolveDns),
+      readBody: readBoundedBody, cleanText, maxBytes: lowerLimit(dependencies.maxBytes, WEBSITE_MAX_BYTES), maxExcerptChars: MAX_EXCERPT_CHARS,
+    }); }
+    catch (fallbackError) {
+      if (fallbackError instanceof WebsiteReadError && fallbackError.code === 'unsafe_url') throw fallbackError;
+      throw error;
+    }
+  }
 }
