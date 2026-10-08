@@ -34,7 +34,7 @@ describe('brand discovery and QA allocation SQL source policy (not SQL execution
     expect(sql).toContain("text_dispatches_reserved between 0 and case when campaign_kind = 'qa' then 6 else 30 end");
     expect(sql).toContain('foreign key (campaign_id, campaign_kind) references public.pilot_campaigns(id, campaign_kind) on delete restrict');
     const invite = functionBody('enforce_pilot_invite_lifetime');
-    expect(invite).toContain("v_campaign.seats_issued >= case when v_campaign.campaign_kind = 'qa' then 1 else 5 end");
+    expect(invite).toContain("v_campaign.seats_issued >= (case when v_campaign.campaign_kind = 'qa' then 1 else 5 end)");
     expect(invite).toContain('new.created_at := clock_timestamp()');
     expect(invite).toContain('new.campaign_kind := v_campaign.campaign_kind');
     expect(invite).toContain("new.expires_at := new.created_at + case when v_campaign.campaign_kind = 'qa' then interval '24 hours' else interval '336 hours' end");
@@ -49,7 +49,7 @@ describe('brand discovery and QA allocation SQL source policy (not SQL execution
     const expected = functionBody('reserve_pilot_operation', base)
       .replace('create function', 'create or replace function')
       .replace('v_campaign.image_attempts_reserved + v_image_cost > 25 or v_campaign.text_dispatches_reserved + 1 > 30',
-        "v_campaign.image_attempts_reserved + v_image_cost > case when v_campaign.campaign_kind = 'qa' then 5 else 25 end or v_campaign.text_dispatches_reserved + 1 > case when v_campaign.campaign_kind = 'qa' then 6 else 30 end");
+        "v_campaign.image_attempts_reserved + v_image_cost > (case when v_campaign.campaign_kind = 'qa' then 5 else 25 end) or v_campaign.text_dispatches_reserved + 1 > (case when v_campaign.campaign_kind = 'qa' then 6 else 30 end)");
     expect(functionBody('reserve_pilot_operation')).toBe(expected);
     expect(sql).not.toMatch(/(?:create|replace) function public\.(?:get_pilot_operation|claim_pilot_dispatch|finish_pilot_operation)\(/);
   });
@@ -74,7 +74,7 @@ describe('brand discovery and QA allocation SQL source policy (not SQL execution
     expect(reserve).toContain('brand_searches_reserved = c.brand_searches_reserved + 1');
     expect(reserve).toContain('brand_reads_reserved = c.brand_reads_reserved + 2');
     expect(reserve.indexOf('update public.pilot_campaigns')).toBeLessThan(reserve.indexOf('insert into public.pilot_brand_research'));
-    expect(reserve).toContain("v_campaign.brand_reads_reserved + 2 > case when v_campaign.campaign_kind = 'qa' then 2 else 10 end");
+    expect(reserve).toContain("v_campaign.brand_reads_reserved + 2 > (case when v_campaign.campaign_kind = 'qa' then 2 else 10 end)");
     expect(reserve).not.toMatch(/(?:image_attempts|text_dispatches)_reserved\s*=/);
     expect(reserve).toContain("'reason', 'research_consumed'");
     const replay = reserve.slice(reserve.indexOf('if found then'), reserve.indexOf('if v_campaign.brand_researches_reserved'));
@@ -244,5 +244,105 @@ describe('brand discovery and QA allocation SQL source policy (not SQL execution
       expect(body).toContain("'request_fingerprint', v_research.request_fingerprint, 'query_kind', v_research.query_kind");
       expect(body).toContain("'payload', v_research.payload");
     }
+  });
+});
+
+
+describe('scoped inherited-default ACL repair source policy (not SQL execution)', () => {
+  const guard = sql.slice(sql.indexOf('do $pilot_acl$'));
+  it('conditionally revokes only sandbox_exec grants on the exact four newly created pilot tables', () => {
+    expect(guard).toContain("select oid into v_sandbox from pg_catalog.pg_roles where rolname = 'sandbox_exec'");
+    expect(guard).toContain('if v_sandbox is not null then');
+    expect(guard).toContain("format('revoke all on table %i.%i from sandbox_exec', v_schema, v_name)");
+    const tables = Array.from(guard.matchAll(/'public\.([a-z_]+)'::regclass::oid/g), match => match[1]);
+    expect(tables).toEqual(['pilot_campaigns', 'pilot_invites', 'pilot_operations', 'pilot_brand_research']);
+    expect(guard).not.toMatch(/brick_concepts|alter default privileges|alter role|\bgrant\s+(?:select|insert|update|delete|execute|all|usage)\b|revoke .* on schema|nspname\s*=\s*'public'|'public'::regnamespace/);
+  });
+  it('limits conditional function revocation to the fourteen new pilot routines without adding objects', () => {
+    const signatures = Array.from(guard.matchAll(/'public\.([^']+)'::regprocedure::oid/g), match => match[1]);
+    expect(signatures).toEqual([
+      'enforce_pilot_invite_lifetime()', 'enforce_pilot_campaign_lifetime()', 'enforce_pilot_operation_lifetime()',
+      'get_pilot_invite_access(text)', 'get_pilot_operation(text,text)',
+      'reserve_pilot_operation(text,text,text,text,text,uuid,uuid,uuid)', 'claim_pilot_dispatch(uuid,text)',
+      'finish_pilot_operation(uuid,uuid,text,jsonb)', 'valid_pilot_brand_payload(jsonb,text)',
+      'enforce_pilot_brand_research_lifetime()', 'get_pilot_brand_research(text,uuid,text)',
+      'reserve_pilot_brand_research(text,text,text)', 'claim_pilot_brand_dispatch(text,uuid,integer,text,uuid)',
+      'save_pilot_brand_research(text,uuid,integer,jsonb)',
+    ]);
+    expect(guard).toContain('if v_sandbox is not null and exists (');
+    expect(guard).toContain('where a.grantee = v_sandbox');
+    expect(guard).toContain("format('revoke all on function %i.%i(%s) from sandbox_exec'");
+    expect(guard).toContain('pg_catalog.pg_get_function_identity_arguments(v_object)');
+    expect(guard).not.toMatch(/create (?:function|table|role|trigger)|cascade/);
+  });
+  it('fails closed on PUBLIC/unintended direct or column ACLs and on grantable service rights', () => {
+    expect(guard).toContain("pg_catalog.aclexplode(coalesce(v_acl, pg_catalog.acldefault('r', v_owner)))");
+    expect(guard).toContain("pg_catalog.aclexplode(coalesce(v_acl, pg_catalog.acldefault('f', v_owner)))");
+    expect(guard).toContain('a.grantee not in (v_owner, v_service)');
+    expect(guard).toContain('cross join lateral pg_catalog.aclexplode(c.attacl)');
+    expect(guard).toContain("a.is_grantable or a.privilege_type not in ('select', 'insert', 'update')");
+    expect(guard).toContain("a.is_grantable or a.privilege_type <> 'execute'");
+    expect(guard).toContain("using errcode = '42501'");
+    expect(guard).toContain("where c.oid = v_object and c.relkind = 'r' and c.relrowsecurity");
+  });
+  it('caps service effective privileges too, including inherited grant options and version-specific table rights', () => {
+    expect(guard).toContain("a.privilege_type not in ('select', 'insert', 'update') and pg_catalog.has_table_privilege(v_service, v_object, a.privilege_type)");
+    expect(guard).toContain("pg_catalog.has_table_privilege(v_service, v_object, a.privilege_type || ' with grant option')");
+    expect(guard).toContain("p.privilege_type = 'references' and pg_catalog.has_any_column_privilege(v_service, v_object, p.privilege_type)");
+    expect(guard).toContain("pg_catalog.has_any_column_privilege(v_service, v_object, p.privilege_type || ' with grant option')");
+    expect(guard).toContain("pg_catalog.has_function_privilege(v_service, v_object, 'execute with grant option')");
+    expect(guard).toContain("raise exception 'unexpected effective service-role pilot table privileges");
+  });
+  it('checks effective table, column and execute rights for all other user-defined roles including inherited grants', () => {
+    expect(guard.match(/r\.oid not in \(v_owner, v_service\) and not r\.rolsuper and r\.rolname !~ '\^pg_'/g)).toHaveLength(2);
+    expect(guard).toContain("pg_catalog.aclexplode(pg_catalog.acldefault('r', v_owner))");
+    expect(guard).toContain('pg_catalog.has_table_privilege(r.oid, v_object, a.privilege_type)');
+    expect(guard).toContain("pg_catalog.has_any_column_privilege(r.oid, v_object, 'select,insert,update,references')");
+    expect(guard).toContain("pg_catalog.has_function_privilege(r.oid, v_object, 'execute')");
+    expect(guard).not.toContain('r.rolcanlogin');
+    for (const check of guard.matchAll(/select r\.rolname into v_unexpected[\s\S]*?limit 1;/g)) expect(check[0]).not.toMatch(/sandbox_exec|authenticator|supabase_admin/);
+    expect(guard).toContain("raise exception 'unexpected effective pilot table access");
+    expect(guard).toContain("raise exception 'unexpected effective pilot routine access");
+  });
+});
+
+
+/** Detect the actual failed grammar shape; this is not a PostgreSQL parser. */
+function topLevelConditionalCases(source: string): number {
+  const plain = source.replace(/--[^\n]*/g, '').replace(/'(?:''|[^'])*'/g, "''");
+  const tokens = plain.toLowerCase().match(/[a-z_][a-z_0-9]*|[();]/g) ?? [];
+  let count = 0;
+  for (let start = 0; start < tokens.length; start++) {
+    if (!['if', 'elsif'].includes(tokens[start]) || tokens[start - 1] === 'end') continue;
+    let depth = 0;
+    for (let i = start + 1; i < tokens.length; i++) {
+      if (tokens[i] === '(') depth++;
+      else if (tokens[i] === ')') depth--;
+      else if (tokens[i] === 'case' && depth === 0) count++;
+      else if (depth === 0 && ['then', ';'].includes(tokens[i])) break;
+    }
+  }
+  return count;
+}
+describe('regression for observed PostgreSQL 42601 conditional CASE failure', () => {
+  it('detects the failed seat IF shape and accepts its parenthesized replacement', () => {
+    expect(topLevelConditionalCases("if not found or v_campaign.seats_issued >= case when v_campaign.campaign_kind = 'qa' then 1 else 5 end then")).toBe(1);
+    expect(topLevelConditionalCases("if not found or v_campaign.seats_issued >= (case when v_campaign.campaign_kind = 'qa' then 1 else 5 end) then")).toBe(0);
+  });
+  it('checks both complete migrations for analogous bare CASE operands in IF or ELSIF', () => {
+    for (const path of ['supabase/migrations/20261008070000_pilot_invite_budget.sql', 'supabase/migrations/20261008133000_pilot_brand_discovery.sql']) {
+      expect(topLevelConditionalCases(readFileSync(path, 'utf8')), path).toBe(0);
+    }
+  });
+  it('parenthesizes all six campaign-dependent conditional caps without changing their values', () => {
+    const checks = [
+      ['enforce_pilot_invite_lifetime', "v_campaign.seats_issued >= (case when v_campaign.campaign_kind = 'qa' then 1 else 5 end)"],
+      ['reserve_pilot_operation', "v_campaign.image_attempts_reserved + v_image_cost > (case when v_campaign.campaign_kind = 'qa' then 5 else 25 end)"],
+      ['reserve_pilot_operation', "v_campaign.text_dispatches_reserved + 1 > (case when v_campaign.campaign_kind = 'qa' then 6 else 30 end)"],
+      ['reserve_pilot_brand_research', "v_campaign.brand_researches_reserved + 1 > (case when v_campaign.campaign_kind = 'qa' then 1 else 5 end)"],
+      ['reserve_pilot_brand_research', "v_campaign.brand_searches_reserved + 1 > (case when v_campaign.campaign_kind = 'qa' then 1 else 5 end)"],
+      ['reserve_pilot_brand_research', "v_campaign.brand_reads_reserved + 2 > (case when v_campaign.campaign_kind = 'qa' then 2 else 10 end)"],
+    ];
+    for (const [name, expression] of checks) expect(functionBody(name)).toContain(expression);
   });
 });

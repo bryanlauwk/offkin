@@ -61,7 +61,7 @@ begin
     return new;
   end if;
   select * into v_campaign from public.pilot_campaigns where id = new.campaign_id for update;
-  if not found or v_campaign.seats_issued >= case when v_campaign.campaign_kind = 'qa' then 1 else 5 end then
+  if not found or v_campaign.seats_issued >= (case when v_campaign.campaign_kind = 'qa' then 1 else 5 end) then
     raise exception 'The lifetime seats for this pilot allocation have been issued' using errcode = '23514';
   end if;
   -- Issuance starts the clock, rather than first redemption. Backdating is not needed.
@@ -237,8 +237,8 @@ begin
     or v_invite.text_dispatches_reserved + 1 > 6 then
     return jsonb_build_object('allowed', false, 'status', 'denied', 'reason', 'invite_budget_exhausted');
   end if;
-  if v_campaign.image_attempts_reserved + v_image_cost > case when v_campaign.campaign_kind = 'qa' then 5 else 25 end
-    or v_campaign.text_dispatches_reserved + 1 > case when v_campaign.campaign_kind = 'qa' then 6 else 30 end then
+  if v_campaign.image_attempts_reserved + v_image_cost > (case when v_campaign.campaign_kind = 'qa' then 5 else 25 end)
+    or v_campaign.text_dispatches_reserved + 1 > (case when v_campaign.campaign_kind = 'qa' then 6 else 30 end) then
     return jsonb_build_object('allowed', false, 'status', 'denied', 'reason', 'campaign_budget_exhausted');
   end if;
   -- Holding image liability even if text fails is intentional and non-refundable.
@@ -467,9 +467,9 @@ begin
     'request_fingerprint', v_research.request_fingerprint, 'query_kind', v_research.query_kind,
     'payload', v_research.payload);
   end if;
-  if v_campaign.brand_researches_reserved + 1 > case when v_campaign.campaign_kind = 'qa' then 1 else 5 end
-    or v_campaign.brand_searches_reserved + 1 > case when v_campaign.campaign_kind = 'qa' then 1 else 5 end
-    or v_campaign.brand_reads_reserved + 2 > case when v_campaign.campaign_kind = 'qa' then 2 else 10 end then
+  if v_campaign.brand_researches_reserved + 1 > (case when v_campaign.campaign_kind = 'qa' then 1 else 5 end)
+    or v_campaign.brand_searches_reserved + 1 > (case when v_campaign.campaign_kind = 'qa' then 1 else 5 end)
+    or v_campaign.brand_reads_reserved + 2 > (case when v_campaign.campaign_kind = 'qa' then 2 else 10 end) then
     return jsonb_build_object('allowed', false, 'status', 'denied', 'reason', 'campaign_research_exhausted');
   end if;
   -- Reserve the maximum research liability before any provider call. A URL-only
@@ -698,3 +698,135 @@ grant execute on function public.get_pilot_brand_research(text, uuid, text) to s
 grant execute on function public.reserve_pilot_brand_research(text, text, text) to service_role;
 grant execute on function public.claim_pilot_brand_dispatch(text, uuid, integer, text, uuid) to service_role;
 grant execute on function public.save_pilot_brand_research(text, uuid, integer, jsonb) to service_role;
+
+-- BEGIN scoped pilot effective-ACL guard
+-- Apply BOTH ordered source migrations in one transaction; this guard must pass
+-- before commit. Public schema defaults may grant sandbox_exec SELECT/INSERT,
+-- and its BYPASSRLS means RLS alone cannot protect these newly created tables.
+-- Repair only that role's grants on the four NEW pilot tables and, if present,
+-- the exact fourteen NEW pilot routines below. Never touch brick_concepts,
+-- global/default privileges, role memberships, or any other existing object.
+-- Owners, actual superusers and built-in pg_* administrative roles retain their
+-- inherent cluster authority. Any other unexpected effective recipient aborts
+-- the transaction instead of broadening the repair's scope to make it pass.
+do $pilot_acl$
+declare
+  v_tables oid[] := array[
+    'public.pilot_campaigns'::regclass::oid,
+    'public.pilot_invites'::regclass::oid,
+    'public.pilot_operations'::regclass::oid,
+    'public.pilot_brand_research'::regclass::oid
+  ];
+  v_functions oid[] := array[
+    'public.enforce_pilot_invite_lifetime()'::regprocedure::oid,
+    'public.enforce_pilot_campaign_lifetime()'::regprocedure::oid,
+    'public.enforce_pilot_operation_lifetime()'::regprocedure::oid,
+    'public.get_pilot_invite_access(text)'::regprocedure::oid,
+    'public.get_pilot_operation(text,text)'::regprocedure::oid,
+    'public.reserve_pilot_operation(text,text,text,text,text,uuid,uuid,uuid)'::regprocedure::oid,
+    'public.claim_pilot_dispatch(uuid,text)'::regprocedure::oid,
+    'public.finish_pilot_operation(uuid,uuid,text,jsonb)'::regprocedure::oid,
+    'public.valid_pilot_brand_payload(jsonb,text)'::regprocedure::oid,
+    'public.enforce_pilot_brand_research_lifetime()'::regprocedure::oid,
+    'public.get_pilot_brand_research(text,uuid,text)'::regprocedure::oid,
+    'public.reserve_pilot_brand_research(text,text,text)'::regprocedure::oid,
+    'public.claim_pilot_brand_dispatch(text,uuid,integer,text,uuid)'::regprocedure::oid,
+    'public.save_pilot_brand_research(text,uuid,integer,jsonb)'::regprocedure::oid
+  ];
+  v_sandbox oid;
+  v_service oid;
+  v_object oid;
+  v_owner oid;
+  v_schema text;
+  v_name text;
+  v_acl aclitem[];
+  v_unexpected text;
+begin
+  select oid into v_sandbox from pg_catalog.pg_roles where rolname = 'sandbox_exec';
+  select oid into strict v_service from pg_catalog.pg_roles where rolname = 'service_role';
+  foreach v_object in array v_tables loop
+    select c.relowner, n.nspname, c.relname into strict v_owner, v_schema, v_name
+      from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where c.oid = v_object and c.relkind = 'r' and c.relrowsecurity;
+    if v_sandbox is not null then
+      execute pg_catalog.format('REVOKE ALL ON TABLE %I.%I FROM sandbox_exec', v_schema, v_name);
+    end if;
+    select c.relacl into v_acl from pg_catalog.pg_class c where c.oid = v_object;
+    if exists (
+      select 1 from pg_catalog.aclexplode(coalesce(v_acl, pg_catalog.acldefault('r', v_owner))) a
+      where a.grantee not in (v_owner, v_service)
+        or (a.grantee = v_service and (a.is_grantable or a.privilege_type not in ('SELECT', 'INSERT', 'UPDATE')))
+    ) or exists (
+      select 1 from pg_catalog.pg_attribute c
+        cross join lateral pg_catalog.aclexplode(c.attacl) a
+      where c.attrelid = v_object and c.attnum > 0 and not c.attisdropped
+        and (a.grantee not in (v_owner, v_service)
+          or (a.grantee = v_service and (a.is_grantable or a.privilege_type not in ('SELECT', 'INSERT', 'UPDATE'))))
+    ) then
+      raise exception 'Unexpected direct or column ACL on pilot table %', v_object::regclass using errcode = '42501';
+    end if;
+    if not (pg_catalog.has_table_privilege(v_service, v_object, 'SELECT')
+      and pg_catalog.has_table_privilege(v_service, v_object, 'INSERT')
+      and pg_catalog.has_table_privilege(v_service, v_object, 'UPDATE')) then
+      raise exception 'Missing service-only pilot table privileges on %', v_object::regclass using errcode = '42501';
+    end if;
+    if exists (
+      select 1 from pg_catalog.aclexplode(pg_catalog.acldefault('r', v_owner)) a
+      where (a.privilege_type not in ('SELECT', 'INSERT', 'UPDATE')
+          and pg_catalog.has_table_privilege(v_service, v_object, a.privilege_type))
+        or pg_catalog.has_table_privilege(v_service, v_object, a.privilege_type || ' WITH GRANT OPTION')
+    ) or exists (
+      select 1 from pg_catalog.unnest(array['SELECT', 'INSERT', 'UPDATE', 'REFERENCES']) as p(privilege_type)
+      where (p.privilege_type = 'REFERENCES'
+          and pg_catalog.has_any_column_privilege(v_service, v_object, p.privilege_type))
+        or pg_catalog.has_any_column_privilege(v_service, v_object, p.privilege_type || ' WITH GRANT OPTION')
+    ) then
+      raise exception 'Unexpected effective service-role pilot table privileges on %', v_object::regclass using errcode = '42501';
+    end if;
+    -- Enumerating acldefault privilege names includes version-specific rights
+    -- such as MAINTAIN without assuming a particular PostgreSQL major version.
+    select r.rolname into v_unexpected from pg_catalog.pg_roles r
+      where r.oid not in (v_owner, v_service) and not r.rolsuper and r.rolname !~ '^pg_'
+        and (exists (
+          select 1 from pg_catalog.aclexplode(pg_catalog.acldefault('r', v_owner)) a
+          where pg_catalog.has_table_privilege(r.oid, v_object, a.privilege_type)
+        ) or pg_catalog.has_any_column_privilege(r.oid, v_object, 'SELECT,INSERT,UPDATE,REFERENCES'))
+      order by r.rolname limit 1;
+    if v_unexpected is not null then
+      raise exception 'Unexpected effective pilot table access for role % on %', v_unexpected, v_object::regclass using errcode = '42501';
+    end if;
+  end loop;
+
+  foreach v_object in array v_functions loop
+    select p.proowner, n.nspname, p.proname, p.proacl into strict v_owner, v_schema, v_name, v_acl
+      from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+      where p.oid = v_object and p.prokind = 'f';
+    -- The observed defaults do not grant sandbox_exec function access. Revoke
+    -- only if an actual grant on one of these exact NEW routines is implicated.
+    if v_sandbox is not null and exists (
+      select 1 from pg_catalog.aclexplode(coalesce(v_acl, pg_catalog.acldefault('f', v_owner))) a
+      where a.grantee = v_sandbox
+    ) then
+      execute pg_catalog.format('REVOKE ALL ON FUNCTION %I.%I(%s) FROM sandbox_exec',
+        v_schema, v_name, pg_catalog.pg_get_function_identity_arguments(v_object));
+    end if;
+    select p.proacl into v_acl from pg_catalog.pg_proc p where p.oid = v_object;
+    if exists (
+      select 1 from pg_catalog.aclexplode(coalesce(v_acl, pg_catalog.acldefault('f', v_owner))) a
+      where a.grantee not in (v_owner, v_service)
+        or (a.grantee = v_service and (a.is_grantable or a.privilege_type <> 'EXECUTE'))
+    ) or not pg_catalog.has_function_privilege(v_service, v_object, 'EXECUTE')
+      or pg_catalog.has_function_privilege(v_service, v_object, 'EXECUTE WITH GRANT OPTION') then
+      raise exception 'Unexpected direct ACL on pilot routine %', v_object::regprocedure using errcode = '42501';
+    end if;
+    select r.rolname into v_unexpected from pg_catalog.pg_roles r
+      where r.oid not in (v_owner, v_service) and not r.rolsuper and r.rolname !~ '^pg_'
+        and pg_catalog.has_function_privilege(r.oid, v_object, 'EXECUTE')
+      order by r.rolname limit 1;
+    if v_unexpected is not null then
+      raise exception 'Unexpected effective pilot routine access for role % on %', v_unexpected, v_object::regprocedure using errcode = '42501';
+    end if;
+  end loop;
+end;
+$pilot_acl$;
+-- END scoped pilot effective-ACL guard

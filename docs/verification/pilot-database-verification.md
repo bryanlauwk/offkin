@@ -18,6 +18,22 @@ The current harness requires both migrations. Original-only execution is no long
 
 The Python harness uses standard-library Python and the official `psql` client. It makes no HTTP/provider calls and reads no application configuration or application secrets. Synthetic ledger digests have no known corresponding bearer token. Mock asset rows use a nonexistent `never-uploaded/fixture.png` path; no images or storage uploads are created.
 
+## Observed first database submission failure
+
+The first rollback-only verification submission (`s14`) was actually attempted and returned PostgreSQL `42601`, with “syntax error at end of input” at the additive migration’s unparenthesized conditional CASE in `enforce_pilot_invite_lifetime`. That attempt did not pass compilation or establish any runtime invariant. Independent namespace-absence verification is outstanding, so target cleanliness remains unconfirmed. Do not infer cleanup or safe retry from the error response alone.
+
+The local source repair parenthesizes all six analogous CASE operands in three PL/pgSQL IF guards: invite seat cap, generation image/text caps, and discovery research/search/read caps. Budget values and ACL scope are unchanged. Both complete migrations were inspected; the original has no analogous conditional CASE and is unchanged. Added source regressions detect the observed bare-CASE shape and check every affected operand, but those tests are not a PostgreSQL syntax parser or runtime validity evidence. A replacement execution packet must not be regenerated until independent source review; database replay additionally requires applicable authorization and verification of the target state.
+
+## Scoped ACL repair and revised execution preconditions
+
+Read-only target preflight found existing public table defaults granting `sandbox_exec` SELECT/INSERT, with LOGIN and BYPASSRLS. The additive migration now contains a conditional scoped ACL guard. Apply both ordered migrations within one transaction; require the guard and all setup postconditions to succeed before any commit. No separately committed original migration is safe under those observed defaults. The older SHA-256/executable packet must be regenerated and independently reviewed.
+
+Only `sandbox_exec` privileges on the four new pilot tables are revoked. An exact allowlist of fourteen new pilot routines is checked, with sandbox revocation only when an actual grant exists. No existing concept-table privilege, default privilege, role membership/attribute, or unrelated object is changed. Conditional role existence supports the disposable three-role runtime without creating a sandbox role. The four-table/four-trigger/fourteen-function pilot inventory is unchanged.
+
+The final guard rejects unexpected direct, column, PUBLIC, grantable service, and inherited effective ACL access. The only effective-check exemptions are exact owners, service_role, actual superusers and built-in `pg_*` administrative roles. The trusted object owner is exempt even when it is not a superuser. No custom recipient is silently exempted or automatically repaired. Service-role effective table rights are also limited to SELECT/INSERT/UPDATE, with no table, column or routine grant options; inherited DELETE/TRUNCATE/REFERENCES/TRIGGER and version-specific rights such as MAINTAIN fail closed. Existing authenticator NOINHERIT/SET ROLE behavior and administrative access remain unchanged. All ACL targets use exact qualified object literals compatible with reversible `public.`-only namespace adaptation.
+
+The separately authorized runtime verification must still demonstrate that sandbox/client effective access is absent, service rights are retained, no unintended ACL recipient remains, owner/admin behavior is unchanged, and no existing public object/default/role was modified. Source tests are not evidence of these runtime results. Any residual access or failed assertion blocks commit and requires review; do not alter unrelated privileges or memberships to make the test pass.
+
 ## Authorized runtime route
 
 An operator must separately provision and authorize an isolated, disposable PostgreSQL cluster and an empty test database. Do not point this harness at production, a shared staging database, a database clone containing user data, or any existing OFFKIN application database. Preparation of this pack is not approval to create or connect to infrastructure.
