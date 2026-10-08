@@ -14,7 +14,7 @@ function harness(binding?:ConstructionBinding) {
   const state={rows:[] as Row[],blobs:new Map<string,Uint8Array>(),output:undefined as unknown,stage:'world',abortOnText:null as AbortController|null};
   const fixture=constructionFixture();
   const respond=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}});
-  const runtime:ProposalRuntime={enabled:true,requireConstructionIntent:false,requireCustomerIdentity:false,textModel:'mock-text',imageModel:'openai/gpt-image-2',construction:binding,
+  const runtime:ProposalRuntime={enabled:true,generationMode:'legacy-engineering',requireConstructionIntent:false,requireCustomerIdentity:false,textModel:'mock-text',imageModel:'openai/gpt-image-2',construction:binding,
     hash:vi.fn(async text=>createHash('sha256').update(text).digest('hex')),reserve:vi.fn(async()=>{}),respond,
     deliver:async row=>respond({concept:restoreProposalRow(row,`https://private.invalid/${row.id}.png`)}),
     db:{from:()=>({select:()=>({eq:(field:string,value:unknown)=>({maybeSingle:async()=>({data:state.rows.find(r=>r[field]===value)||null})})}),insert:async(row:Row)=>{state.rows.push(row);return {};}}),storage:{from:()=>({download:async(path:string)=>{const bytes=state.blobs.get(path);return {data:bytes?{size:bytes.length,type:'image/png',arrayBuffer:async()=>Uint8Array.from(bytes).buffer}:undefined};},upload:async(path:string,bytes:Uint8Array)=>{state.blobs.set(path,bytes);return {};},remove:async(paths:string[])=>{paths.forEach(p=>state.blobs.delete(p));return {};}})}} as ProposalDatabase,
@@ -162,5 +162,27 @@ describe('construction compiler boundaries',()=>{
  });
  it('rejects origin without a frozen strict ProductPlan and rejects provenance statuses claiming approval',async()=>{
   const h=harness(constructionFixture().binding);await h.generate(h.world);const m=parseProposalManifest(h.state.rows[0].story)!;expect(isProposalManifest({...m,productPlan:undefined})).toBe(false);expect(isProposalManifest({...m,constructionOrigin:{...m.constructionOrigin,evidence:'approved'}})).toBe(false);
+ });
+});
+
+describe('creative-preview versus legacy engineering cache isolation', () => {
+ it('computes distinct cache keys for otherwise identical requests and models, and restores each own completed cache', async () => {
+  const h=harness();const request=structuredClone(h.world);
+  const legacy=await h.generate(request);const legacyKey=h.state.rows[0].cache_key;
+  expect(legacy.productPlan).toBeDefined();expect(legacy.conceptPreview).toBeUndefined();
+  // The public default takes only creative output; no new client flag changes the server mode.
+  delete h.runtime.generationMode;
+  h.state.output={needsContext:false,brand:legacy.brand,title:legacy.title,story:legacy.story,interaction:legacy.interaction,design:legacy.design,worldElements:legacy.worldElements};
+  const preview=await h.generate(request);const previewKey=h.state.rows[1].cache_key;
+  expect(previewKey).toBeTruthy();expect(previewKey).not.toBe(legacyKey);expect(preview.id).not.toBe(legacy.id);
+  expect(preview.conceptPreview?.version).toBe('concept-preview-v1');expect(preview.productPlan).toBeUndefined();
+  expect(h.images()).toHaveLength(2);
+  const cachedPreview=await h.generate(request);expect(cachedPreview.id).toBe(preview.id);expect(h.images()).toHaveLength(2);
+  h.runtime.generationMode='legacy-engineering';
+  const cachedLegacy=await h.generate(request);expect(cachedLegacy.id).toBe(legacy.id);expect(h.images()).toHaveLength(2);
+  const inputs=vi.mocked(h.runtime.hash).mock.calls.map(([text])=>{try{return JSON.parse(text);}catch{return null;}}).filter(v=>v?.request?.stage==='world');
+  const oldInput=inputs.find(v=>v.generationMode==='legacy-engineering');const newInput=inputs.find(v=>v.generationMode==='creative-preview');
+  expect(oldInput.request).toEqual(newInput.request);expect(oldInput.model).toBe(newInput.model);expect(oldInput.textModel).toBe(newInput.textModel);
+  expect(newInput.conceptPreviewVersion).toBe('concept-preview-v1');expect(oldInput.conceptPreviewVersion).toBeUndefined();
  });
 });

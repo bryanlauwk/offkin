@@ -1,4 +1,4 @@
-import { constructionInteraction, isConstructionIntent } from '../../supabase/functions/generate-concept/construction-intent';
+import { CONCEPT_PREVIEW_VERSION } from '../../supabase/functions/generate-concept/concept-preview';
 import { PROPOSAL_GENERATION_PAUSED, PROPOSAL_PAUSE_MESSAGE } from './proposal-availability';
 import {
   PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGES, hasProposalCapabilities, isCustomerIdentity, isProposalConcept,
@@ -34,7 +34,7 @@ function equalContext(a: ProposalConcept['context'], b: ProposalConcept['context
 export async function requestProposalAsset(body: ProposalRequest, signal: AbortSignal): Promise<ProposalConcept> {
   active(signal); validateProposalRequest(body);
   if (body.stage==='world'&&!isCustomerIdentity(body.customerIdentity)) throw new Error('Enter the exact brand name before generating your proposal.');
-  if ((body.stage==='world'||body.stage==='physical') && (!isConstructionIntent(body.constructionIntent)||body.context.mode!=='mechanical'||body.context.interaction!==constructionInteraction(body.constructionIntent))) throw new ProposalConstructionNeededError('Choose a construction action before generating this direction.');
+  if (body.constructionIntent) throw new Error('Construction choices belong to a later build proposal. Start with your visual direction.');
   if (!await supportsProposalGeneration(signal)) { active(signal); throw new ProposalUnavailableError(); }
   const data = await post(body, signal);
   if (record(data) && data.needsConstruction === true) throw new ProposalConstructionNeededError(typeof data.clarification === 'string' && data.clarification.trim() && data.clarification.length <= 600 ? data.clarification : 'The physical construction needs a little more detail.');
@@ -42,8 +42,7 @@ export async function requestProposalAsset(body: ProposalRequest, signal: AbortS
   if (!record(data) || !isProposalConcept(data.concept)) throw new Error(record(data) && typeof data.message === 'string' ? data.message : 'The backend returned an incomplete proposal section.');
   const c = data.concept;
   if (body.customerIdentity && (c.customerIdentity?.version!==body.customerIdentity.version || c.customerIdentity?.name!==body.customerIdentity.name || c.brand!==body.customerIdentity.name)) throw new Error('The response does not match your customer brand. Your accepted version is unchanged.');
-  if ((body.stage === 'world' || body.stage === 'physical') && !c.productPlan) throw new Error('The new product response has no construction plan. Your accepted version is unchanged.');
-  if ((body.stage==='world'||body.stage==='physical') && (c.constructionIntent?.version!==body.constructionIntent?.version||c.constructionIntent?.action!==body.constructionIntent?.action)) throw new Error('The response does not match your construction choice. Your accepted version is unchanged.');
+  if (c.conceptPreview?.version !== CONCEPT_PREVIEW_VERSION) throw new Error('The new image has no creative-preview metadata. Your accepted version is unchanged.');
   if (c.stage !== body.stage || !equalContext(c.context, body.context) || c.sourceWorldId !== body.sourceWorldId || c.sourcePhysicalId !== body.sourcePhysicalId) throw new Error('The response does not match the current proposal. Your accepted version is unchanged.');
   if (body.stage === 'physical' && (JSON.stringify(c.selectedElementIds) !== JSON.stringify(body.selectedElementIds) || c.heroElementId !== body.heroElementId || JSON.stringify(c.replacements || []) !== JSON.stringify(body.replacements || []))) throw new Error('The response does not match your selected story elements.');
   return c;

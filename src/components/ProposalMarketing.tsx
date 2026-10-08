@@ -22,9 +22,9 @@ export function MarketingArtwork({ kind, className = '' }: { kind: Artwork; clas
 }
 
 const applications = [
-  { art: 'stories', title: 'Collectible stories', copy: 'Translate your identity, signature product or hero story into an object worth keeping.', note: 'Our focus' },
-  { art: 'editions', title: 'Campaign editions', copy: 'Explore a collectible for a launch, anniversary, collaboration or special release.', note: 'An application to explore' },
-  { art: 'experiences', title: 'Physical experiences', copy: 'Explore how discovery, movement and play can bring a brand story into the real world.', note: 'An application to explore' },
+  { art: 'stories', title: 'From IP to “I Want That”', copy: 'Turn your identity into a richly layered, tangible showcase with a silhouette people remember.', note: 'Our focus' },
+  { art: 'editions', title: 'Give People Something To Talk About', copy: 'Give a launch, campaign or collaboration a story people can discover, discuss and keep.', note: 'An application to explore' },
+  { art: 'experiences', title: 'Make It LIVE', copy: 'Imagine playful discoveries and proposed interactions, then shape a realistic build proposal around the idea.', note: 'An application to explore' },
 ] as const;
 
 export default function ProposalMarketing() {

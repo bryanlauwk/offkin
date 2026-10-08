@@ -49,7 +49,7 @@ describe('ProposalBoard',()=>{
     expect(screen.getByText(/No CAD, sliced file or physical sample has been validated/)).toBeInTheDocument();
     expect(screen.getByText(/Parts, joins, assembly and checks before production/)).toBeInTheDocument();
   });
-  it('labels old visual-only proposals without inventing construction evidence',()=>{render(<ProposalBoard {...props()}/>);expect(screen.getByText(/no construction plan was generated/)).toBeInTheDocument();});
+  it('labels old visual-only proposals without inventing construction evidence',()=>{render(<ProposalBoard {...props()}/>);expect(screen.getByText('Concept preview. Final design, functionality and pricing confirmed during the build proposal.')).toBeInTheDocument();});
   it('renders exact wording unchanged and keeps element descriptions independently readable',()=>{
     const input=props();const {container}=render(<ProposalBoard {...input}/>);
     expect(container.querySelector('.pb-exact-wording')?.textContent).toBe(input.assets.world!.context.exactWording);

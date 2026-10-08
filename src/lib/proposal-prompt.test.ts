@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PRODUCT_PLAN_CORRECTION_PROMPT, PROPOSAL_PROMPT_REVISION, PROPOSAL_REVISION_PROMPT, proposalDesignPrompt, proposalImagePrompt } from '../../supabase/functions/generate-concept/proposal-prompt';
+import { PRODUCT_PLAN_CORRECTION_PROMPT, PROPOSAL_PROMPT_REVISION, PROPOSAL_REVISION_PROMPT, legacyEngineeringDesignPrompt, proposalDesignPrompt, proposalImagePrompt } from '../../supabase/functions/generate-concept/proposal-prompt';
 import { PROPOSAL_CONTRACT_VERSION, PROPOSAL_STAGE_VERSION, parseRevisionPlan, type RevisionPlanRequest } from '../../supabase/functions/generate-concept/proposal';
 
 const current = {
@@ -24,11 +24,11 @@ describe('proposal prompt corrections from live output review', () => {
     expect(PRODUCT_PLAN_CORRECTION_PROMPT).toContain('Diagnostics are bounded');
   });
   it('versions prompt cache identity separately from saved manifest compatibility', () => {
-    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v7-customer-identity');
+    expect(PROPOSAL_PROMPT_REVISION).toBe('proposal-prompts-v8-creative-preview');
     expect(PROPOSAL_STAGE_VERSION).toBe('proposal-assets-v1');
   });
-  it('makes the plan a nested property without overriding the outer stage JSON', () => {
-    const prompt = proposalDesignPrompt('world');
+  it('keeps historical engineering plan validation isolated from public preview prompts', () => {
+    const prompt = legacyEngineeringDesignPrompt('world');
     expect(prompt).toContain('"worldElements":[{"id":string');
     expect(prompt).toContain('Nested productPlan schema');
     expect(prompt).toContain('NOT the whole stage response');
@@ -59,15 +59,19 @@ describe('proposal prompt corrections from live output review', () => {
     expect(image).toContain('No invented slogans');
     expect(image).toContain('Do not invent a logo design or verified colour specification from a name alone');
   });
-  it('requires product logic before art and never treats generated plans as production proof',()=>{
+  it('preserves visual richness first and defers engineering without making production claims',()=>{
     for(const stage of ['world','physical','details','packaging'] as const){
-      expect(proposalDesignPrompt(stage)).toContain('PRODUCT FIRST');
-      expect(proposalDesignPrompt(stage)).toContain('Generated verification gates remain unverified');
-      expect(proposalImagePrompt(stage,'mechanical')).toContain('common source of truth');
-      expect(proposalImagePrompt(stage,'mechanical')).not.toContain('Do not simplify the creative world for manufacturing');
+      const design=proposalDesignPrompt(stage);const image=proposalImagePrompt(stage,'mechanical');
+      expect(design).toContain('Do not simplify the creative world for manufacturing');
+      expect(design).toContain('metadata/UI limit, never a cap on visual details or manufactured parts');
+      expect(design).toContain('request a quote and realistic build proposal');
+      expect(design).toContain('unverified visual concept');
+      expect(design).not.toContain('PRODUCT FIRST');expect(design).not.toContain('Nested productPlan schema');
+      expect(image).toContain('no manufacturing part-count limit or rigid mechanism template');
+      expect(image).toContain('unverified visual concept, never CAD, tested construction or production proof');
     }
-    expect(proposalDesignPrompt('details')).toContain('proposed printable parts or planned subassemblies');
-    expect(proposalDesignPrompt('packaging')).toContain('avoids loading fragile protrusions');
+    expect(proposalDesignPrompt('details')).toContain('not proof of detachable manufactured parts');
+    expect(proposalDesignPrompt('packaging')).toContain('Packaging fit, protective structure');
   });
   it('requires concrete story elements rather than style or palette cards', () => {
     const prompt = proposalDesignPrompt('world');
@@ -79,8 +83,8 @@ describe('proposal prompt corrections from live output review', () => {
     const prompt = proposalDesignPrompt('physical');
     expect(prompt).toContain('freestanding, fully dimensional collectible by default');
     expect(prompt).toContain('NOT a tracing template');
-    expect(prompt).toContain('Resolve and return the complete current productPlan before the image');
-    expect(prompt).toContain('do NOT preserve the illustration’s rectangular outline');
+    expect(prompt).toContain('Do not dilute the details to satisfy a speculative fabrication limit');
+    expect(prompt).toContain('Do NOT preserve the illustration’s rectangular outline');
     expect(prompt).toContain('prohibited unless the customer explicitly requested that form');
     expect(prompt).toContain('retain every selected meaning');
     expect(prompt).toContain('no universal palm-size limit');
@@ -98,7 +102,7 @@ describe('proposal prompt corrections from live output review', () => {
   it('requests full isolated component forms rather than another hero or crop panels', () => {
     const prompt = proposalDesignPrompt('details');
     expect(prompt).toContain('dedicated landscape component sheet');
-    expect(prompt).toContain('4–6 complete planned parts or subassemblies');
+    expect(prompt).toContain('4–6 complete conceptual forms or visual groups');
     expect(prompt).toContain('entire silhouette');
     expect(prompt).toContain('generous negative space on every side');
     expect(prompt).toContain('Do not repeat a large full hero');
@@ -146,5 +150,42 @@ describe('proposal prompt corrections from live output review', () => {
     const wording = parseRevisionPlan({ scope: 'world', context: { exactWording: 'Unrequested slogan' }, summary: 'New slogan.' }, request);
     expect(wording.clarification).toContain('exact wording'); expect(wording).not.toHaveProperty('plan');
     expect(parseRevisionPlan({ clarification: 'Should navy apply to the sleeve or the whole box?' }, request)).toEqual({ clarification: 'Should navy apply to the sleeve or the whole box?' });
+  });
+});
+
+describe('reference-led art direction without an implicit engineering mode', () => {
+  it('takes broad visual qualities from the supplied book references while keeping customer-specific content', () => {
+    for (const prompt of [proposalDesignPrompt('world'), proposalImagePrompt('world')]) {
+      expect(prompt).toContain('fine black hand-drawn outlines on warm ivory');
+      expect(prompt).toContain('restrained brand-specific accent routes');
+      expect(prompt).toContain('dense navigable isometric stacked collage');
+      expect(prompt).toContain('playful scale shifts, tiny daily activities and unexpected object landmarks');
+      expect(prompt).toContain('without copying their composition, characters, landmarks, printed text');
+      expect(prompt).toContain('Yellow and Japanese motifs are not mandatory');
+      expect(prompt).toContain('customer has not specified a different style');
+    }
+  });
+  it('permits brief-supported conceptual lighting when no mode was chosen, while honoring explicit mechanical constraints', () => {
+    const unspecified = proposalImagePrompt('physical');
+    expect(unspecified).toContain('unspecified; follow the customer brief');
+    expect(unspecified).toContain('No implicit mechanical-only restriction');
+    expect(unspecified).toContain('lighting or movement only when supported by the customer brief');
+    expect(unspecified).not.toContain('No powered electronics.');
+    expect(unspecified).toContain('unengineered conceptual intent');
+    expect(proposalImagePrompt('physical', 'mechanical')).toContain('No powered electronics.');
+  });
+});
+
+describe('stylized collectible-toy visual language', () => {
+  it.each(['world', 'physical'] as const)('preserves toy-like charm instead of a luxury maquette in %s', stage => {
+    for (const prompt of [proposalDesignPrompt(stage), proposalImagePrompt(stage)]) {
+      expect(prompt).toContain('oversized meaningful brand-specific icons');
+      expect(prompt).toContain('tiny charming characters');
+      expect(prompt).toContain('curved connected story paths');
+      expect(prompt).toContain('luxury architectural maquette');
+    }
+    expect(proposalDesignPrompt('physical')).toContain('premium stylized resin/vinyl collectible-toy appearance');
+    expect(proposalDesignPrompt('physical')).toContain('visual language rather than a committed material or manufacturing process');
+    expect(proposalDesignPrompt('physical')).toContain('tactile matte/gloss colour blocking');
   });
 });

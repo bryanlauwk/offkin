@@ -9,7 +9,7 @@ describe('Illustrative marketing artwork', () => {
   it('keeps all application copy in accessible HTML', () => {
     render(<ProposalMarketing/>);
     expect(screen.getByRole('heading', { name: 'Small objects. Bigger possibilities.' })).toBeInTheDocument();
-    for (const name of ['Collectible stories', 'Campaign editions', 'Physical experiences']) {
+    for (const name of ['From IP to “I Want That”', 'Give People Something To Talk About', 'Make It LIVE']) {
       expect(screen.getByRole('heading', { name })).toBeInTheDocument();
     }
     expect(screen.getByText(/Illustrative concepts from our visual direction/)).toBeInTheDocument();
