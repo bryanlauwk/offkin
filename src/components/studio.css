@@ -115,3 +115,6 @@
 @media(prefers-reduced-motion:reduce){.ox *{transition:none!important;animation:none!important}}
 .ox-match svg{flex-shrink:0}
 @media(max-width:720px){.ox-search button span{display:none}.ox-search button{padding:0;width:48px}}
+.op-request-dialog{font-family:Manrope,'DM Sans',sans-serif;border-radius:24px}
+.op-request-dialog button[type=submit]{background:#1b1a17;color:#f6f1e7;border-radius:999px;min-height:50px;padding:0 24px}
+.op-request-dialog button[type=submit]:hover:not(:disabled){background:#d9573b}
