@@ -1,0 +1,1 @@
+- Website reading tries the pinned direct reader first and only falls back to Firecrawl for blocked/unreadable/empty/secure/timeout failures, after the same URL and public-DNS validation, re-validating the final URL and keeping the byte/excerpt ceilings. Why: improve reach without weakening SSRF or size limits.
