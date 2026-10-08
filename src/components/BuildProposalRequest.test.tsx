@@ -63,7 +63,7 @@ describe('Local quote and build-proposal handoff',()=>{
     if(action==='new revision')view.rerender(<BuildProposalRequest brief="New chosen direction"/>);
     if(action==='generation starts')view.rerender(<BuildProposalRequest brief="Old direction" disabled/>);
     expect(signal.aborted).toBe(true);await act(async()=>resolve({html:'stale',missing:[],embedded:4}));expect(URL.createObjectURL).not.toHaveBeenCalled();
-    if(action==='escape'){expect(trigger).toHaveFocus();fireEvent.click(trigger);expect(screen.queryByText(/Request draft downloaded/)).not.toBeInTheDocument();}
+    if(action==='escape'){await waitFor(()=>expect(trigger).toHaveFocus());fireEvent.click(trigger);expect(screen.queryByText(/Request draft downloaded/)).not.toBeInTheDocument();}
   });
   it('clears a prepared partial result when request notes change and requires a new snapshot',async()=>{
     vi.spyOn(exporter,'prepareProposalRequest').mockResolvedValue({html:'partial',missing:['Packaging missing'],embedded:3});URL.createObjectURL=vi.fn();
