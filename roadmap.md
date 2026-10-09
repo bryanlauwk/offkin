@@ -1,5 +1,9 @@
 # Roadmap
 
+- [ ] Achievement-led homepage with original paired imagery and clear physical-edition scope
+- [ ] Functional local achievement / future-goal wizard and preserved business/proposal routes
+- [ ] Homepage regression tests and desktop/mobile checks; source only, no deployment
+
 - [x] Implement isolated paired-design manifest, gates, deterministic prompts and refinement identity checks
 - [x] Add safe offline review journey and collectible-first legacy presentation
 - [x] Test four distinct brand fixtures and compatibility; document backend activation blockers
