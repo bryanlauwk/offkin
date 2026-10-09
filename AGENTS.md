@@ -1,6 +1,6 @@
 # Project architecture
 
-- OFFKIN’s public experience is a conversation-first brand-world co-creation journey for business/marketing buyers, with personal collectibles as a secondary use. Preserve the exact headline: “Your business DNA. Made collectible.”
+- Keep the achievement homepage and local wizard separate from the existing capability-gated brand studio (`/?studio=brand`); saved and legacy route dispatch takes precedence. Why: conversion exploration must work without triggering generation or changing saved contracts.
 - Read public logo, logo-link, and site-title values from `site_settings`; existing admin controls remain authoritative. Preserve later server-side admin-auth fixes.
 - Airbnb/A24/Tesla studies are unofficial creative references, not client work or available products. Why: reference imagery must not imply verified customer results.
 - Keep live v10 four-stage generation, reference capability and strict saved-data readers intact; show collectible first and supporting studies in disclosures without relabelling world art as a paired card. Preserve v9/v8 routes. Why: presentation must not break lineage or restore.
@@ -11,7 +11,7 @@
 -Before release, run tests, type checks, build and mocked generation contracts, then inspect desktop/mobile layouts and perform bounded authorized live world → physical generation, refinement, restore and share checks. Do not claim public readiness from a GET health check alone.
 
 - Proposal assets save independently. Persist partial progress, resume missing stages, preserve the accepted complete version during revisions, and switch atomically when its full dependency closure is ready. Stop, double-click, navigation and restore must not trigger stale generation or overwrite newer state.
-- The public home is a brand-first invited-buyer journey; completed concepts lead to a private server-validated proposal request saved for password-protected owner review. Public generation is enabled (owner-authorized); the readiness check still gates the Generate button. Why: make the commercial handoff real without exposing buyer details or implying email delivery or purchase.
+- Only actual complete saved concepts enter the existing private server-validated proposal request. Local achievement briefs have their own versioned storage namespace and cannot provide asset IDs or submit as generated concepts. Why: illustrative previews must not bypass lineage or imply an order.
 
 - Preserve the campaign lines “From IP to “I Want That””, “Give People Something To Talk About”, and “Make It LIVE”, alongside the exact existing headline. Use the note: “Concept preview. Final design, functionality and pricing confirmed during the build proposal.”
 - World illustration language may draw on fine black outlines, warm ivory, restrained connecting accent routes, dense navigable isometric collage, playful scale shifts and tiny everyday scenes. Translate into premium stylized collectible forms, not realistic miniature property developments. Do not copy the supplied book composition/characters or impose yellow/Japan on all brands.
