@@ -4,6 +4,11 @@
 
 @layer base {
   :root {
+    --offkin-ivory: #faf6ee;
+    --offkin-ink: #191916;
+    --offkin-coral: #b95e52;
+    --offkin-yellow: #d7b84b;
+    --offkin-line: #d5cec3;
     --background: 225 100% 98%;
     --foreground: 222 24% 18%;
 
