@@ -1,5 +1,9 @@
 # Roadmap
 
+- [x] Implement isolated paired-design manifest, gates, deterministic prompts and refinement identity checks
+- [x] Add safe offline review journey and collectible-first legacy presentation
+- [x] Test four distinct brand fixtures and compatibility; document backend activation blockers
+
 - [x] Simple mode: hide refinement composer / Edit details on results
 - [x] Showcase page (/showcase) with regenerated Airbnb/A24/Tesla studies + home teaser
 - [x] Home cleanup: yellow paused banner replaced, fine print folded into Details

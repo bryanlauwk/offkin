@@ -31,6 +31,14 @@ const props = (overrides:Partial<ProposalBoardProps>={}):ProposalBoardProps => (
 afterEach(cleanup);
 
 describe('ProposalBoard',()=>{
+  it('adapts legacy v10 without changing asset lineage or inventing a story-card image',()=>{
+    const {container}=render(<ProposalBoard {...props()} pairedPresentation/>);
+    expect(container.querySelector('.pb-hero-grid img')?.getAttribute('src')).toBe('https://images.example/physical.png');
+    expect(container.querySelector('.pb-supporting')).not.toHaveAttribute('open');
+    fireEvent.click(screen.getByText('Supporting studies & proposed interaction'));
+    expect(container.querySelectorAll('img')).toHaveLength(4);
+    expect(screen.getByText(/not a newly generated paired story card/)).toBeInTheDocument();
+  });
   it('shows four distinct complete generated visuals with real component and packaging sections',()=>{
     const input=props();const {container}=render(<ProposalBoard {...input}/>);
     expect(screen.getAllByRole('img').map(img=>img.getAttribute('src'))).toEqual(['world','physical','details','packaging'].map(stage=>`https://images.example/${stage}.png`));
