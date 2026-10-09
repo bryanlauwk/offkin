@@ -22,9 +22,9 @@ export async function runOfflinePair(manifest:FrozenPairedDesign,runtime:Offline
   }
   if (progress.assets.collectible && progress.assets.collectible.id===progress.assets['story-card']?.id) failure('The pair must contain distinct assets.');
   for (const artifact of artifacts) {
-    signal.throwIfAborted();if (progress.assets[artifact.role]) continue;
+    if (signal.aborted) throw new DOMException('Stopped. Accepted pair is unchanged.', 'AbortError');if (progress.assets[artifact.role]) continue;
     const source=artifact.role==='story-card'?progress.assets.collectible||null:null;
-    const asset=await runtime.render(artifact,source,signal);signal.throwIfAborted();
+    const asset=await runtime.render(artifact,source,signal);if (signal.aborted) throw new DOMException('Stopped. Accepted pair is unchanged.', 'AbortError');
     if (!validAsset(asset,artifact,source) || source?.id===asset.id) failure('Returned artifact lost identity or lineage. Accepted version is unchanged.');
     progress={...progress,assets:{...progress.assets,[artifact.role]:{...asset}}};
     await runtime.persist(JSON.parse(JSON.stringify(progress)));
