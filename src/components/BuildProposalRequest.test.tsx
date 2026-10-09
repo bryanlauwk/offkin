@@ -22,7 +22,7 @@ function fill() {
 }
 async function pair(): Promise<[PairedConcept, PairedConcept]> {
   const manifest = await freezePairedDesign(makePairedFixture());
-  const asset = (index: 0 | 1): PairedConcept => ({ contractVersion: 'offkin-paired-live-v1', assetVersion: 'offkin-paired-assets-v1', manifest, specDigest: manifest.manifestId, sourceCollectibleId: index ? pairIds[0] : null, id: pairIds[index], role: index ? 'story-card' : 'collectible', title: index ? 'Story card' : 'Collectible', brand: 'Fable Finch', story: 'A linked brand story.', sourceUrl: 'https://example.com' });
+  const asset = (index: 0 | 1): PairedConcept => ({ contractVersion: 'offkin-paired-live-v1', assetVersion: 'offkin-paired-assets-v1', manifest, specDigest: manifest.manifestId, sourceCollectibleId: index ? pairIds[0] : null, id: pairIds[index], role: index ? 'story-card' : 'collectible', title: index ? 'Story card' : 'Collectible', brand: 'Fable Finch', story: 'A linked brand story.', image: 'data:image/png;base64,AA==', sourceUrl: 'https://example.com', sourceTitle: 'Fixture source' });
   return [asset(0), asset(1)];
 }
 beforeEach(() => invoke.mockReset());
