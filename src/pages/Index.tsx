@@ -25,7 +25,7 @@ export default function Index() {
   useEffect(() => {
     if (explicitRoute || PROPOSAL_GENERATION_PAUSED) return;
     const abort = new AbortController(); let live = true; setProposalReady(null);
-    const timer = window.setTimeout(() => { if (live) { abort.abort(); setProposalReady(false); } }, 6000);
+    const timer = window.setTimeout(() => { if (live) { abort.abort(); setProposalReady(false); setPairedReady(false); } }, 6000);
     Promise.all([supportsProposalGeneration(abort.signal),supportsPairedGeneration(abort.signal)]).then(([proposal,paired]) => { if (live && !abort.signal.aborted) {setProposalReady(proposal);setPairedReady(paired);} }).catch(() => { if (live && !abort.signal.aborted) {setProposalReady(false);setPairedReady(false);} }).finally(() => clearTimeout(timer));
     return () => { live = false; clearTimeout(timer); abort.abort(); };
   }, [explicitRoute]);
