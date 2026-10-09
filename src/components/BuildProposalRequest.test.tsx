@@ -3,6 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BuildProposalRequest from './BuildProposalRequest';
 import type { ExportSnapshot } from '@/lib/proposal-export';
 import type { PairedConcept } from '../../supabase/functions/generate-concept/paired-design';
+import { freezePairedDesign } from '../../supabase/functions/generate-concept/paired-design';
+import { makePairedFixture } from '@/test/paired-design-fixture';
 
 const invoke = vi.fn();
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { functions: { invoke: (...args: unknown[]) => invoke(...args) } } }));
@@ -18,8 +20,9 @@ function fill() {
   fireEvent.change(screen.getByLabelText(/Work email/i), { target: { value: 'ana@example.com' } });
   fireEvent.change(screen.getByLabelText(/Company/i), { target: { value: 'Acme' } });
 }
-function pair(): [PairedConcept, PairedConcept] {
-  const asset = (index: 0 | 1): PairedConcept => ({ id: pairIds[index], role: index ? 'story-card' : 'collectible', title: index ? 'Story card' : 'Collectible', brand: 'Fable Finch', story: 'A linked brand story.', sourceUrl: 'https://example.com' });
+async function pair(): Promise<[PairedConcept, PairedConcept]> {
+  const manifest = await freezePairedDesign(makePairedFixture());
+  const asset = (index: 0 | 1): PairedConcept => ({ contractVersion: 'offkin-paired-live-v1', assetVersion: 'offkin-paired-assets-v1', manifest, specDigest: manifest.manifestId, sourceCollectibleId: index ? pairIds[0] : null, id: pairIds[index], role: index ? 'story-card' : 'collectible', title: index ? 'Story card' : 'Collectible', brand: 'Fable Finch', story: 'A linked brand story.', sourceUrl: 'https://example.com' });
   return [asset(0), asset(1)];
 }
 beforeEach(() => invoke.mockReset());
@@ -51,7 +54,7 @@ describe('Proposal request handoff', () => {
   });
   it('submits exactly the two linked paired asset IDs', async () => {
     invoke.mockResolvedValue({ data: { ok: true, reference: 'OFF-PAIR12' }, error: null });
-    render(<BuildProposalRequest brief="b" pairedAssets={pair()} />);
+    render(<BuildProposalRequest brief="b" pairedAssets={await pair()} />);
     fireEvent.click(screen.getByRole('button', { name: /Request a Quote/ }));
     fill();
     fireEvent.submit(screen.getByLabelText(/Company/i).closest('form') as HTMLFormElement);
