@@ -19,7 +19,8 @@ function fill() {
   fireEvent.change(screen.getByLabelText(/Company/i), { target: { value: 'Acme' } });
 }
 function pair(): [PairedConcept, PairedConcept] {
-  return pairIds.map((id, index) => ({ id, role: index ? 'story-card' : 'collectible', title: index ? 'Story card' : 'Collectible', brand: 'Fable Finch', story: 'A linked brand story.', sourceUrl: 'https://example.com', imageUrl: `https://example.com/${id}.png` })) as [PairedConcept, PairedConcept];
+  const asset = (index: 0 | 1): PairedConcept => ({ id: pairIds[index], role: index ? 'story-card' : 'collectible', title: index ? 'Story card' : 'Collectible', brand: 'Fable Finch', story: 'A linked brand story.', sourceUrl: 'https://example.com', imageUrl: `https://example.com/${pairIds[index]}.png` });
+  return [asset(0), asset(1)];
 }
 beforeEach(() => invoke.mockReset());
 
