@@ -25,7 +25,8 @@ export async function handlePaired(input:unknown,req:Request,runtime:PairedRunti
   const result=await runtime.ai('chat/completions',{model:runtime.textModel,messages:[{role:'system',content:planPrompt},{role:'user',content:JSON.stringify({brand:input.brand,lens:input.lens,exactText:input.exactText,context:input.context,evidence:website})}],response_format:{type:'json_object'},max_tokens:5000});active();
   const planned=plannerResult(result);if(!record(planned))throw new CanvasFailure(502,'The paired design plan was incomplete. No image was generated.');
   const evidence={id:'public-source',kind:'public-source' as const,text:website.excerpt,sourceUrl:website.url,sourceTitle:website.title};
-  const design:PairedDesignInput={brand:input.brand,exactText:input.exactText,evidence:[evidence],evidenceConfirmed:true,lens:input.lens as PairedDesignInput['lens'],truth:planned.truth as PairedDesignInput['truth'],symbolism:planned.symbolism as string,plan:planned.plan as PairedDesignInput['plan'],card:planned.card as PairedDesignInput['card'],localizedBrandAccents:planned.localizedBrandAccents as string[]};
+  const plannedTruth=record(planned.truth)&&typeof planned.truth.quote==='string'?{evidenceId:evidence.id,quote:planned.truth.quote}:planned.truth;
+  const design:PairedDesignInput={brand:input.brand,exactText:input.exactText,evidence:[evidence],evidenceConfirmed:true,lens:input.lens as PairedDesignInput['lens'],truth:plannedTruth as PairedDesignInput['truth'],symbolism:planned.symbolism as string,plan:planned.plan as PairedDesignInput['plan'],card:planned.card as PairedDesignInput['card'],localizedBrandAccents:planned.localizedBrandAccents as string[]};
   const issues=validatePairedDesign(design);if(issues.length)return runtime.respond({issues,message:issues.map(issue=>issue.message).join(' ')},422);
   const manifest=await freezePairedDesign(design);return runtime.respond({manifest,evidence:website});
  }
