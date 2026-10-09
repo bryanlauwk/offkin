@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'npm:zod@3.25.76';
 import { PAIRED_CONTRACT_VERSION, parsePairedStoredManifest } from '../_shared/paired-design.ts';
-import { PROPOSAL_CONTRACT_VERSION, parseProposalManifest } from '../generate-concept/proposal.ts';
+import { PROPOSAL_CONTRACT_VERSION, parseProposalManifest } from '../_shared/proposal.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
