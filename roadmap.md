@@ -14,3 +14,5 @@
 - [x] Private proposal request form and admin review inbox
 - [x] Tests and desktop/mobile verification for the redesigned journey
 - [x] Rebuild studio from scratch with generation re-enabled
+- [x] Add the live paired contract, evidence confirmation, linked rendering and two-asset proposal handoff
+- [ ] Deploy paired backend, run one bounded A24 acceptance, verify restore and publish — pending release checks
