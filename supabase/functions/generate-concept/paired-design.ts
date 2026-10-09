@@ -1,6 +1,20 @@
 /** Source-only next contract. Not imported by the deployed v10 handler. No network or provider calls. */
 export const PAIRED_DESIGN_VERSION = 'offkin-paired-design-v1' as const;
 export const PAIRED_PROMPT_VERSION = 'offkin-paired-prompts-v1' as const;
+export const PAIRED_CONTRACT_VERSION = 'offkin-paired-live-v1' as const;
+export const PAIRED_ASSET_VERSION = 'offkin-paired-assets-v1' as const;
+export const PAIRED_ROLES = ['collectible', 'story-card'] as const;
+export type PairedRole = typeof PAIRED_ROLES[number];
+export const PAIRED_CAPABILITIES = {
+  paired: true,
+  paired_contract_version: PAIRED_CONTRACT_VERSION,
+  paired_design_version: PAIRED_DESIGN_VERSION,
+  paired_prompt_version: PAIRED_PROMPT_VERSION,
+  paired_asset_version: PAIRED_ASSET_VERSION,
+  paired_roles: [...PAIRED_ROLES],
+  paired_story_lenses: ['signature-product', 'signature-action', 'brand-belief'],
+  paired_generation_phase: 'creative-preview',
+} as const;
 export const STORY_LENSES = ['signature-product', 'signature-action', 'brand-belief'] as const;
 export type StoryLens = typeof STORY_LENSES[number];
 export const REFINEMENT_TARGETS = ['silhouette', 'brand-symbolism', 'mechanism', 'story-card-composition'] as const;
@@ -141,4 +155,50 @@ export async function refinePairedDesign(previous: FrozenPairedDesign,target: Re
     }
   }
   return freezePairedDesign(next);
+}
+
+export type PairedStoredManifest = {
+  contractVersion: typeof PAIRED_CONTRACT_VERSION;
+  assetVersion: typeof PAIRED_ASSET_VERSION;
+  role: PairedRole;
+  manifest: FrozenPairedDesign;
+  specDigest: string;
+  sourceCollectibleId: string | null;
+};
+export type PairedConcept = PairedStoredManifest & {
+  id: string; brand: string; title: string; story: string; image: string;
+  sourceUrl: string; sourceTitle: string;
+};
+const storedPrefix = 'OFFKIN_PAIRED_V1\n';
+const conceptId = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+export async function isPairedStoredManifest(value: unknown): Promise<value is PairedStoredManifest> {
+  if (!record(value) || !exactKeys(value,['contractVersion','assetVersion','role','manifest','specDigest','sourceCollectibleId']) ||
+    value.contractVersion!==PAIRED_CONTRACT_VERSION || value.assetVersion!==PAIRED_ASSET_VERSION || !PAIRED_ROLES.includes(value.role as PairedRole) ||
+    typeof value.specDigest!=='string' || !/^[a-f0-9]{64}$/.test(value.specDigest) || !(value.sourceCollectibleId===null || conceptId(value.sourceCollectibleId)) ||
+    !await verifyFrozenDesign(value.manifest as FrozenPairedDesign)) return false;
+  const expected=await buildPairedArtifacts(value.manifest as FrozenPairedDesign);
+  const artifact=expected.find(item=>item.role===value.role);
+  return Boolean(artifact && artifact.specDigest===value.specDigest && (value.role==='collectible' ? value.sourceCollectibleId===null : conceptId(value.sourceCollectibleId)));
+}
+export async function serializePairedStoredManifest(value: PairedStoredManifest): Promise<string> {
+  if (!await isPairedStoredManifest(value)) throw new PairedDesignError([{gate:'pair',code:'unsafe-storage',message:'The linked concept could not be saved safely.'}]);
+  return storedPrefix+canonicalDesign(value);
+}
+export async function parsePairedStoredManifest(value: string): Promise<PairedStoredManifest|null> {
+  if (!value.startsWith(storedPrefix) || value.length>48000) return null;
+  try { const parsed=JSON.parse(value.slice(storedPrefix.length)); return await isPairedStoredManifest(parsed)?parsed:null; } catch { return null; }
+}
+export async function restorePairedRow(row:{id:string;brand:string;title:string;story:string;image_path:string;prompt_version:string;interaction?:string;source_url?:string;source_title?:string},image:string):Promise<PairedConcept|null>{
+  const stored=await parsePairedStoredManifest(row.story);
+  if(!stored||row.prompt_version!==PAIRED_CONTRACT_VERSION||row.brand!==stored.manifest.brand||!conceptId(row.id)||!row.image_path.startsWith(row.id+'.'))return null;
+  return {...stored,id:row.id,brand:row.brand,title:row.title,story:stored.manifest.card.narrative,image,sourceUrl:row.source_url||'',sourceTitle:row.source_title||''};
+}
+export function isPairedConcept(value:unknown):value is PairedConcept{
+  if(!record(value)||!conceptId(value.id)||typeof value.brand!=='string'||typeof value.title!=='string'||typeof value.story!=='string'||typeof value.image!=='string'||typeof value.sourceUrl!=='string'||typeof value.sourceTitle!=='string')return false;
+  try{if(new URL(value.image).protocol!=='https:')return false;}catch{return false;}
+  return value.contractVersion===PAIRED_CONTRACT_VERSION&&value.assetVersion===PAIRED_ASSET_VERSION&&PAIRED_ROLES.includes(value.role as PairedRole)&&record(value.manifest)&&typeof value.specDigest==='string';
+}
+export function hasPairedCapabilities(value:unknown):boolean{
+  if(!record(value)||value.ready!==true||!record(value.capabilities))return false;const c=value.capabilities;
+  return c.paired===true&&c.paired_contract_version===PAIRED_CONTRACT_VERSION&&c.paired_design_version===PAIRED_DESIGN_VERSION&&c.paired_prompt_version===PAIRED_PROMPT_VERSION&&c.paired_asset_version===PAIRED_ASSET_VERSION&&c.paired_generation_phase==='creative-preview'&&canonicalDesign(c.paired_roles)===canonicalDesign(PAIRED_ROLES)&&canonicalDesign(c.paired_story_lenses)===canonicalDesign(STORY_LENSES);
 }
