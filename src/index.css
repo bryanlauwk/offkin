@@ -235,3 +235,6 @@
   }
 }
 
+
+/* Scoped achievement-commerce tokens; legacy studio themes remain independent. */
+.ah-theme{--background:40 38% 96%;--foreground:50 10% 12%;--primary:9 46% 44%;--primary-foreground:40 40% 98%;--secondary:42 26% 91%;--secondary-foreground:50 10% 12%;--muted:42 26% 91%;--muted-foreground:45 8% 40%;--accent:43 48% 55%;--accent-foreground:50 10% 12%;--border:40 18% 80%;--input:40 18% 75%;--ring:9 46% 44%;--ah-teal:164 18% 34%;--ah-hero:38 32% 91%;--ah-shadow:0 14px 40px hsl(var(--foreground)/.08);background:hsl(var(--background));color:hsl(var(--foreground));font-family:'DM Sans',Arial,sans-serif;letter-spacing:0;line-height:1.6}
