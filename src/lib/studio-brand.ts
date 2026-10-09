@@ -6,7 +6,7 @@ export const studioBrand = {
   headline: 'Your business DNA. Made collectible.',
   description: 'An independent creative studio connecting art, technology and commercial purpose through physical stories. Co-create curious brand worlds. Let the story choose the form.',
   // Browser-tab / search-result wording. The on-page headline above stays exact.
-  pageTitleSuffix: 'Illustrated Brand Worlds, Made Collectible',
-  metaDescription: 'OFFKIN｜异趣伙伴 is an independent creative studio. Co-create an illustrated brand world and shape it into a physical collectible concept — prototyped offline.',
+  pageTitleSuffix: 'Turn Your Achievements Into Collectibles',
+  metaDescription: 'Celebrate personal and business milestones with OFFKIN collectible concepts and illustrated story cards. Physical editions require design review and agreed pricing.',
 };
 export const displayStudioName = (name: string) => name === studioBrand.name ? studioBrand.displayName : name;
