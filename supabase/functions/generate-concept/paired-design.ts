@@ -171,7 +171,7 @@ export type PairedConcept = PairedStoredManifest & {
 };
 const storedPrefix = 'OFFKIN_PAIRED_V1\n';
 const conceptId = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-export async function isPairedStoredManifest(value: unknown): Promise<value is PairedStoredManifest> {
+export async function isPairedStoredManifest(value: unknown): Promise<boolean> {
   if (!record(value) || !exactKeys(value,['contractVersion','assetVersion','role','manifest','specDigest','sourceCollectibleId']) ||
     value.contractVersion!==PAIRED_CONTRACT_VERSION || value.assetVersion!==PAIRED_ASSET_VERSION || !PAIRED_ROLES.includes(value.role as PairedRole) ||
     typeof value.specDigest!=='string' || !/^[a-f0-9]{64}$/.test(value.specDigest) || !(value.sourceCollectibleId===null || conceptId(value.sourceCollectibleId)) ||
@@ -186,7 +186,7 @@ export async function serializePairedStoredManifest(value: PairedStoredManifest)
 }
 export async function parsePairedStoredManifest(value: string): Promise<PairedStoredManifest|null> {
   if (!value.startsWith(storedPrefix) || value.length>48000) return null;
-  try { const parsed=JSON.parse(value.slice(storedPrefix.length)); return await isPairedStoredManifest(parsed)?parsed:null; } catch { return null; }
+  try { const parsed=JSON.parse(value.slice(storedPrefix.length)); return await isPairedStoredManifest(parsed)?parsed as PairedStoredManifest:null; } catch { return null; }
 }
 export async function restorePairedRow(row:{id:string;brand:string;title:string;story:string;image_path:string;prompt_version:string;interaction?:string;source_url?:string;source_title?:string},image:string):Promise<PairedConcept|null>{
   const stored=await parsePairedStoredManifest(row.story);
