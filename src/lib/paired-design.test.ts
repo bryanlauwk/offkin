@@ -1,0 +1,37 @@
+import { describe,expect,it,vi } from 'vitest';
+import { makePairedFixture,pairedBrandFixtures } from '../test/paired-design-fixture';
+import { HOUSE_STYLE,PAIRED_DESIGN_VERSION,buildPairedArtifacts,canonicalDesign,editorialWarnings,freezePairedDesign,isPairedDesignInput,refinePairedDesign,validateArtifactPair,validatePairedDesign,verifyFrozenDesign } from '../../supabase/functions/generate-concept/paired-design';
+
+describe('offline paired design gates',()=>{
+  it.each(pairedBrandFixtures.map((f,i)=>[f.brand,i] as const))('%s has one distinct signature silhouette and a linked causal story',async(_brand,index)=>{
+    const input=makePairedFixture(index); expect(validatePairedDesign(input)).toEqual([]);
+    const frozen=await freezePairedDesign(input); expect(frozen.version).toBe(PAIRED_DESIGN_VERSION);
+    expect(frozen.houseStyle).toEqual(HOUSE_STYLE); expect(frozen.card.narrative).toContain(input.plan.object);
+    expect(frozen.card.narrative).toContain(input.truth.quote); expect(frozen.card.frames).toBe(2);
+    const outputs=await buildPairedArtifacts(frozen); expect(outputs.map(a=>a.role)).toEqual(['collectible','story-card']);
+    expect(outputs[0].identityId).toBe(outputs[1].identityId);expect(outputs[0].specDigest).toBe(outputs[1].specDigest);
+    expect(validateArtifactPair(frozen,outputs,outputs)).toEqual([]);expect(await verifyFrozenDesign(frozen)).toBe(true);
+  });
+  it('produces four distinct identities/silhouettes but exactly one house style without network calls',async()=>{
+    const fetch=vi.spyOn(globalThis,'fetch');
+    try {const manifests=await Promise.all(pairedBrandFixtures.map((_,i)=>freezePairedDesign(makePairedFixture(i))));
+      expect(new Set(manifests.map(m=>m.plan.silhouette)).size).toBe(4);expect(new Set(manifests.map(m=>m.identityId)).size).toBe(4);
+      expect(new Set(manifests.map(m=>canonicalDesign(m.houseStyle))).size).toBe(1);expect(fetch).not.toHaveBeenCalled();
+    } finally {fetch.mockRestore();}
+  });
+  it('requires confirmed evidence before lock',async()=>{const input=makePairedFixture();input.evidenceConfirmed=false;expect(validatePairedDesign(input).map(i=>i.code)).toContain('confirm-evidence');await expect(freezePairedDesign(input)).rejects.toThrow('Confirm the evidence');});
+  it('rejects invented facts not present in the selected evidence',()=>{const input=makePairedFixture();input.truth.quote='Invented award-winning claim';expect(validatePairedDesign(input).map(i=>i.code)).toContain('unsupported-truth');});
+  it('allows missing website only with explicitly labelled owner evidence',()=>{const input=makePairedFixture();expect(isPairedDesignInput(input)).toBe(true);input.evidence[0].kind='public-source';expect(isPairedDesignInput(input)).toBe(false);});
+  it('keeps a public citation URL and quoted excerpt in the frozen spec',async()=>{const input=makePairedFixture();input.evidence[0]={...input.evidence[0],kind:'public-source',sourceUrl:'https://example.org/about',sourceTitle:'Fixture source'};const frozen=await freezePairedDesign(input);expect(frozen.evidence[0].sourceUrl).toBe('https://example.org/about');});
+  it.each(['generic shoebox','cluttered diorama','pasted-on logo','perpetual motion','working miniature engine'])('rejects %s before prompts',async(form)=>{const input=makePairedFixture();input.plan.silhouette=form;await expect(freezePairedDesign(input)).rejects.toThrow('Replace generic props');});
+  it('rejects incoherent input/output part and purchased-part references',()=>{const input=makePairedFixture();if(!input.plan.mechanic)throw new Error('Fixture needs mechanic');input.plan.mechanic.inputPartId='body';input.plan.mechanic.purchasedPartIds=['missing'];const codes=validatePairedDesign(input).map(i=>i.code);expect(codes).toContain('action-part-mismatch');expect(codes).toContain('missing-purchased-part');});
+  it('permits display-only but rejects unexplained moving parts',()=>{const input=makePairedFixture();input.plan.mechanic=null;expect(validatePairedDesign(input).map(i=>i.code)).toContain('unassigned-motion');input.plan.components[1].role='symbol';expect(validatePairedDesign(input)).toEqual([]);});
+  it('makes 3–5 components an editorial warning, not a hard rule',async()=>{const input=makePairedFixture();for(let i=0;i<3;i++)input.plan.components.push({id:`symbol-${i}`,name:'Relief',form:'Integrated story relief',role:'symbol'});expect(editorialWarnings(input)).toHaveLength(1);expect((await freezePairedDesign(input)).plan.components).toHaveLength(6);});
+  it('rejects more than one mechanic and unexpected schema fields',()=>{const input=makePairedFixture();expect(isPairedDesignInput({...input,plan:{...input.plan,mechanics:[input.plan.mechanic,input.plan.mechanic]}})).toBe(false);});
+  it('preserves exact supplied text including whitespace and Unicode; freezes nested parts',async()=>{const input=makePairedFixture();const frozen=await freezePairedDesign(input);expect(frozen.exactText).toBe('  Your business DNA. Made collectible.\n异趣伙伴  ');expect(Object.isFrozen(frozen.plan.components[0])).toBe(true);input.plan.object='Changed';expect(frozen.plan.object).toBe('heat press mini clicker');});
+  it('uses canonical ordering, version-separated IDs and rejects tampering',async()=>{const input=makePairedFixture();const a=await freezePairedDesign(input);const b=await freezePairedDesign(Object.fromEntries(Object.entries(input).reverse()) as typeof input);expect(a.manifestId).toBe(b.manifestId);expect(a.identityId).toMatch(/^offkin-[a-f0-9]{64}$/);const changed=JSON.parse(JSON.stringify(a));changed.plan.silhouette='Another silhouette';expect(await verifyFrozenDesign(changed)).toBe(false);await expect(buildPairedArtifacts(changed)).rejects.toThrow('locked design changed');});
+  it('rejects mixed identities or altered prompts',async()=>{const a=await freezePairedDesign(makePairedFixture());const b=await freezePairedDesign(makePairedFixture(1));const expected=await buildPairedArtifacts(a);const other=await buildPairedArtifacts(b);expect(validateArtifactPair(a,[expected[0],other[1]],expected)[0].code).toBe('pair-mismatch');expect(validateArtifactPair(a,[expected[0],{...expected[1],prompt:'Unbounded new direction'}],expected)).toHaveLength(1);});
+  it('card composition keeps approved identity but gets a new pair/cache ID',async()=>{const a=await freezePairedDesign(makePairedFixture());const b=await refinePairedDesign(a,'story-card-composition',3);expect(b.identityId).toBe(a.identityId);expect(b.manifestId).not.toBe(a.manifestId);expect(b.plan).toEqual(a.plan);expect(b.card.narrative).toBe(a.card.narrative);expect(b.card.frames).toBe(3);});
+  it('requires explicit approval for a new silhouette identity and retains the old one',async()=>{const a=await freezePairedDesign(makePairedFixture());await expect(refinePairedDesign(a,'silhouette','A rounded press arch')).rejects.toThrow('Explicitly approve');const b=await refinePairedDesign(a,'silhouette','A rounded press arch',true);expect(b.identityId).not.toBe(a.identityId);expect(a.plan.silhouette).toContain('C-shaped');});
+  it('mechanism edits require the full plan/narrative dependency closure',async()=>{const a=await freezePairedDesign(makePairedFixture());await expect(refinePairedDesign(a,'mechanism','add gears',true)).rejects.toThrow('complete related plan');});
+});
