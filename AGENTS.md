@@ -15,5 +15,5 @@
 
 - Preserve the campaign lines “From IP to “I Want That””, “Give People Something To Talk About”, and “Make It LIVE”, alongside the exact existing headline. Use the note: “Concept preview. Final design, functionality and pricing confirmed during the build proposal.”
 - World illustration language may draw on fine black outlines, warm ivory, restrained connecting accent routes, dense navigable isometric collage, playful scale shifts and tiny everyday scenes. Translate into premium stylized collectible forms, not realistic miniature property developments. Do not copy the supplied book composition/characters or impose yellow/Japan on all brands.
-- Paired schema/prompts/offline runner remain isolated from live v10; offline review never calls research/generation APIs or writes legacy sessions. Why: review a new contract without paid calls or saved-data corruption.
+- Live paired generation uses a separate additive contract, private saved lineage and capability gate; v8/v9/v10 remain unchanged. Why: activation must not reinterpret old concepts or weaken restore safety.
 - Paired prompts derive from one immutable versioned manifest; product refinements require approval and dependency closure, card-frame changes retain identity. Why: prevent cross-output drift and unintended replacement.

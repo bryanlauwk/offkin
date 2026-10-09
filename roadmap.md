@@ -14,3 +14,5 @@
 - [x] Private proposal request form and admin review inbox
 - [x] Tests and desktop/mobile verification for the redesigned journey
 - [x] Rebuild studio from scratch with generation re-enabled
+- [x] Add the live paired contract, evidence confirmation, linked rendering and two-asset proposal handoff
+- [ ] Complete A24 acceptance, restore check and publish — BLOCKED: three bounded planner attempts failed strict schema validation; no images were generated
