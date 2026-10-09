@@ -109,6 +109,17 @@ export async function handleRequest(req: Request) {
     }
    });
   }
+  if(paired){
+   return await handlePaired(input,req,{db,enabled:Boolean(key)&&enabled&&pairedEnabled(),textModel:Deno.env.get('BRICK_TEXT_MODEL')||'google/gemini-3-flash-preview',imageModel:proposalImageModel(),ai,hash,respond:json,deliver,
+    reserve:async()=>{
+     if(!dailyLimitsEnforced())return;
+     const client=await hash(service+':'+(req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()||'unknown'));
+     const {data:allowed,error:limitError}=await db.rpc('reserve_brick_generation',{client_key:client});
+     if(limitError)throw new Failure(503,'Linked concept generation is temporarily unavailable.');
+     if(!allowed)throw new Failure(429,'Today’s generation limit has been reached. Completed linked artifacts are saved.');
+    }
+   });
+  }
   if(canvas){
    const request=validateCanvasRequest(input);
    const ensureActive=()=>{if(req.signal.aborted)throw new Failure(499,'The request was cancelled.');};
