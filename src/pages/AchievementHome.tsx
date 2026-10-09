@@ -22,7 +22,7 @@ export default function AchievementHome() {
   const [settings, setSettings] = useState({ title: studioBrand.name, logo: '', link: '/' });
   useEffect(() => {
     let active = true;
-    supabase.from('site_settings').select('key,value').then(({ data }) => {
+    Promise.resolve(supabase.from('site_settings').select('key,value')).then(({ data }) => {
       if (!active || !data) return;
       const next = { title: studioBrand.name, logo: '', link: '/' };
       for (const setting of data) {
