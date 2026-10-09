@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'npm:zod@3.25.76';
+import { PAIRED_CONTRACT_VERSION, parsePairedStoredManifest } from '../generate-concept/paired-design.ts';
+import { PROPOSAL_CONTRACT_VERSION, parseProposalManifest } from '../generate-concept/proposal.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -20,10 +22,10 @@ const RequestSchema = z.object({
   brandName: z.string().trim().min(1).max(120),
   website: z.string().trim().max(300).default(''),
   conceptStory: z.string().trim().min(1).max(6000),
-  assetIds: z.array(z.string().uuid()).length(4).refine(ids => new Set(ids).size === 4),
+  assetIds: z.array(z.string().uuid()).min(2).max(4).refine(ids => new Set(ids).size === ids.length),
   conceptSummary: z.object({
     title: z.string().trim().max(240),
-    stages: z.array(z.object({ stage: z.enum(['world', 'physical', 'details', 'packaging']), title: z.string().trim().max(240) })).length(4),
+    stages: z.array(z.object({ stage: z.enum(['world', 'physical', 'details', 'packaging', 'collectible', 'story-card']), title: z.string().trim().max(240) })).min(2).max(4),
   }),
   websiteField: z.string().max(0).optional(),
 });
@@ -50,10 +52,20 @@ Deno.serve(async request => {
   if (limitError) return json({ error: 'The request could not be saved right now.' }, 503);
   if (!reserved) return json({ error: 'Too many requests were submitted today. Please try again tomorrow.' }, 429);
 
-  const { data: assets, error: assetError } = await db.from('brick_concepts').select('id').in('id', input.assetIds);
-  if (assetError || !assets || assets.length !== 4 || new Set(assets.map(asset => asset.id)).size !== 4) {
+  const { data: assets, error: assetError } = await db.from('brick_concepts').select('id,brand,story,prompt_version').in('id', input.assetIds);
+  if (assetError || !assets || assets.length !== input.assetIds.length || new Set(assets.map(asset => asset.id)).size !== input.assetIds.length) {
     return json({ error: 'Restore the complete concept before submitting this request.' }, 400);
   }
+  const paired = assets.length === 2 && assets.every(asset => asset.prompt_version === PAIRED_CONTRACT_VERSION);
+  const legacy = assets.length === 4 && assets.every(asset => asset.prompt_version === PROPOSAL_CONTRACT_VERSION && Boolean(parseProposalManifest(asset.story)));
+  if (paired) {
+    const manifests = await Promise.all(assets.map(asset => parsePairedStoredManifest(asset.story)));
+    const collectible = manifests.find(manifest => manifest?.role === 'collectible');
+    const card = manifests.find(manifest => manifest?.role === 'story-card');
+    if (!collectible || !card || collectible.manifest.manifestId !== card.manifest.manifestId || collectible.specDigest !== card.specDigest || card.sourceCollectibleId !== assets[manifests.indexOf(collectible)]?.id || assets.some(asset => asset.brand !== input.brandName)) {
+      return json({ error: 'Restore the complete matching concept pair before submitting this request.' }, 400);
+    }
+  } else if (!legacy) return json({ error: 'Restore a complete verified concept before submitting this request.' }, 400);
   const { data, error } = await db.from('proposal_requests').insert({
     buyer_name: input.buyerName,
     work_email: input.workEmail.toLowerCase(),

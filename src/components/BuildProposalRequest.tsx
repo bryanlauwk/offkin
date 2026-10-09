@@ -4,11 +4,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { CONCEPT_PREVIEW_NOTE, type ExportSnapshot } from '@/lib/proposal-export';
+import type { PairedConcept } from '../../supabase/functions/generate-concept/paired-design';
 
 type Fields = { buyerName: string; workEmail: string; company: string; quantity: string; timing: string; budget: string; priorities: string; websiteField: string };
 const empty: Fields = { buyerName: '', workEmail: '', company: '', quantity: '', timing: '', budget: '', priorities: '', websiteField: '' };
 
-export default function BuildProposalRequest({ brief, snapshot, disabled = false, hasPending = false }: { brief: string; snapshot?: ExportSnapshot; disabled?: boolean; hasPending?: boolean }) {
+export default function BuildProposalRequest({ brief, snapshot, pairedAssets, disabled = false, hasPending = false }: { brief: string; snapshot?: ExportSnapshot; pairedAssets?: [PairedConcept,PairedConcept]; disabled?: boolean; hasPending?: boolean }) {
   const [open, setOpen] = useState(false);
   const [fields, setFields] = useState(empty);
   const [submitting, setSubmitting] = useState(false);
@@ -17,10 +18,11 @@ export default function BuildProposalRequest({ brief, snapshot, disabled = false
   const trigger = useRef<HTMLButtonElement>(null);
   const key = snapshot?.key || brief;
   useEffect(() => { setError(''); setReference(''); setOpen(false); }, [key]);
-  const assets = useMemo(() => snapshot?.stages.flatMap(item => item.asset ? [{ stage: item.stage, id: item.asset.id, title: item.asset.title, brand: item.asset.brand, story: item.asset.story, website: item.asset.sourceUrl }] : []) || [], [snapshot]);
-  const complete = assets.length === 4 && !hasPending;
+  const assets = useMemo(() => pairedAssets?.map(asset=>({stage:asset.role,id:asset.id,title:asset.title,brand:asset.brand,story:asset.story,website:asset.sourceUrl})) || snapshot?.stages.flatMap(item => item.asset ? [{ stage: item.stage, id: item.asset.id, title: item.asset.title, brand: item.asset.brand, story: item.asset.story, website: item.asset.sourceUrl }] : []) || [], [pairedAssets,snapshot]);
+  const paired=Boolean(pairedAssets);
+  const complete = (paired ? assets.length === 2 : assets.length === 4) && !hasPending;
   const brand = assets[0]?.brand || 'Your brand';
-  const story = assets.find(asset => asset.stage === 'physical')?.story || assets[0]?.story || brief.slice(0, 6000);
+  const story = assets.find(asset => asset.stage === 'physical'||asset.stage==='collectible')?.story || assets[0]?.story || brief.slice(0, 6000);
   const website = assets.find(asset => asset.website)?.website || '';
   function update(name: keyof Fields, value: string) { setFields(current => ({ ...current, [name]: value })); setError(''); }
   async function submit(event: React.FormEvent) {
@@ -31,7 +33,7 @@ export default function BuildProposalRequest({ brief, snapshot, disabled = false
     const { data, error: requestError } = await supabase.functions.invoke('proposal-request', { body: {
       ...fields, brandName: brand, website, conceptStory: story,
       assetIds: assets.map(asset => asset.id),
-      conceptSummary: { title: assets.find(asset => asset.stage === 'physical')?.title || brand, stages: assets.map(asset => ({ stage: asset.stage, title: asset.title })) },
+       conceptSummary: { title: assets.find(asset => asset.stage === 'physical'||asset.stage==='collectible')?.title || brand, stages: assets.map(asset => ({ stage: asset.stage, title: asset.title })) },
     } });
     setSubmitting(false);
     if (requestError || !data?.ok || typeof data.reference !== 'string') { setError(data?.error || 'Your request could not be saved. Nothing was submitted; please try again.'); return; }
@@ -40,7 +42,7 @@ export default function BuildProposalRequest({ brief, snapshot, disabled = false
   return <section className="op-build-request" aria-labelledby="op-build-request-title">
     <div><p className="op-eyebrow">NEXT / BUILD PROPOSAL</p><h2 id="op-build-request-title">Take the idea into the real world.</h2><p>Tell the studio what success looks like. We’ll review the concept, then scope materials, mechanisms, prototype, timing and price.</p></div>
     <Button ref={trigger} className="op-primary" disabled={disabled || !complete} onClick={() => { setError(''); setOpen(true); }}>Request a Quote &amp; Build Proposal<ArrowRight aria-hidden="true"/></Button>
-    {!complete && <p className="op-subtle">Complete and restore all four concept sections before requesting a build proposal.</p>}
+    {!complete && <p className="op-subtle">Complete and restore the linked concept before requesting a build proposal.</p>}
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="op-dialog op-request-dialog" onCloseAutoFocus={event => { event.preventDefault(); trigger.current?.focus(); }}>
       {reference ? <div className="op-request-success"><span><Check aria-hidden="true"/></span><DialogHeader><DialogTitle>Request saved for review.</DialogTitle><DialogDescription>Your request is in the OFFKIN review inbox. No order has been placed and no email was sent.</DialogDescription></DialogHeader><strong>{reference}</strong><p>Keep this reference for your conversation with the studio.</p><Button className="op-primary" onClick={() => setOpen(false)}>Done</Button></div> : <form onSubmit={submit}>
         <DialogHeader><DialogTitle>Request a Quote &amp; Build Proposal</DialogTitle><DialogDescription>Review the chosen concept, then leave your contact and project direction.</DialogDescription></DialogHeader>
